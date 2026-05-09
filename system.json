@@ -10,7 +10,7 @@
   },
   "url": "https://github.com/Lexi-Alice/peasant-core",
   "manifest": "https://raw.githubusercontent.com/Lexi-Alice/peasant-core/main/system.json",
-  "download": "https://github.com/Lexi-Alice/peasant-core/archive/refs/heads/main.zip",
+  "download":  "https://github.com/Lexi-Alice/peasant-core/releases/latest/download/peasant-core-release.zip",
   "relationships": {
     "requires": [
       {
