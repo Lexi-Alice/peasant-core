@@ -1,7 +1,7 @@
 {
   "id": "peasant-core",
   "title": "Peasant Core",
-  "description": "A system for FoundryVTT, based on the Peasant Core RPG by AshenWolf.",
+  "description": "A system for FoundryVTT, based on the Peasant Core RPG by AshenWolf. Ashenwolf is reachable at willsonw.author@gmail.com.",
   "version": "1.1.0",
   "compatibility": {
     "minimum": "13",
