@@ -1,0 +1,710 @@
+<div class="actor-sheet" tabindex="0">
+  <div class="character-header pc-character-banner{{#if hasCustomIdentitySelection}} has-custom-popovers{{/if}}">
+    <div class="pc-banner-identity">
+    {{#if @root.editable}}
+      <input type="text" name="name" value="{{actor.name}}" class="character-name pc-banner-name-input" placeholder="Character Name" />
+    {{else}}
+      <div class="character-name pc-banner-title">{{actor.name}}</div>
+    {{/if}}
+
+    <div class="pc-banner-subtitle{{#if @root.editable}} is-editing{{/if}}">
+    {{#if @root.editable}}
+      <div class="character-field-popover">
+        <select name="system.race" class="character-field">
+          <option value="Human" {{#if (eq actor.system.race "Human")}} selected{{/if}}>Human</option>
+          <option value="Eve" {{#if (eq actor.system.race "Eve")}} selected{{/if}}>Eve</option>
+          <option value="Taru" {{#if (eq actor.system.race "Taru")}} selected{{/if}}>Taru</option>
+          <option value="Tarfel" {{#if (eq actor.system.race "Tarfel")}} selected{{/if}}>Tarfel</option>
+          <option value="Lupine" {{#if (eq actor.system.race "Lupine")}} selected{{/if}}>Lupine</option>
+          <option value="Ursa" {{#if (eq actor.system.race "Ursa")}} selected{{/if}}>Ursa</option>
+          <option value="Leon" {{#if (eq actor.system.race "Leon")}} selected{{/if}}>Leon</option>
+          <option value="Doomi" {{#if (eq actor.system.race "Doomi")}} selected{{/if}}>Doomi</option>
+          <option value="Skeever" {{#if (eq actor.system.race "Skeever")}} selected{{/if}}>Skeever</option>
+          <option value="Custom" {{#if customRaceSelected}} selected{{/if}}>Custom</option>
+        </select>
+        {{#if customRaceSelected}}
+          <input type="text" name="system.customRace" class="character-field-popover-input" value="{{actor.system.customRace}}" placeholder="Custom race" />
+        {{/if}}
+      </div>
+    {{else}}
+      <span class="pc-banner-meta-item">{{displayRace}}</span>
+    {{/if}}
+    
+    {{#if @root.editable}}
+      <div class="character-field-popover">
+        <select name="system.origin" class="character-field">
+          <option value="French Republic" {{#if (eq actor.system.origin "French Republic")}} selected{{/if}}>French Republic</option>
+          <option value="United Kingdom of Great Britain and Ireland" {{#if (eq actor.system.origin "United Kingdom of Great Britain and Ireland")}} selected{{/if}}>United Kingdom of Great Britain and Ireland</option>
+          <option value="Habsburg Monarchy" {{#if (eq actor.system.origin "Habsburg Monarchy")}} selected{{/if}}>Habsburg Monarchy</option>
+          <option value="Kingdom of Prussia" {{#if (eq actor.system.origin "Kingdom of Prussia")}} selected{{/if}}>Kingdom of Prussia</option>
+          <option value="Kingdom of Sweden" {{#if (eq actor.system.origin "Kingdom of Sweden")}} selected{{/if}}>Kingdom of Sweden</option>
+          <option value="Russian Empire" {{#if (eq actor.system.origin "Russian Empire")}} selected{{/if}}>Russian Empire</option>
+          <option value="Ottoman Empire" {{#if (eq actor.system.origin "Ottoman Empire")}} selected{{/if}}>Ottoman Empire</option>
+          <option value="Denmark-Norway" {{#if (eq actor.system.origin "Denmark-Norway")}} selected{{/if}}>Denmark-Norway</option>
+          <option value="Kingdom of Spain" {{#if (eq actor.system.origin "Kingdom of Spain")}} selected{{/if}}>Kingdom of Spain</option>
+          <option value="Hearthless" {{#if (eq actor.system.origin "Hearthless")}} selected{{/if}}>Hearthless</option>
+          <option value="Starborn" {{#if (eq actor.system.origin "Starborn")}} selected{{/if}}>Starborn</option>
+          <option value="Atlantis" {{#if (eq actor.system.origin "Atlantis")}} selected{{/if}}>Atlantis</option>
+          <option value="Winter" {{#if (eq actor.system.origin "Winter")}} selected{{/if}}>Winter</option>
+          <option value="Port Noon" {{#if (eq actor.system.origin "Port Noon")}} selected{{/if}}>Port Noon</option>
+          <option value="Custom" {{#if customOriginSelected}} selected{{/if}}>Custom</option>
+        </select>
+        {{#if customOriginSelected}}
+          <input type="text" name="system.customOrigin" class="character-field-popover-input" value="{{actor.system.customOrigin}}" placeholder="Custom origin" />
+        {{/if}}
+      </div>
+    {{else}}
+      <span class="pc-banner-meta-item">{{displayOrigin}}</span>
+    {{/if}}
+    
+    {{#if @root.editable}}
+      <div class="character-field-popover">
+        <select name="system.specificOrigin" class="character-field">
+          <option value="Soldier" {{#if (eq actor.system.specificOrigin "Soldier")}} selected{{/if}}>Soldier</option>
+          <option value="Merchant" {{#if (eq actor.system.specificOrigin "Merchant")}} selected{{/if}}>Merchant</option>
+          <option value="Noble" {{#if (eq actor.system.specificOrigin "Noble")}} selected{{/if}}>Noble</option>
+          <option value="Fate-Bound" {{#if (eq actor.system.specificOrigin "Fate-Bound")}} selected{{/if}}>Fate-Bound</option>
+          <option value="Adventurer" {{#if (eq actor.system.specificOrigin "Adventurer")}} selected{{/if}}>Adventurer</option>
+          <option value="Wanderer" {{#if (eq actor.system.specificOrigin "Wanderer")}} selected{{/if}}>Wanderer</option>
+          <option value="Scoundrel" {{#if (eq actor.system.specificOrigin "Scoundrel")}} selected{{/if}}>Scoundrel</option>
+          <option value="Pirate" {{#if (eq actor.system.specificOrigin "Pirate")}} selected{{/if}}>Pirate</option>
+          <option value="Commoner" {{#if (eq actor.system.specificOrigin "Commoner")}} selected{{/if}}>Commoner</option>
+          <option value="Tradesman" {{#if (eq actor.system.specificOrigin "Tradesman")}} selected{{/if}}>Tradesman</option>
+          <option value="Innkeep" {{#if (eq actor.system.specificOrigin "Innkeep")}} selected{{/if}}>Inkeep</option>
+          <option value="Apprentice" {{#if (eq actor.system.specificOrigin "Apprentice")}} selected{{/if}}>Apprentice</option>
+          <option value="Exile" {{#if (eq actor.system.specificOrigin "Exile")}} selected{{/if}}>Exile</option>
+          <option value="Covenant" {{#if (eq actor.system.specificOrigin "Covenant")}} selected{{/if}}>Covenant</option>
+          <option value="Umbral Explorer" {{#if (eq actor.system.specificOrigin "Umbral Explorer")}} selected{{/if}}>Umbral Explorer</option>
+          <option value="Bandit" {{#if (eq actor.system.specificOrigin "Bandit")}} selected{{/if}}>Bandit</option>
+          <option value="Deprived" {{#if (eq actor.system.specificOrigin "Deprived")}} selected{{/if}}>Deprived</option>
+          <option value="Scholar" {{#if (eq actor.system.specificOrigin "Scholar")}} selected{{/if}}>Scholar</option>
+          <option value="Bureaucrat" {{#if (eq actor.system.specificOrigin "Bureaucrat")}} selected{{/if}}>Bureaucrat</option>
+          <option value="Engineer" {{#if (eq actor.system.specificOrigin "Engineer")}} selected{{/if}}>Engineer</option>
+          <option value="Priest" {{#if (eq actor.system.specificOrigin "Priest")}} selected{{/if}}>Priest</option>
+          <option value="Custom" {{#if customSpecificOriginSelected}} selected{{/if}}>Custom</option>
+        </select>
+        {{#if customSpecificOriginSelected}}
+          <input type="text" name="system.customSpecificOrigin" class="character-field-popover-input" value="{{actor.system.customSpecificOrigin}}" placeholder="Custom specific origin" />
+        {{/if}}
+      </div>
+    {{else}}
+      <span class="pc-banner-meta-item">{{displaySpecificOrigin}}</span>
+    {{/if}}
+    </div>
+    </div>
+
+    {{#if owner}}
+      <div class="pc-banner-rest-actions sheet-header-buttons" aria-label="Rest actions">
+        <div class="pc-banner-rest-button-row">
+          <button type="button" class="pc-banner-rest-button short-rest gold-button" data-action="rest" data-type="short" data-rest-type="short" data-tooltip="Short Rest" title="Short Rest" aria-label="Short Rest">
+            <i class="fa-solid fa-utensils" inert aria-hidden="true"></i>
+          </button>
+          <button type="button" class="pc-banner-rest-button long-rest gold-button" data-action="rest" data-type="long" data-rest-type="long" data-tooltip="Long Rest" title="Long Rest" aria-label="Long Rest">
+            <i class="fa-solid fa-campground" inert aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="pc-banner-ap-meter" role="meter" aria-label="Action points" aria-valuemin="0" aria-valuenow="{{apBar.value}}" aria-valuemax="{{apBar.max}}">
+          <div class="pc-banner-ap-label{{#if @root.editable}} is-editing{{/if}}">
+            {{#if @root.editable}}
+              <input type="number" name="system.ap.value" value="{{actor.system.ap.value}}" min="0" inputmode="numeric" class="pc-banner-ap-input" aria-label="Current AP">
+              <span>/</span>
+              <input type="number" name="system.ap.max" value="{{actor.system.ap.max}}" min="0" inputmode="numeric" class="pc-banner-ap-input" aria-label="Maximum AP">
+              <span>AP</span>
+            {{else}}
+              {{apBar.value}} / {{apBar.max}} AP
+            {{/if}}
+          </div>
+          <div class="pc-banner-ap-track">
+            <div class="pc-banner-ap-fill" style="width: {{apBar.pct}}%;"></div>
+          </div>
+        </div>
+      </div>
+    {{/if}}
+
+  </div>
+
+  <div class="hp-section{{#if artPanelCollapsed}} pc-art-collapsed{{/if}}">
+    <aside class="pc-art-panel{{#if artPanelCollapsed}} is-collapsed{{/if}}" aria-label="Character art panel">
+      <button type="button" class="pc-art-panel-toggle" title="{{#if artPanelCollapsed}}Show Character Art{{else}}Hide Character Art{{/if}}" aria-label="{{#if artPanelCollapsed}}Show Character Art{{else}}Hide Character Art{{/if}}" aria-expanded="{{#if artPanelCollapsed}}false{{else}}true{{/if}}">
+        <i class="fas fa-caret-{{#if artPanelCollapsed}}right{{else}}left{{/if}}" aria-hidden="true"></i>
+      </button>
+      <div class="pc-art-panel-frame">
+        <div class="portrait-container">
+          <div class="character-portrait {{#if @root.editable}}editing{{/if}}">
+            <img src="{{actor.img}}" alt="{{actor.name}}" style="transform: translate(-50%, -50%) translate({{actor.system.portraitOffsetX}}px, {{actor.system.portraitOffsetY}}px) scale({{actor.system.portraitScale}});" />
+            {{#if @root.editable}}
+              <div class="portrait-controls">
+                <button type="button" class="portrait-control-btn select-portrait-btn" title="Change Portrait" aria-label="Change Portrait">
+                  <i class="fas fa-image" aria-hidden="true"></i>
+                </button>
+              </div>
+            {{/if}}
+          </div>
+          <div class="pc-portrait-lozenges" aria-label="Movement and initiative">
+            {{#if @root.editable}}
+              <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" aria-label="Initiative">
+                <span class="pc-portrait-lozenge-frame">
+                  <input type="text" data-field="system.initiative" class="pc-portrait-lozenge-input" value="{{actor.system.initiative}}" aria-label="Initiative">
+                </span>
+                <span class="pc-portrait-lozenge-label">Initiative</span>
+              </label>
+              <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" title="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
+                <span class="pc-portrait-lozenge-frame">
+                  <input type="number" data-field="system.movement" class="pc-portrait-lozenge-input" value="{{actor.system.movement}}" min="0" inputmode="numeric" aria-label="Movement">
+                </span>
+                <span class="pc-portrait-lozenge-label">Movement</span>
+              </label>
+            {{else}}
+              <button type="button" class="pc-portrait-lozenge pc-portrait-lozenge-button initiative-clickable" data-action="rollInitiative" title="Roll Initiative" aria-label="Roll Initiative">
+                <span class="pc-portrait-lozenge-frame">
+                  <span class="pc-portrait-lozenge-value">{{portraitStats.initiative}}</span>
+                </span>
+                <span class="pc-portrait-lozenge-label">Initiative</span>
+              </button>
+              <div class="pc-portrait-lozenge" title="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
+                <span class="pc-portrait-lozenge-frame">
+                  <span class="pc-portrait-lozenge-value">{{portraitStats.movement}}</span>
+                </span>
+                <span class="pc-portrait-lozenge-label">Movement</span>
+              </div>
+            {{/if}}
+          </div>
+          <div class="pc-portrait-hp" role="group" aria-label="Hit points">
+            <div class="pc-portrait-hp-heading">
+              <span class="pc-portrait-hp-heading-main">
+                <span>Hit Points</span>
+                <span class="pc-portrait-hp-actions" aria-label="Hit point actions">
+                  <button type="button" class="pc-portrait-hp-action damage-toggle" title="Take Damage" aria-label="Take Damage">
+                    <i class="fas fa-swords" aria-hidden="true"></i>
+                  </button>
+                  <button type="button" class="pc-portrait-hp-action heal-toggle" title="Heal" aria-label="Heal">
+                    <i class="fas fa-heart" aria-hidden="true"></i>
+                  </button>
+                  <button type="button" class="pc-portrait-hp-action pc-hp-grid-open" title="Open HP Grid" aria-label="Open HP Grid">
+                    <i class="fas fa-th" aria-hidden="true"></i>
+                  </button>
+                </span>
+              </span>
+              <span class="pc-portrait-hp-heading-side">THP</span>
+              <span class="pc-portrait-hp-heading-side">BHP</span>
+            </div>
+            <div class="pc-portrait-hp-composite">
+              <div class="pc-portrait-hp-main">
+                <div class="pc-portrait-hp-fill" style="width: {{hpBar.healthPct}}%;"></div>
+                <span class="pc-portrait-hp-label">
+                  <span class="value">{{hpBar.healthValue}}</span>
+                  <span class="separator">/</span>
+                  <span class="max">{{hpBar.healthMax}}</span>
+                </span>
+              </div>
+              <label class="pc-portrait-hp-side pc-portrait-hp-temp" title="Temporary HP">
+                <input type="number" class="pc-portrait-hp-input pc-portrait-thp-input" value="{{#if hpBar.tempValue}}{{hpBar.tempValue}}{{/if}}" min="0" inputmode="numeric" placeholder="0" aria-label="Temporary HP">
+              </label>
+              <label class="pc-portrait-hp-side pc-portrait-hp-bolstered" title="Bolstered HP max {{hpBar.bolsteredMax}}">
+                <input type="number" class="pc-portrait-hp-input pc-portrait-bhp-input" value="{{#if hpBar.bolsteredValue}}{{hpBar.bolsteredValue}}{{/if}}" min="0" max="{{hpBar.bolsteredMax}}" inputmode="numeric" placeholder="0" aria-label="Bolstered HP">
+              </label>
+            </div>
+          </div>
+          {{#if stressBars.anyVisible}}
+          <div class="pc-portrait-stress-bars" aria-label="Stress summary">
+            {{#if stressBars.firstRowVisible}}
+            <div class="pc-portrait-stress-row {{#if stressBars.firstRowSingle}}is-single{{/if}}">
+              {{#if stressBars.physical.show}}
+              <div class="pc-portrait-stress-bar-wrapper">
+                <div class="pc-portrait-stress-heading">
+                  <span class="pc-portrait-stress-heading-main">
+                    <span>Physical</span>
+                    <span class="pc-portrait-stress-actions" aria-label="Physical stress actions">
+                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="physical" title="Take Physical Stress" aria-label="Take Physical Stress">
+                        <i class="fas fa-swords" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="physical" title="Heal Physical Stress" aria-label="Heal Physical Stress">
+                        <i class="fas fa-heart" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="physical" title="Open Physical Stress Grid" aria-label="Open Physical Stress Grid">
+                        <i class="fas fa-th" aria-hidden="true"></i>
+                      </button>
+                    </span>
+                  </span>
+                  {{#if @root.editable}}
+                    <span class="pc-portrait-stress-max-edit">
+                      <input type="number" class="pc-portrait-stress-count-input" data-stress-type="physical" value="{{stressBars.physical.count}}" min="0" inputmode="numeric" aria-label="Physical stress columns">
+                    </span>
+                  {{else}}
+                    <span>{{stressBars.physical.totalSeverity}} / {{stressBars.physical.maxSeverity}}</span>
+                  {{/if}}
+                </div>
+                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="physical" title="Left-click to take 1 physical stress. Right-click to heal 1 physical stress.">
+                  {{#each stressBars.physical.segments as |segment|}}
+                    <div class="pc-stress-bar-section pc-stress-bar-section-{{segment.key}}" data-stress-type="physical" data-stress-section="{{segment.key}}">
+                      <div class="pc-stress-bar-fill" style="width: {{segment.fillPct}}%;"></div>
+                    </div>
+                  {{/each}}
+                </div>
+              </div>
+              {{/if}}
+              {{#if stressBars.mental.show}}
+              <div class="pc-portrait-stress-bar-wrapper">
+                <div class="pc-portrait-stress-heading">
+                  <span class="pc-portrait-stress-heading-main">
+                    <span>Mental</span>
+                    <span class="pc-portrait-stress-actions" aria-label="Mental stress actions">
+                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="mental" title="Take Mental Stress" aria-label="Take Mental Stress">
+                        <i class="fas fa-swords" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="mental" title="Heal Mental Stress" aria-label="Heal Mental Stress">
+                        <i class="fas fa-heart" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="mental" title="Open Mental Stress Grid" aria-label="Open Mental Stress Grid">
+                        <i class="fas fa-th" aria-hidden="true"></i>
+                      </button>
+                    </span>
+                  </span>
+                  {{#if @root.editable}}
+                    <span class="pc-portrait-stress-max-edit">
+                      <input type="number" class="pc-portrait-stress-count-input" data-stress-type="mental" value="{{stressBars.mental.count}}" min="0" inputmode="numeric" aria-label="Mental stress columns">
+                    </span>
+                  {{else}}
+                    <span>{{stressBars.mental.totalSeverity}} / {{stressBars.mental.maxSeverity}}</span>
+                  {{/if}}
+                </div>
+                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="mental" title="Left-click to take 1 mental stress. Right-click to heal 1 mental stress.">
+                  {{#each stressBars.mental.segments as |segment|}}
+                    <div class="pc-stress-bar-section pc-stress-bar-section-{{segment.key}}" data-stress-type="mental" data-stress-section="{{segment.key}}">
+                      <div class="pc-stress-bar-fill" style="width: {{segment.fillPct}}%;"></div>
+                    </div>
+                  {{/each}}
+                </div>
+              </div>
+              {{/if}}
+            </div>
+            {{/if}}
+            {{#if stressBars.general.show}}
+              <div class="pc-portrait-stress-bar-wrapper pc-portrait-stress-bar-wrapper-full">
+                <div class="pc-portrait-stress-heading">
+                  <span class="pc-portrait-stress-heading-main">
+                    <span>General</span>
+                    <span class="pc-portrait-stress-actions" aria-label="General stress actions">
+                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="general" title="Take General Stress" aria-label="Take General Stress">
+                        <i class="fas fa-swords" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="general" title="Heal General Stress" aria-label="Heal General Stress">
+                        <i class="fas fa-heart" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="general" title="Open General Stress Grid" aria-label="Open General Stress Grid">
+                        <i class="fas fa-th" aria-hidden="true"></i>
+                      </button>
+                    </span>
+                  </span>
+                  {{#if @root.editable}}
+                    <span class="pc-portrait-stress-max-edit">
+                      <input type="number" class="pc-portrait-stress-count-input" data-stress-type="general" value="{{stressBars.general.count}}" min="0" inputmode="numeric" aria-label="General stress columns">
+                    </span>
+                  {{else}}
+                    <span>{{stressBars.general.totalSeverity}} / {{stressBars.general.maxSeverity}}</span>
+                  {{/if}}
+                </div>
+                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="general" title="Left-click to take 1 general stress. Right-click to heal 1 general stress.">
+                  {{#each stressBars.general.segments as |segment|}}
+                    <div class="pc-stress-bar-section pc-stress-bar-section-{{segment.key}}" data-stress-type="general" data-stress-section="{{segment.key}}">
+                      <div class="pc-stress-bar-fill" style="width: {{segment.fillPct}}%;"></div>
+                    </div>
+                  {{/each}}
+                </div>
+              </div>
+            {{/if}}
+          </div>
+          {{/if}}
+          {{#if resourceBars.anyVisible}}
+            <div class="pc-portrait-resource-bars" aria-label="Resource summary">
+              {{#if resourceBars.firstRowVisible}}
+                <div class="pc-portrait-resource-row {{#if resourceBars.firstRowSingle}}is-single{{/if}}">
+                  {{#if resourceBars.stamina.show}}
+                    <div class="pc-portrait-resource-bar-wrapper pc-resource-stamina">
+                      <div class="pc-portrait-resource-heading">
+                        <span>Stamina</span>
+                      </div>
+                      <div class="pc-portrait-resource-bar" data-resource="stamina" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.stamina.value}}" aria-valuemax="{{resourceBars.stamina.max}}" title="Stamina {{resourceBars.stamina.value}} / {{resourceBars.stamina.max}}">
+                        <div class="pc-portrait-resource-fill pc-portrait-resource-fill-stamina" style="width: {{resourceBars.stamina.pct}}%;"></div>
+                        <span class="pc-portrait-resource-bar-label">
+                          <span class="pc-portrait-resource-value">{{resourceBars.stamina.value}}</span>
+                          <span class="pc-portrait-resource-separator">/</span>
+                          <span class="pc-portrait-resource-max">{{resourceBars.stamina.max}}</span>
+                        </span>
+                          {{#if @root.editable}}
+                            <input type="number" class="pc-portrait-resource-max-input" data-resource="stamina" value="{{resourceBars.stamina.max}}" min="0" inputmode="numeric" aria-label="Stamina maximum" hidden>
+                          {{else}}
+                            <input type="number" class="pc-portrait-resource-value-input" data-resource="stamina" value="{{resourceBars.stamina.value}}" min="0" max="{{resourceBars.stamina.max}}" inputmode="numeric" aria-label="Stamina current" hidden>
+                          {{/if}}
+                      </div>
+                    </div>
+                  {{/if}}
+                  {{#if resourceBars.attunement.show}}
+                    <div class="pc-portrait-resource-bar-wrapper pc-resource-attunement">
+                      <div class="pc-portrait-resource-heading">
+                        <span>Attunement</span>
+                      </div>
+                      <div class="pc-portrait-resource-bar" data-resource="attunement" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.attunement.value}}" aria-valuemax="{{resourceBars.attunement.max}}" title="Attunement {{resourceBars.attunement.value}} / {{resourceBars.attunement.max}}">
+                        <div class="pc-portrait-resource-fill pc-portrait-resource-fill-attunement" style="width: {{resourceBars.attunement.pct}}%;"></div>
+                        <span class="pc-portrait-resource-bar-label">
+                          <span class="pc-portrait-resource-value">{{resourceBars.attunement.value}}</span>
+                          <span class="pc-portrait-resource-separator">/</span>
+                          <span class="pc-portrait-resource-max">{{resourceBars.attunement.max}}</span>
+                        </span>
+                          {{#if @root.editable}}
+                            <input type="number" class="pc-portrait-resource-max-input" data-resource="attunement" value="{{resourceBars.attunement.max}}" min="0" inputmode="numeric" aria-label="Attunement maximum" hidden>
+                          {{else}}
+                            <input type="number" class="pc-portrait-resource-value-input" data-resource="attunement" value="{{resourceBars.attunement.value}}" min="0" max="{{resourceBars.attunement.max}}" inputmode="numeric" aria-label="Attunement current" hidden>
+                          {{/if}}
+                      </div>
+                    </div>
+                  {{/if}}
+                </div>
+              {{/if}}
+              {{#if resourceBars.secondRowVisible}}
+                <div class="pc-portrait-resource-row {{#if resourceBars.secondRowSingle}}is-single{{/if}}">
+                  {{#if resourceBars.capacity.show}}
+                    <div class="pc-portrait-resource-bar-wrapper pc-resource-capacity">
+                      <div class="pc-portrait-resource-heading">
+                        <span>Capacity</span>
+                      </div>
+                      <div class="pc-portrait-resource-bar" data-resource="capacity" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.capacity.value}}" aria-valuemax="{{resourceBars.capacity.max}}" title="Capacity {{resourceBars.capacity.value}} / {{resourceBars.capacity.max}}">
+                        <div class="pc-portrait-resource-fill pc-portrait-resource-fill-capacity" style="width: {{resourceBars.capacity.pct}}%;"></div>
+                        <span class="pc-portrait-resource-bar-label">
+                          <span class="pc-portrait-resource-value">{{resourceBars.capacity.value}}</span>
+                          <span class="pc-portrait-resource-separator">/</span>
+                          <span class="pc-portrait-resource-max">{{resourceBars.capacity.max}}</span>
+                        </span>
+                          {{#if @root.editable}}
+                            <input type="number" class="pc-portrait-resource-max-input" data-resource="capacity" value="{{resourceBars.capacity.max}}" min="0" inputmode="numeric" aria-label="Capacity maximum" hidden>
+                          {{else}}
+                            <input type="number" class="pc-portrait-resource-value-input" data-resource="capacity" value="{{resourceBars.capacity.value}}" min="0" max="{{resourceBars.capacity.max}}" inputmode="numeric" aria-label="Capacity current" hidden>
+                          {{/if}}
+                      </div>
+                    </div>
+                  {{/if}}
+                  {{#if resourceBars.edge.show}}
+                    <div class="pc-portrait-resource-bar-wrapper pc-resource-edge">
+                      <div class="pc-portrait-resource-heading">
+                        <span>Edge</span>
+                      </div>
+                      <div class="pc-portrait-resource-bar" data-resource="edge" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.edge.value}}" aria-valuemax="{{resourceBars.edge.max}}" title="Edge {{resourceBars.edge.value}} / {{resourceBars.edge.max}}">
+                        <div class="pc-portrait-resource-fill pc-portrait-resource-fill-edge" style="width: {{resourceBars.edge.pct}}%;"></div>
+                        <span class="pc-portrait-resource-bar-label">
+                          <span class="pc-portrait-resource-value">{{resourceBars.edge.value}}</span>
+                          <span class="pc-portrait-resource-separator">/</span>
+                          <span class="pc-portrait-resource-max">{{resourceBars.edge.max}}</span>
+                        </span>
+                          {{#if @root.editable}}
+                            <input type="number" class="pc-portrait-resource-max-input" data-resource="edge" value="{{resourceBars.edge.max}}" min="0" inputmode="numeric" aria-label="Edge maximum" hidden>
+                          {{else}}
+                            <input type="number" class="pc-portrait-resource-value-input" data-resource="edge" value="{{resourceBars.edge.value}}" min="0" max="{{resourceBars.edge.max}}" inputmode="numeric" aria-label="Edge current" hidden>
+                          {{/if}}
+                      </div>
+                    </div>
+                  {{/if}}
+                </div>
+              {{/if}}
+            </div>
+          {{/if}}
+          <div class="halt-section pc-portrait-halt-list {{#if simplifiedHp}}simplified-halt-section{{/if}}">
+            <div class="halt-row">
+              <div class="halt-label-group">
+                <span class="halt-letter {{#if actor.system.hardHead}}hard{{/if}}" data-loc="Head" data-type="halt" title="Head">H</span>
+                <span class="halt-letter {{#if actor.system.hardArms}}hard{{/if}}" data-loc="Arms" data-type="halt" title="Arms">A</span>
+                <span class="halt-letter {{#if actor.system.hardLegs}}hard{{/if}}" data-loc="Legs" data-type="halt" title="Legs">L</span>
+                <span class="halt-letter {{#if actor.system.hardTorso}}hard{{/if}}" data-loc="Torso" data-type="halt" title="Torso">T</span>
+                :
+              </div>
+              {{#if @root.editable}}
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input type="text" name="system.haltValues" value="{{actor.system.haltValues}}" class="halt-input">
+                </div>
+              {{else}}
+                <span class="halt-value">{{#each haltDisplay as |part index|}}<span class="{{#if part.isHard}}hard-val{{/if}}">{{part.value}}</span>{{#unless @last}}/{{/unless}}{{/each}}</span>
+              {{/if}}
+            </div>
+            <div class="halt-row">
+              {{#if @root.editable}}
+                <div class="halt-label-group">
+                  <span class="halt-title" style="margin-right: 4px;">Natural</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardHead}}hard{{/if}}" data-loc="Head" data-type="natural">H</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardArms}}hard{{/if}}" data-loc="Arms" data-type="natural">A</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardLegs}}hard{{/if}}" data-loc="Legs" data-type="natural">L</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardTorso}}hard{{/if}}" data-loc="Torso" data-type="natural">T</span>
+                  <span style="margin-left: 2px;">:</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input type="text" name="system.naturalHaltValues" value="{{actor.system.naturalHaltValues}}" class="halt-input">
+                </div>
+              {{else}}
+                <div class="halt-label-group">
+                  <span class="halt-title" style="margin-right: 4px;">Natural</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardHead}}hard{{/if}}" title="Head">H</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardArms}}hard{{/if}}" title="Arms">A</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardLegs}}hard{{/if}}" title="Legs">L</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardTorso}}hard{{/if}}" title="Torso">T</span>
+                  <span style="margin-left: 2px;">:</span>
+                </div>
+                <span class="halt-value">{{#each naturalHaltDisplay as |part index|}}<span class="{{#if part.isHard}}hard-val{{/if}}">{{part.value}}</span>{{#unless @last}}/{{/unless}}{{/each}}</span>
+              {{/if}}
+            </div>
+            {{#unless simplifiedHp}}
+            <div class="halt-row" style="margin-top: 4px; position: relative; gap: 6px;">
+              <button type="button" class="toggle-wounds-menu">
+                <span>Wound</span>
+              </button>
+              <span class="halt-title">Thresholds:</span>
+              <span class="halt-value {{#if woundThresholdsReduced}}wounded-thresholds{{/if}}">{{woundThresholds}}</span>
+
+              <div class="wounds-menu hidden">
+                <div class="wounds-menu-handle window-header flexrow">
+                  <h4 class="window-title popup-handle-title">Active Wounds</h4>
+                  <button type="button" class="close-wounds header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
+                </div>
+
+                {{#if actor.system.conditions.wounded}}
+                  <div class="wound-tag">
+                    <span>WOUNDED</span>
+                    <button type="button" class="remove-condition" data-condition="wounded">&times;</button>
+                  </div>
+                {{/if}}
+
+                {{#each activeConditions as |cond|}}
+                  <div class="wound-tag">
+                    <span>{{cond.label}}</span>
+                    <button type="button" class="remove-condition" data-condition="{{cond.key}}">&times;</button>
+                  </div>
+                {{/each}}
+
+                {{#unless hasConditions}}
+                  <div class="no-active-wounds" style="font-style: italic; font-size: 11px; text-align: center; padding-top: 4px;">No active wounds</div>
+                {{/unless}}
+
+                <button type="button" class="add-wound-btn" title="Add Wound">
+                  <span style="font-size: 16px;">+</span>
+                </button>
+              </div>
+            </div>
+            {{/unless}}
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="hp-grid-container">
+      <!-- HIDDEN DAMAGE CONTROLS -->
+      <div class="damage-controls hidden">
+          <div class="damage-controls-handle window-header flexrow">
+              <h4 class="window-title popup-handle-title">Take Damage</h4>
+              <button type="button" class="close-damage header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
+          </div>
+          
+          <div style="display: flex; gap: 5px; align-items: center; width: 100%; flex-wrap: nowrap;">
+              <select name="damageType" style="flex: 1; font-size: 11px; padding: 4px; min-width: 80px;">
+                  <option value="blunt">Blunt</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="lethal">Lethal</option>
+                  <option value="critical">Critical</option>
+              </select>
+              <input type="number" name="damageAmount" value="5" min="1" style="flex: 0 0 50px; text-align: center;">
+              <select name="damageLocation" style="flex: 1; font-size: 11px; padding: 4px; min-width: 90px;">
+                  <option value="Head">Head</option>
+                  <option value="Torso" selected>Torso</option>
+                  <option value="RightArm">Right Arm</option>
+                  <option value="LeftArm">Left Arm</option>
+                  <option value="RightLeg">Right Leg</option>
+                  <option value="LeftLeg">Left Leg</option>
+              </select>
+          </div>
+
+          <div style="display: flex; gap: 15px; width: 100%; justify-content: center; margin-top: 4px;">
+              <label title="Ignore HALT and Hard Location (unless Natural)">
+                  <input type="checkbox" name="damageAP">
+                  Armor Pen?
+              </label>
+              <label title="Multiply armor HALT using the actor's Armor Charge multiplier">
+                  <input type="checkbox" name="damageArmorCharge">
+                  Armor Charge?
+              </label>
+          </div>
+
+          <button type="button" class="apply-damage">
+              Apply Damage
+          </button>
+      </div>
+      
+      <!-- HIDDEN HEALING CONTROLS -->
+      <div class="heal-controls hidden">
+          <div class="heal-controls-handle window-header flexrow">
+              <h4 class="window-title popup-handle-title">Heal Damage</h4>
+              <button type="button" class="close-heal header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
+          </div>
+          
+          <div style="display: flex; gap: 5px; align-items: center; width: 100%; flex-wrap: nowrap;">
+              <input type="number" name="healAmount" value="5" min="1" style="flex: 0 0 50px; text-align: center;">
+              <select name="healType" style="flex: 1; font-size: 11px; padding: 4px; min-width: 100px;">
+                  <option value="temporary">Temporary Heal</option>
+                  <option value="greater">Greater Heal</option>
+              </select>
+          </div>
+          
+          <button type="button" class="apply-heal">
+              Apply Healing
+          </button>
+      </div>
+      
+      <!-- HIDDEN STRESS DAMAGE CONTROLS -->
+      <div class="stress-damage-controls hidden">
+          <div class="stress-damage-controls-handle window-header flexrow">
+              <h4 class="window-title popup-handle-title stress-damage-title">Take Stress</h4>
+              <button type="button" class="close-stress-damage header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
+          </div>
+          
+          <input type="number" name="stressAmount" value="1" min="1">
+          
+          <button type="button" class="apply-stress-damage">
+              Apply Stress
+          </button>
+      </div>
+      
+      <!-- HIDDEN STRESS HEALING CONTROLS -->
+      <div class="stress-heal-controls hidden">
+          <div class="stress-heal-controls-handle window-header flexrow">
+              <h4 class="window-title popup-handle-title stress-heal-title">Heal Stress</h4>
+              <button type="button" class="close-stress-heal header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
+          </div>
+          
+          <input type="number" name="stressHealAmount" value="1" min="1">
+          
+          <button type="button" class="apply-stress-heal">
+              Apply Stress Healing
+          </button>
+      </div>
+    </div>
+  <!-- ATTRIBUTES TABLE -->
+  <div class="attributes-resources-container">
+    <div class="left-column">
+      <div class="attributes-table-cluster">
+      <div class="attributes-table pc-hex-attributes">
+        <div class="pc-hex-row pc-hex-score-row" aria-label="Attributes">
+          <div class="pc-attr-hex-card">
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" title="Click to open Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
+            <div class="pc-attr-hex-frame">
+              {{#if @root.editable}}
+                <input type="number" name="system.build" value="{{actor.system.build}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Build score">
+              {{else}}
+                <div class="pc-attr-hex-score">{{actor.system.build}}</div>
+              {{/if}}
+            </div>
+            <button type="button" class="attr-calculated pc-attr-save-pill attr-save-clickable" data-action="rollAttributeSave" data-save="build">{{attributes.buildSave}}</button>
+            <div class="pc-attr-hex-caption">Save</div>
+          </div>
+
+          <div class="pc-attr-hex-card">
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" title="Click to open Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
+            <div class="pc-attr-hex-frame">
+              {{#if @root.editable}}
+                <input type="number" name="system.reflex" value="{{actor.system.reflex}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Reflex score">
+              {{else}}
+                <div class="pc-attr-hex-score">{{actor.system.reflex}}</div>
+              {{/if}}
+            </div>
+            <div class="attr-calculated pc-attr-save-pill pc-attr-reflex-save">
+              <button type="button" class="attr-save-clickable attr-reflex-save-primary" data-action="rollAttributeSave" data-save="reflex">{{attributes.reflexSave}}</button>
+              {{#if @root.editable}}
+                {{#if reflexAoeSaveEnabled}}
+                  <input type="text" name="system.reflexAoeSaveTarget" value="{{reflexAoeSaveTarget}}" class="attr-input-text reflex-aoe-save-input" placeholder="AoE" inputmode="numeric" aria-label="AoE Reflex Save">
+                  <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-remove" title="Remove AoE Reflex Save">-</button>
+                {{else}}
+                  <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-add" title="Add AoE Reflex Save">+</button>
+                {{/if}}
+              {{else}}
+                {{#if reflexAoeSaveDisplay}}
+                  <span class="reflex-aoe-paren">(</span>
+                  <button type="button" class="attr-reflex-aoe-save-clickable" data-action="rollAttributeSave" data-save="reflex" data-tn="{{reflexAoeSaveTn}}" data-save-label="AoE Reflex Save">{{reflexAoeSaveDisplay}}</button>
+                  <span class="reflex-aoe-paren">)</span>
+                {{/if}}
+              {{/if}}
+            </div>
+            <div class="pc-attr-hex-caption">Save</div>
+          </div>
+
+          <div class="pc-attr-hex-card">
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" title="Click to open Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
+            <div class="pc-attr-hex-frame">
+              {{#if @root.editable}}
+                <input type="number" name="system.intuition" value="{{actor.system.intuition}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Intuition score">
+              {{else}}
+                <div class="pc-attr-hex-score">{{actor.system.intuition}}</div>
+              {{/if}}
+            </div>
+            <button type="button" class="attr-calculated pc-attr-save-pill attr-save-clickable" data-action="rollAttributeSave" data-save="intuition">{{attributes.intuitionSave}}</button>
+            <div class="pc-attr-hex-caption">Save</div>
+          </div>
+
+          <div class="pc-attr-hex-card">
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" title="Click to open Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
+            <div class="pc-attr-hex-frame">
+              {{#if @root.editable}}
+                <input type="number" name="system.learn" value="{{actor.system.learn}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Learn score">
+              {{else}}
+                <div class="pc-attr-hex-score">{{actor.system.learn}}</div>
+              {{/if}}
+            </div>
+            <button type="button" class="attr-calculated pc-attr-save-pill attr-save-clickable" data-action="rollAttributeSave" data-save="learn">{{attributes.learnSave}}</button>
+            <div class="pc-attr-hex-caption">Save</div>
+          </div>
+
+          <div class="pc-attr-hex-card">
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" title="Click to open Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
+            <div class="pc-attr-hex-frame">
+              {{#if @root.editable}}
+                <input type="number" name="system.charisma" value="{{actor.system.charisma}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Charisma score">
+              {{else}}
+                <div class="pc-attr-hex-score">{{actor.system.charisma}}</div>
+              {{/if}}
+            </div>
+            <button type="button" class="attr-calculated pc-attr-save-pill attr-save-clickable" data-action="rollAttributeSave" data-save="charisma">{{attributes.charismaSave}}</button>
+            <div class="pc-attr-hex-caption">Save</div>
+          </div>
+        </div>
+
+        <div class="pc-hex-row pc-hex-characteristic-row" aria-label="Characteristics">
+          <div class="pc-characteristic-card characteristic-label {{#if (eq toHitPenaltyTarget 'Strength')}}blessed{{/if}}" data-characteristic="Strength">
+            <div class="pc-characteristic-name">STR</div>
+            <button type="button" class="attr-calculated pc-characteristic-tohit attr-tohit-clickable" data-action="rollAttributeToHit" data-characteristic="Strength">{{attributes.strToHit}}</button>
+          </div>
+          <div class="pc-characteristic-card characteristic-label {{#if (eq toHitPenaltyTarget 'Dexterity')}}blessed{{/if}}" data-characteristic="Dexterity">
+            <div class="pc-characteristic-name">DEX</div>
+            <button type="button" class="attr-calculated pc-characteristic-tohit attr-tohit-clickable" data-action="rollAttributeToHit" data-characteristic="Dexterity">{{attributes.dexToHit}}</button>
+          </div>
+          <div class="pc-characteristic-card characteristic-label {{#if (eq toHitPenaltyTarget 'Mental')}}blessed{{/if}}" data-characteristic="Mental">
+            <div class="pc-characteristic-name">MNT</div>
+            <button type="button" class="attr-calculated pc-characteristic-tohit attr-tohit-clickable" data-action="rollAttributeToHit" data-characteristic="Mental">{{attributes.mntToHit}}</button>
+          </div>
+          <div class="pc-characteristic-card characteristic-label {{#if (eq toHitPenaltyTarget 'Social')}}blessed{{/if}}" data-characteristic="Social">
+            <div class="pc-characteristic-name">SOC</div>
+            <button type="button" class="attr-calculated pc-characteristic-tohit attr-tohit-clickable" data-action="rollAttributeToHit" data-characteristic="Social">{{attributes.socToHit}}</button>
+          </div>
+        </div>
+
+      </div>
+        {{> "systems/peasant-core/templates/actor/parts/character-skills.html" }}
+
+      </div>
+    </div>
+  </div>
+  </div>
+
+  {{> "systems/peasant-core/templates/actor/parts/character-biography.html" }}
+  {{> "systems/peasant-core/templates/actor/parts/character-effects.html" }}
+
+  {{> "systems/peasant-core/templates/actor/parts/character-notable-combats.html" }}
+  {{> "systems/peasant-core/templates/actor/parts/character-advantages.html" }}
+
+  {{> "systems/peasant-core/templates/actor/parts/character-inventory.html" }}
+  {{> "systems/peasant-core/templates/actor/parts/character-settings.html" }}
+
+  {{> "systems/peasant-core/templates/actor/parts/character-blessing-menu.html" }}
+</div>
+

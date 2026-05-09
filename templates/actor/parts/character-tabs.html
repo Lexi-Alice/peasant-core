@@ -1,0 +1,15 @@
+<nav class="pc-sheet-tab-rail tabs tabs-right" data-group="primary" aria-label="Character sheet sections">
+  {{#each sheetTabs as |tab|}}
+    <button
+      type="button"
+      class="pc-sheet-tab-button item control {{tab.cssClass}}"
+      data-action="tab"
+      data-group="{{tab.group}}"
+      data-tab="{{tab.id}}"
+      title="{{tab.label}}"
+      aria-label="{{tab.label}}"
+      aria-pressed="{{#if tab.active}}true{{else}}false{{/if}}">
+      <i class="{{tab.icon}}" aria-hidden="true"></i>
+    </button>
+  {{/each}}
+</nav>

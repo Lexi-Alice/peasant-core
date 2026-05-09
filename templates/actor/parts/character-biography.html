@@ -1,0 +1,213 @@
+<hr class="section-divider pc-tab-detached-divider">
+<div class="sir-section pc-tab-panel pc-biography-tab-panel tab{{#if (eq activeSheetTab "biography")}} active{{/if}}{{#if @root.editable}} sir-section-edit{{/if}}" data-pc-tab-panel="biography" data-group="primary" data-tab="biography">
+  <div class="pc-biography-detail-strip" aria-label="Character details">
+    <label class="pc-bio-field">
+      <span>Faith</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.faith" value="{{actor.system.faith}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.faith}}</div>
+      {{/if}}
+    </label>
+    <label class="pc-bio-field">
+      <span>Eyes</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.eyes" value="{{actor.system.eyes}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.eyes}}</div>
+      {{/if}}
+    </label>
+    <label class="pc-bio-field">
+      <span>Height</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.height" value="{{actor.system.height}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.height}}</div>
+      {{/if}}
+    </label>
+    <label class="pc-bio-field">
+      <span>Gender</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.gender" value="{{actor.system.gender}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.gender}}</div>
+      {{/if}}
+    </label>
+    <label class="pc-bio-field">
+      <span>Hair</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.hair" value="{{actor.system.hair}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.hair}}</div>
+      {{/if}}
+    </label>
+    <label class="pc-bio-field">
+      <span>Weight</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.weight" value="{{actor.system.weight}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.weight}}</div>
+      {{/if}}
+    </label>
+    <label class="pc-bio-field">
+      <span>Skin</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.skin" value="{{actor.system.skin}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.skin}}</div>
+      {{/if}}
+    </label>
+    <label class="pc-bio-field">
+      <span>Age</span>
+      {{#if @root.editable}}
+        <input type="text" name="system.age" value="{{actor.system.age}}">
+      {{else}}
+        <div class="pc-bio-value">{{actor.system.age}}</div>
+      {{/if}}
+    </label>
+  </div>
+
+  <fieldset class="pc-foundry-section pc-biography-details-section">
+    <legend>Biography</legend>
+
+    <div class="pc-biography-notes-grid">
+      <label class="pc-bio-note">
+        <span><i class="fa-solid fa-seedling" aria-hidden="true"></i> Ideals</span>
+        {{#if @root.editable}}
+          <textarea name="system.ideals" rows="2">{{actor.system.ideals}}</textarea>
+        {{else}}
+          <div class="pc-bio-note-value">{{actor.system.ideals}}</div>
+        {{/if}}
+      </label>
+      <label class="pc-bio-note">
+        <span><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i> Personality Traits</span>
+        {{#if @root.editable}}
+          <textarea name="system.personalityTraits" rows="2">{{actor.system.personalityTraits}}</textarea>
+        {{else}}
+          <div class="pc-bio-note-value">{{actor.system.personalityTraits}}</div>
+        {{/if}}
+      </label>
+      <label class="pc-bio-note">
+        <span><i class="fa-solid fa-link" aria-hidden="true"></i> Bonds</span>
+        {{#if @root.editable}}
+          <textarea name="system.bonds" rows="2">{{actor.system.bonds}}</textarea>
+        {{else}}
+          <div class="pc-bio-note-value">{{actor.system.bonds}}</div>
+        {{/if}}
+      </label>
+      <label class="pc-bio-note">
+        <span><i class="fa-solid fa-scroll" aria-hidden="true"></i> Appearance</span>
+        {{#if @root.editable}}
+          <textarea name="system.appearance" rows="2">{{actor.system.appearance}}</textarea>
+        {{else}}
+          <div class="pc-bio-note-value">{{actor.system.appearance}}</div>
+        {{/if}}
+      </label>
+      <label class="pc-bio-note">
+        <span><i class="fa-solid fa-heart-crack" aria-hidden="true"></i> Flaws</span>
+        {{#if @root.editable}}
+          <textarea name="system.flaws" rows="2">{{actor.system.flaws}}</textarea>
+        {{else}}
+          <div class="pc-bio-note-value">{{actor.system.flaws}}</div>
+        {{/if}}
+      </label>
+      <label class="pc-bio-note pc-bio-note-wide">
+        <span><i class="fa-solid fa-feather" aria-hidden="true"></i> Biography</span>
+        {{#if @root.editable}}
+          <div class="inventory-container pc-biography-editor-container">
+            <prose-mirror name="system.biography" class="inventory-editor pc-biography-editor" value="{{actor.system.biography}}" data-document-uuid="{{actor.uuid}}"></prose-mirror>
+          </div>
+        {{else}}
+          <div class="pc-bio-note-value pc-bio-biography-value">{{#if hasBiographyText}}{{{biographyHTML}}}{{/if}}</div>
+        {{/if}}
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset class="pc-foundry-section pc-sir-foundry-section">
+    <legend>SIRs</legend>
+
+    <div class="sir-grid">
+    <div class="sir-item">
+      <label class="sir-label">French Republic</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirFrenchRepublic" value="{{actor.system.sirFrenchRepublic}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirFrenchRepublic}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">United Kingdom of Great Britain and Ireland</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirUnitedKingdom" value="{{actor.system.sirUnitedKingdom}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirUnitedKingdom}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">Habsburg Monarchy</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirHabsburgMonarchy" value="{{actor.system.sirHabsburgMonarchy}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirHabsburgMonarchy}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">Kingdom of Prussia</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirKingdomOfPrussia" value="{{actor.system.sirKingdomOfPrussia}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirKingdomOfPrussia}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">Kingdom of Sweden</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirKingdomOfSweden" value="{{actor.system.sirKingdomOfSweden}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirKingdomOfSweden}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">Russian Empire</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirRussianEmpire" value="{{actor.system.sirRussianEmpire}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirRussianEmpire}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">Ottoman Empire</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirOttomanEmpire" value="{{actor.system.sirOttomanEmpire}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirOttomanEmpire}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">Denmark-Norway</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirDenmarkNorway" value="{{actor.system.sirDenmarkNorway}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirDenmarkNorway}}</div>
+      {{/if}}
+    </div>
+
+    <div class="sir-item">
+      <label class="sir-label">Kingdom of Spain</label>
+      {{#if @root.editable}}
+        <input type="text" name="system.sirKingdomOfSpain" value="{{actor.system.sirKingdomOfSpain}}" class="sir-input" placeholder="+/-">
+      {{else}}
+        <div class="sir-value">{{actor.system.sirKingdomOfSpain}}</div>
+      {{/if}}
+    </div>
+    </div>
+  </fieldset>
+</div>

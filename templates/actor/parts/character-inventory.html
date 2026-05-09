@@ -1,0 +1,16 @@
+<hr class="section-divider pc-tab-detached-divider">
+<div class="pc-tab-panel pc-inventory-tab-panel tab{{#if (eq activeSheetTab "inventory")}} active{{/if}}" data-pc-tab-panel="inventory" data-group="primary" data-tab="inventory">
+  <fieldset class="pc-foundry-section pc-inventory-foundry-section">
+    <legend>Inventory</legend>
+
+    <div class="inventory-container">
+      {{#if @root.editable}}
+        <prose-mirror name="system.inventory" class="inventory-editor" value="{{actor.system.inventory}}" data-document-uuid="{{actor.uuid}}"></prose-mirror>
+      {{else}}
+        <div class="inventory-view" style="min-height: 100px; padding: 0; color: #e0e0e0;">
+          {{{inventoryHTML}}}
+        </div>
+      {{/if}}
+    </div>
+  </fieldset>
+</div>

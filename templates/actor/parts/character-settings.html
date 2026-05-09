@@ -1,0 +1,45 @@
+<hr class="section-divider pc-tab-detached-divider">
+<div class="pc-tab-panel pc-settings-tab-panel tab{{#if (eq activeSheetTab "settings")}} active{{/if}}" data-pc-tab-panel="settings" data-group="primary" data-tab="settings">
+  <header class="pc-settings-header">
+    <h3><i class="fa-solid fa-gear" aria-hidden="true"></i> Peasant Sheet Configuration</h3>
+  </header>
+
+  <div class="pc-settings-groups">
+    {{#each peasantCoreSettingGroups as |group|}}
+      <fieldset class="pc-settings-group">
+        <legend>{{group.label}}</legend>
+
+        {{#each group.settings as |setting|}}
+          <div class="pc-setting-row">
+            <div class="pc-setting-copy">
+              <label class="pc-setting-label" for="{{setting.id}}">{{setting.label}}</label>
+              <p class="pc-setting-hint">{{setting.hint}}</p>
+            </div>
+            <div class="pc-setting-control">
+              {{#if setting.isBoolean}}
+                <input
+                  type="checkbox"
+                  id="{{setting.id}}"
+                  class="pc-sheet-setting-input"
+                  data-pc-setting="{{setting.flagKey}}"
+                  {{#if setting.checked}}checked{{/if}}
+                  {{#unless setting.editable}}disabled{{/unless}}>
+              {{else}}
+                <input
+                  type="number"
+                  id="{{setting.id}}"
+                  class="pc-sheet-setting-input"
+                  data-pc-setting="{{setting.flagKey}}"
+                  value="{{setting.value}}"
+                  step="{{setting.step}}"
+                  inputmode="{{setting.inputMode}}"
+                  {{#if setting.hasMin}}min="{{setting.min}}"{{/if}}
+                  {{#unless setting.editable}}disabled{{/unless}}>
+              {{/if}}
+            </div>
+          </div>
+        {{/each}}
+      </fieldset>
+    {{/each}}
+  </div>
+</div>

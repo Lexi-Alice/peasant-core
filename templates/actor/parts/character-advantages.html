@@ -1,0 +1,45 @@
+<hr class="section-divider pc-tab-detached-divider">
+<div class="pc-tab-panel pc-advantages-tab-panel tab{{#if (eq activeSheetTab "aspects-advantages")}} active{{/if}}" data-pc-tab-panel="aspects-advantages" data-group="primary" data-tab="aspects-advantages">
+  <fieldset class="pc-foundry-section pc-advantages-foundry-section">
+    <legend>Flexible Advantages</legend>
+
+    <div class="advantages-container">
+      {{#if @root.editable}}
+        <ul class="advantages-list">
+          {{#each flexibleAdvantages as |advantage index|}}
+            <li class="advantage-item" data-advantage-index="{{index}}" draggable="true">
+              <span class="advantage-drag-handle" title="Drag to reorder">&bull;</span>
+              <input type="text" value="{{advantage.name}}" class="advantage-input" data-index="{{index}}" placeholder="Enter advantage...">
+              <input type="hidden" class="advantage-description-hidden" value="{{advantage.description}}">
+              <button type="button" class="advantage-desc-btn" title="Edit Description">+</button>
+              <button type="button" class="advantage-delete" title="Delete">&times;</button>
+            </li>
+          {{/each}}
+        </ul>
+        <button type="button" class="add-advantage-btn">+ Add Advantage</button>
+      {{else}}
+        <div class="advantages-list-view" style="padding: 10px; border-radius: 4px;">
+          <ul style="padding-left: 20px; margin: 0; list-style-type: disc;">
+          {{#each flexibleAdvantages as |advantage|}}
+            {{#if advantage.name}}
+              <li style="margin-bottom: 4px; color: #e0e0e0;">
+                {{#if advantage.hasDescription}}
+                  <span class="advantage-name-wrapper combat-name-wrapper" data-index="{{advantage.index}}" tabindex="0">
+                    <span class="advantage-name-view advantage-has-desc" data-index="{{advantage.index}}">{{advantage.name}}</span>
+                    <div class="combat-description-tooltip">
+                      <div class="skill-tooltip-header">{{advantage.name}}</div>
+                      <div class="skill-tooltip-content">{{{advantage.description}}}</div>
+                    </div>
+                  </span>
+                {{else}}
+                  {{advantage.name}}
+                {{/if}}
+              </li>
+            {{/if}}
+          {{/each}}
+          </ul>
+        </div>
+      {{/if}}
+    </div>
+  </fieldset>
+</div>

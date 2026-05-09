@@ -1,0 +1,127 @@
+<section class="pc-attributes-skills-section">
+  <div class="pc-attributes-skills-header"></div>
+
+  <div class="skills-container pc-skills-tab-panel tab{{#if (eq activeSheetTab "skills")}} active{{/if}}" data-group="primary" data-tab="skills">
+    <fieldset class="pc-foundry-section pc-skills-foundry-section">
+      <legend>Skills</legend>
+    {{#if @root.editable}}
+      <div class="skills-header" style="display: flex; align-items: center; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #aaa;">
+        <div class="skill-header-drag" style="flex: 0 0 20px;"></div>
+        <div class="skill-header-sig" style="flex: 0 0 24px; text-align: center;">Sig?</div>
+        <div class="skill-header-class" style="flex: 0 0 30px; text-align: center;">Class</div>
+        <div class="skill-header-rank" style="flex: 0 0 30px; text-align: center;">Rank</div>
+        <div style="flex: 0 0 20px;"></div>
+        <div class="skill-header-name" style="flex: 1; padding-left: 0;">Name</div>
+        <div class="skill-header-tohit" style="flex: 0 0 35px; text-align: center; font-size: 10px;">TH</div>
+        <div class="skill-header-accuracy" style="flex: 0 0 35px; text-align: center; font-size: 10px;">Acc</div>
+        <div class="skill-header-ap" style="flex: 0 0 35px; text-align: center; font-size: 10px;">AP</div>
+        <div class="skill-header-sp" style="flex: 0 0 35px; text-align: center; font-size: 10px;">SP</div>
+        <div class="skill-header-actions" style="flex: 0 0 60px;"></div>
+      </div>
+
+      <div class="skills-list">
+        {{#each skills as |skill index|}}
+          <div class="skill-item" data-skill-index="{{index}}" data-indent="{{skill.indent}}" style="--indent-level: {{skill.indent}}; display: flex; align-items: center; flex-wrap: nowrap;" draggable="true">
+            <div class="skill-drag-handle" style="font-size: 18px; line-height: 1; flex: 0 0 20px; text-align: center;">&bull;</div>
+
+            {{#if skill.isStandard}}
+              <div style="flex: 0 0 24px; text-align: center; display: flex; align-items: center; justify-content: center;">
+                <input type="checkbox" class="skill-sig-checkbox" {{#if skill.sig}}checked{{/if}} data-field="sig" title="Sig?">
+              </div>
+              <input type="number" value="{{skill.class}}" class="skill-input skill-class" min="1" max="10" placeholder="C" data-field="class" style="flex: 0 0 30px;">
+              <input type="text" value="{{skill.rank}}" class="skill-input skill-rank" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" title="Enter 0-4 or 'U' for untrained">
+              <button type="button" class="skill-toggle-type" title="Switch to Special Skill" style="flex: 0 0 12px; width: 12px; height: 12px; padding: 0; font-size: 10px; border: none; background: transparent; color: #666; cursor: pointer; align-self: center; margin: 0 2px 0 0; line-height: 1;">&times;</button>
+            {{else}}
+              <select class="skill-select" data-field="type" style="flex: 0 0 75px; height: 24px; font-size: 11px;">
+                <option value="standard">Standard</option>
+                <option value="Stance" {{#if (eq skill.type "Stance")}}selected{{/if}}>Stance</option>
+                <option value="Perk" {{#if (eq skill.type "Perk")}}selected{{/if}}>Perk</option>
+                <option value="Style" {{#if (eq skill.type "Style")}}selected{{/if}}>Style</option>
+                <option value="Cantrip" {{#if (eq skill.type "Cantrip")}}selected{{/if}}>Cantrip</option>
+                <option value="Historic" {{#if (eq skill.type "Historic")}}selected{{/if}}>Historic</option>
+                <option value="TM" {{#if (eq skill.type "TM")}}selected{{/if}}>TM</option>
+                <option value="Spellcraft" {{#if (eq skill.type "Spellcraft")}}selected{{/if}}>Spellcraft</option>
+                <option value="Gate" {{#if (eq skill.type "Gate")}}selected{{/if}}>Gate</option>
+                <option value="Other" {{#if (eq skill.type "Other")}}selected{{/if}}>Other</option>
+              </select>
+              {{#if (eq skill.type "TM")}}
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="Grade" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+              {{else if (eq skill.type "Perk")}}
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="Grade" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+              {{else if (eq skill.type "Spellcraft")}}
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="C#" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+              {{else if (eq skill.type "Gate")}}
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="C#" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+              {{/if}}
+            {{/if}}
+
+            <input type="text" value="{{skill.name}}" class="skill-input skill-name" placeholder="Skill name" data-field="name" style="flex: 1; margin-left: 2px;">
+            <button type="button" class="skill-desc-btn" title="Edit Description" style="margin-left:6px; background:#666; color:#fff; border:none; border-radius:3px; width:20px; height:20px; line-height:16px; padding:0; cursor:pointer;">+</button>
+            {{#if skill.allowToHitAcc}}
+              <input type="text" value="{{skill.tohit}}" class="skill-input skill-tohit" placeholder="TH" data-field="tohit" style="flex: 0 0 30px; margin-left: 2px;">
+              <input type="text" value="{{skill.accuracy}}" class="skill-input skill-accuracy" placeholder="Acc" data-field="accuracy" style="flex: 0 0 30px; margin-left: 2px;">
+            {{/if}}
+            {{#if skill.sig}}
+              <input type="number" value="{{skill.usesMax}}" class="skill-input skill-uses-max" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
+            {{/if}}
+            <input type="text" value="{{skill.ap}}" class="skill-input skill-ap" placeholder="AP" data-field="ap" style="flex: 0 0 30px; margin-left: 2px;">
+            <input type="text" value="{{skill.sp}}" class="skill-input skill-sp" placeholder="SP" data-field="sp" style="flex: 0 0 30px; margin-left: 2px;">
+            <div class="skill-actions" style="display: flex; gap: 2px; flex: 0 0 auto;">
+              <button type="button" class="skill-indent" title="Indent" style="padding: 0 4px; font-size: 10px;">&rarr;</button>
+              <button type="button" class="skill-outdent" title="Outdent" style="padding: 0 4px; font-size: 10px;">&larr;</button>
+              <button type="button" class="skill-delete" title="Delete" style="padding: 0 4px; font-size: 10px;">&times;</button>
+            </div>
+          </div>
+        {{/each}}
+      </div>
+      <button type="button" class="add-skill-btn"> + Add Skill </button>
+    {{else}}
+      <div class="skills-list-view" style="padding: 10px; border-radius: 4px;">
+        <ul style="padding-left: 20px; margin: 0; list-style-type: disc;">
+          {{#each skills as |skill index|}}
+            {{#if skill.isDisplayable}}
+              <li style="margin-left: {{multiply skill.indent 20}}px; margin-bottom: 4px; color: #e0e0e0;">
+                {{#if skill.isStandard}}
+                  <span style="font-weight: bold; color: #e0e0e0;">{{skill.classRankDisplay}}:</span>
+                  {{#if skill.sig}}<span style="color:#cfe; font-weight: bold; margin-left: 6px;">SIG</span>{{/if}}
+                {{else}}
+                  <span style="font-weight: bold; color: #e0e0e0;">{{skill.specialTypeDisplay}}:</span>
+                {{/if}}
+
+                {{#if skill.hasDescription}}
+                  <span class="skill-name-wrapper combat-name-wrapper" data-index="{{index}}" tabindex="0">
+                    <span class="skill-name-view skill-has-desc" data-index="{{index}}">{{skill.name}}{{#if skill.hasToHit}}:{{else}}{{#if skill.hasAccuracy}}:{{/if}}{{/if}}</span>
+                    <div class="combat-description-tooltip">
+                      <div class="skill-tooltip-header">{{skill.name}}</div>
+                      <div class="skill-tooltip-content">{{{skill.description}}}</div>
+                    </div>
+                  </span>
+                {{else}}
+                  <span class="skill-name-view" style="font-weight: bold;">{{skill.name}}{{#if skill.hasToHit}}:{{else}}{{#if skill.hasAccuracy}}:{{/if}}{{/if}}</span>
+                {{/if}}
+
+                {{#if skill.allowToHitAcc}}
+                  <span class="skill-roll-clickable" data-action="rollSkill" data-index="{{index}}" role="button" tabindex="0" title="Roll {{skill.name}}">{{#if skill.hasToHit}}{{skill.modifiedTohit}}+{{/if}}{{#if skill.hasAccuracy}} {{skill.accuracySign}}{{skill.accuracyNum}} Acc{{/if}}</span>
+                {{/if}}
+
+                {{#if skill.sig}}
+                  <span class="skill-uses-display">
+                    <span class="uses-label">Uses</span>
+                    <div class="skill-uses-box">
+                      <input type="number" class="skill-uses-current" data-index="{{index}}" value="{{skill.usesCurrent}}">
+                      <span class="uses-separator">/ {{skill.usesMax}}</span>
+                    </div>
+                  </span>
+                {{/if}}
+
+                {{#if skill.ap}}<span style="font-weight: bold; color: #aaa; margin-left: 5px;"> [{{skill.ap}}] AP</span>{{/if}}
+                {{#if skill.sp}}<span style="font-weight: bold; color: #aaa; margin-left: 5px;"> [{{skill.sp}}] SP</span>{{/if}}
+              </li>
+            {{/if}}
+          {{/each}}
+        </ul>
+      </div>
+    {{/if}}
+    </fieldset>
+  </div>
+</section>

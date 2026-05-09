@@ -1,0 +1,94 @@
+<hr class="section-divider pc-tab-detached-divider">
+<div class="pc-tab-panel pc-effects-tab-panel tab{{#if (eq activeSheetTab "effects")}} active{{/if}}" data-pc-tab-panel="effects" data-group="primary" data-tab="effects">
+  <fieldset class="pc-foundry-section pc-effects-foundry-section">
+    <legend>Combat Adjustments</legend>
+
+    <div class="combat-modifiers pc-effects-modifiers">
+      <div class="combat-modifier-box">
+        <label>To-Hit</label>
+        <input type="number" name="system.combatMods.toHit" value="{{#if actor.system.combatMods.toHit}}{{actor.system.combatMods.toHit}}{{else}}0{{/if}}" class="combat-mod-input" tabindex="0">
+        <p class="pc-effect-hint">Adjusts attack and save target numbers.</p>
+      </div>
+      <div class="combat-modifier-box">
+        <label>Accuracy</label>
+        <input type="number" name="system.combatMods.accuracy" value="{{#if actor.system.combatMods.accuracy}}{{actor.system.combatMods.accuracy}}{{else}}0{{/if}}" class="combat-mod-input" tabindex="0">
+        <p class="pc-effect-hint">Adds accuracy to notable combat and skill rolls.</p>
+      </div>
+      <div class="combat-modifier-box">
+        <label>Die-Rate</label>
+        <input type="number" name="system.combatMods.diceRate" value="{{#if actor.system.combatMods.diceRate}}{{actor.system.combatMods.diceRate}}{{else}}0{{/if}}" class="combat-mod-input" tabindex="0">
+        <p class="pc-effect-hint">Adjusts die-rate progression for damage, healing, and similar effects.</p>
+      </div>
+
+      {{#each combatHaltBuffRows as |buff|}}
+        {{#if buff.isHaltLike}}
+          <div class="combat-modifier-box combat-halt-buff-inline" data-buff-index="{{buff.index}}">
+            <label class="combat-halt-buff-label">{{buff.label}}</label>
+            <input
+              type="text"
+              value="{{buff.values}}"
+              class="combat-mod-input halt-input combat-halt-buff-input"
+              data-buff-index="{{buff.index}}"
+              tabindex="0">
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
+          </div>
+        {{/if}}
+        {{#if buff.isFlat}}
+          <div class="combat-modifier-box combat-extra-buff-inline" data-buff-index="{{buff.index}}">
+            <label class="combat-halt-buff-label">{{buff.label}}</label>
+            <input
+              type="number"
+              value="{{buff.value}}"
+              class="combat-mod-input combat-flat-buff-input"
+              data-buff-index="{{buff.index}}"
+              tabindex="0">
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
+          </div>
+        {{/if}}
+        {{#if buff.isCost}}
+          <div class="combat-modifier-box combat-extra-buff-inline combat-cost-buff-inline" data-buff-index="{{buff.index}}">
+            <label class="combat-halt-buff-label">{{buff.label}}</label>
+            <select
+              class="combat-cost-buff-resource"
+              data-buff-index="{{buff.index}}"
+              tabindex="0">
+              <option value="Stamina" {{#if (eq buff.resourceType "Stamina")}}selected{{/if}}>Stamina</option>
+              <option value="Attunement" {{#if (eq buff.resourceType "Attunement")}}selected{{/if}}>Attunement</option>
+              <option value="HP" {{#if (eq buff.resourceType "HP")}}selected{{/if}}>HP</option>
+              <option value="Physical Stress" {{#if (eq buff.resourceType "Physical Stress")}}selected{{/if}}>Physical Stress</option>
+              <option value="Mental Stress" {{#if (eq buff.resourceType "Mental Stress")}}selected{{/if}}>Mental Stress</option>
+            </select>
+            <input
+              type="number"
+              value="{{buff.value}}"
+              class="combat-mod-input combat-cost-buff-value"
+              data-buff-index="{{buff.index}}"
+              tabindex="0">
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
+          </div>
+        {{/if}}
+        {{#if buff.isCustom}}
+          <div class="combat-modifier-box combat-extra-buff-inline combat-custom-buff-inline" data-buff-index="{{buff.index}}">
+            <input
+              type="text"
+              value="{{buff.customName}}"
+              class="combat-custom-buff-name"
+              data-buff-index="{{buff.index}}"
+              placeholder="Custom"
+              tabindex="0">
+            <label class="combat-halt-buff-label">:</label>
+            <input
+              type="number"
+              value="{{buff.value}}"
+              class="combat-mod-input combat-custom-buff-value"
+              data-buff-index="{{buff.index}}"
+              tabindex="0">
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.customName}}">-</button>
+          </div>
+        {{/if}}
+      {{/each}}
+
+      <button type="button" class="add-combat-halt-buff" title="Add Buff">+</button>
+    </div>
+  </fieldset>
+</div>

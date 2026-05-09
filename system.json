@@ -1,0 +1,64 @@
+{
+  "id": "peasant-core",
+  "title": "Peasant Core",
+  "description": "A system for FoundryVTT, based on the Peasant Core RPG by AshenWolf.",
+  "version": "1.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14",
+    "maximum": "14"
+  },
+  "relationships": {
+    "requires": [
+      {
+        "id": "socketlib",
+        "type": "module",
+        "manifest": "https://github.com/farling42/foundryvtt-socketlib/releases/latest/download/module.json",
+        "compatibility": {
+          "minimum": "1.0.0"
+        }
+      }
+    ]
+  },
+  "authors": [
+    {
+      "name": "AshenWolf"
+    }
+  ],
+  "socket": true,
+  "esmodules": [
+    "peasant-core.mjs"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "styles": [
+    "peasant-core.css"
+  ],
+  "media": [
+    {
+      "type": "setup",
+      "url": "systems/peasant-core/ui/peasantcore-background.jpeg",
+      "thumbnail": "systems/peasant-core/ui/peasantcore-background.jpeg"
+    }
+  ],
+  "background": "systems/peasant-core/ui/peasantcore-background.jpeg",
+  "primaryTokenAttribute": "health",
+  "documentTypes": {
+    "Actor": {
+      "character": {
+        "htmlFields": [
+          "biography",
+          "inventory",
+          "skills.*.description",
+          "notableCombats.*.description",
+          "flexibleAdvantageDescriptions.*"
+        ]
+      }
+    }
+  }
+}
