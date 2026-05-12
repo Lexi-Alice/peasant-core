@@ -32,6 +32,30 @@
   "esmodules": [
     "peasant-core.mjs"
   ],
+  "packs": [
+    {
+      "name": "peasant-core-macro",
+      "label": "Peasant Core Macros",
+      "path": "packs/peasant-core-macro",
+      "type": "Macro",
+      "system": "peasant-core",
+      "ownership": {
+        "PLAYER": "LIMITED",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "peasant-core-table",
+      "label": "Peasant Core Tables",
+      "path": "packs/peasant-core-table",
+      "type": "RollTable",
+      "system": "peasant-core",
+      "ownership": {
+        "PLAYER": "LIMITED",
+        "ASSISTANT": "OWNER"
+      }
+    }
+  ],
   "languages": [
     {
       "lang": "en",
