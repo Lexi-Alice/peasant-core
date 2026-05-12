@@ -2,15 +2,15 @@
   "id": "peasant-core",
   "title": "Peasant Core",
   "description": "A system for FoundryVTT, based on the Peasant Core RPG by AshenWolf. Ashenwolf is reachable at willsonw.author@gmail.com.",
-  "version": "1.0",
+  "version": "1.0.0",
   "compatibility": {
     "minimum": "13",
     "verified": "14",
     "maximum": "14"
   },
   "url": "https://github.com/Lexi-Alice/peasant-core",
-  "manifest": "https://raw.githubusercontent.com/Lexi-Alice/peasant-core/main/system.json",
-  "download":  "https://github.com/Lexi-Alice/peasant-core/releases/latest/download/peasant-core-release.zip",
+  "manifest": "https://github.com/Lexi-Alice/peasant-core/releases/latest/download/system.json",
+  "download": "https://github.com/Lexi-Alice/peasant-core/releases/download/1.0/peasant-core.zip",
   "relationships": {
     "requires": [
       {
