@@ -1,5 +1,5 @@
 ﻿// Peasant Core System Initialization
-import { configurePeasantCombat } from "./documents/combat.mjs";
+import { configurePeasantCombat } from "./documents/_module.mjs";
 import { configureChatListeners } from "./applications/chat-listeners.mjs";
 import { configureCombatTracker } from "./applications/combat-tracker.mjs";
 import { PC_WORLD_MIGRATION_VERSION_SETTING, migrateWorldNotableCombatData } from "./migration/world.mjs";

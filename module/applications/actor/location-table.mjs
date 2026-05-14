@@ -4,12 +4,14 @@ import { pcLog } from "../../utils/logging.mjs";
 import {
   getTargetedDamageConditionKey,
   getTargetedDamageLocationDisplay,
+  isArmorPenLocationLike,
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
 
 export {
   getTargetedDamageConditionKey,
   getTargetedDamageLocationDisplay,
+  isArmorPenLocationLike,
   normalizeAppliedDamageType
 };
 
@@ -49,15 +51,6 @@ const LOCATION_RESULT_TEXT_ALIASES = Object.freeze({
   "head pen": ["head pen", "armor pen head"],
   "armor pen head": ["armor pen head", "head pen"]
 });
-
-export function isArmorPenLocationLike({ isAP = false, rawText = "", locationResultText = "", label = "" } = {}) {
-  if (isAP) return true;
-  const combined = [rawText, locationResultText, label]
-    .map((part) => String(part || "").trim().toLowerCase())
-    .filter(Boolean)
-    .join(" ");
-  return combined.includes("armor pen") || combined.includes("head pen");
-}
 
 export function getLocationBySkillOptions(maxMoS) {
   const mos = Number(maxMoS) || 0;

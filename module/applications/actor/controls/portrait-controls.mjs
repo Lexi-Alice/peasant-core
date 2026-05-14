@@ -1,4 +1,4 @@
-import { pcLog } from "../../utils/logging.mjs";
+import { pcLog } from "../../../utils/logging.mjs";
 
 const ImagePopoutClass = foundry?.applications?.apps?.ImagePopout;
 const FilePickerClass = foundry?.applications?.apps?.FilePicker ?? globalThis.FilePicker;

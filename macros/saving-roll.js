@@ -1,2 +1,2 @@
-const { promptSavingRoll } = await import("/systems/peasant-core/module/applications/dice/roll-dialogs.mjs");
+const { promptSavingRoll } = await import("/systems/peasant-core/module/applications/dice/_module.mjs");
 await promptSavingRoll();

@@ -1,3 +1,5 @@
+import { COMBAT_HALT_BUFF_TYPE_HALT, getCombatHaltBuffTotals, parseHaltSlashValues } from "./combat-modifiers.mjs";
+
 export const PC_ARMOR_CHARGE_MULTIPLIER_FLAG = "armorChargeMultiplier";
 export const PC_DEFAULT_ARMOR_CHARGE_MULTIPLIER = 2;
 export const PC_WOUND_HEAD_MULTIPLIER_FLAG = "woundHeadMultiplier";
@@ -82,6 +84,35 @@ export function getTargetedDamageLocationDisplay(location) {
 
 export function getTargetedDamageConditionKey(location) {
   return TARGETED_DAMAGE_CONDITION_KEY_MAP[location] || "torso";
+}
+
+export function isArmorPenLocationLike({ isAP = false, rawText = "", locationResultText = "", label = "" } = {}) {
+  if (isAP) return true;
+  const combined = [rawText, locationResultText, label]
+    .map((part) => String(part || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+  return combined.includes("armor pen") || combined.includes("head pen");
+}
+
+export function getLowestHaltDamageLocation(actor) {
+  if (!actor) return "Torso";
+
+  const haltParts = parseHaltSlashValues(actor.system?.haltValues || "0/0/0/0");
+  const combatHaltTotals = getCombatHaltBuffTotals(actor.system?.combatMods?.haltBuffs);
+  const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];
+
+  let bestLocation = "Torso";
+  let bestValue = Number.POSITIVE_INFINITY;
+  for (const location of LOWEST_HALT_LOCATION_PRIORITY) {
+    const haltIndex = TARGETED_DAMAGE_HALT_INDEX_MAP[location] ?? 0;
+    const haltValue = (Number.parseInt(haltParts[haltIndex], 10) || 0) + (armorHaltBuffs[haltIndex] || 0);
+    if (haltValue < bestValue) {
+      bestValue = haltValue;
+      bestLocation = location;
+    }
+  }
+  return bestLocation;
 }
 
 export function normalizeAppliedDamageType(rawType, fallback = "blunt") {

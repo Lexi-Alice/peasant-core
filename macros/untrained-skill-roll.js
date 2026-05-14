@@ -1,2 +1,2 @@
-const { promptUntrainedSkillRoll } = await import("/systems/peasant-core/module/applications/dice/roll-dialogs.mjs");
+const { promptUntrainedSkillRoll } = await import("/systems/peasant-core/module/applications/dice/_module.mjs");
 await promptUntrainedSkillRoll();
