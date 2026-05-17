@@ -1,4 +1,5 @@
 ﻿import { PeasantCharacterModel, PC_ACTOR_SETTING_DEFINITIONS, PC_ART_PANEL_COLLAPSED_FLAG, PC_SIMPLIFIED_HP_FLAG, isPeasantCharacterType, sanitizePeasantCoreSettingNumber } from "../../data/actor/_module.mjs";
+import { PC_CUSTOM_SIR_LOCATION_VALUES_FLAG } from "../../data/actor/identity-options.mjs";
 import { PeasantActor } from "../../documents/_module.mjs";
 import { setupBlessingControls } from "./controls/blessing-controls.mjs";
 import { setupCombatModifierControls } from "./controls/combat-modifier-controls.mjs";
@@ -22,7 +23,6 @@ import { setupBasicSkillAdvantageControls } from "./skills/skill-advantage-contr
 import { setupSkillAdvantageDescriptionEditors } from "./skills/skill-advantage-description-editors.mjs";
 import { setupSkillAdvantageDragDropControls } from "./skills/skill-advantage-drag-drop.mjs";
 import { ensureSlideToggleElement } from "../components/slide-toggle.mjs";
-import { applyIncomingHit, closeActiveRemotePrompt, showDefensePromptDialog as showDefensePromptDialogApplication, showIncomingHitPrompt, startNotableCombatRoll } from "../combat/_module.mjs";
 import { renderDialogCompat } from "../dialogs.mjs";
 import { registerPeasantCoreApi } from "../../utils/api.mjs";
 import { pcLog } from "../../utils/logging.mjs";
@@ -57,19 +57,7 @@ function getApplicationJQuery(appOrElement) {
   return element ? $(element) : $();
 }
 
-async function showDefensePromptDialog(payload = {}) {
-  return showDefensePromptDialogApplication(payload, { rollNotableCombat: startNotableCombatRoll });
-}
-
-registerPeasantCoreApi({ showDefensePrompt: showDefensePromptDialog });
-
-registerPeasantCoreApi({
-  showIncomingHitPrompt,
-  applyIncomingHit,
-  closeRemotePrompt: closeActiveRemotePrompt,
-  drawLocationTable: drawLocationTableLikeMacro,
-  startNotableCombatRoll
-});
+registerPeasantCoreApi({ drawLocationTable: drawLocationTableLikeMacro });
 
 export class PeasantActorSheet extends ActorSheetBase {
   static MODES = {
@@ -946,6 +934,26 @@ export class PeasantActorSheet extends ActorSheetBase {
     }
   }
 
+  async _onCustomSirLocationChange(event) {
+    const input = event.currentTarget;
+    const sirKey = String(input?.dataset?.sirKey ?? "").trim();
+    if (!sirKey || !this.actor?.setFlag) return;
+
+    const value = String(input.value ?? "");
+    const current = this.actor.getFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG);
+    const values = current && typeof current === "object" && !Array.isArray(current) ? { ...current } : {};
+    if (value.trim()) values[sirKey] = value;
+    else delete values[sirKey];
+
+    if (Object.keys(values).length) {
+      await this.actor.setFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG, values);
+    } else if (typeof this.actor.unsetFlag === "function") {
+      await this.actor.unsetFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG);
+    } else {
+      await this.actor.setFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG, {});
+    }
+  }
+
   activateListeners(html) {
     if (typeof super.activateListeners === "function") {
       try {
@@ -977,6 +985,10 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     html.find(".pc-sheet-setting-input").off("change.peasantCoreSettings").on("change.peasantCoreSettings", async (event) => {
       await this._onPeasantCoreSettingChange(event);
+    });
+
+    html.find(".pc-custom-sir-input").off("change.peasantCustomSir").on("change.peasantCustomSir", async (event) => {
+      await this._onCustomSirLocationChange(event);
     });
 
     html.find(".pc-portrait-lozenge-input[data-field]").off("input.peasantPortraitLozenge change.peasantPortraitLozenge").on("input.peasantPortraitLozenge", (event) => {

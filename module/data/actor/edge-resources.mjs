@@ -1,3 +1,5 @@
+import { PC_WINTER_EDGE_FLAG } from "./sheet-settings.mjs";
+
 export const EDGE_LABEL_MODE_EDGE = "edge";
 export const EDGE_LABEL_MODE_WINTER = "winter";
 export const EDGE_LABEL_MODE_DRAGON = "dragon";
@@ -11,10 +13,9 @@ const EDGE_LABEL_MODES = new Set([
 ]);
 
 export function getDefaultEdgeLabelMode(source) {
-  const originRaw = String(source?.system?.origin ?? source?.origin ?? "").trim();
-  const customOrigin = String(source?.system?.customOrigin ?? source?.customOrigin ?? "").trim();
-  const origin = (/^(custom|other)$/i.test(originRaw) ? customOrigin : originRaw).toLowerCase();
-  return origin === "winter" ? EDGE_LABEL_MODE_WINTER : EDGE_LABEL_MODE_EDGE;
+  return source?.getFlag?.("peasant-core", PC_WINTER_EDGE_FLAG)
+    ? EDGE_LABEL_MODE_WINTER
+    : EDGE_LABEL_MODE_EDGE;
 }
 
 export function sanitizeEdgeLabelMode(value, fallback = EDGE_LABEL_MODE_EDGE) {

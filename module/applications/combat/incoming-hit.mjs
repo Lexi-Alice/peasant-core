@@ -1,18 +1,17 @@
-import { getAutomatedCombatDamageTypeLabel } from "../../data/actor/combat-damage.mjs";
 import {
   getTargetedDamageLocationDisplay,
-  isArmorPenLocationLike,
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
-import { PC_SOCKET_NAMESPACE, PC_SOCKET_PROMPT_INCOMING_HIT } from "../../socket/remote-prompts.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { renderDialogCompat } from "../dialogs.mjs";
-import { getPreferredDefensePromptRecipientUser, resolveDefensePromptActor } from "./actor-targets.mjs";
-import { withWaitingForDefenderResponse } from "./prompt-dialogs.mjs";
+import { resolveDefensePromptActor } from "./actor-targets.mjs";
 import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remote-prompt-registry.mjs";
-import { applyTargetedDamageWorkflow } from "./targeted-damage-workflow.mjs";
 
-export { requestIncomingHitApplicationForTarget, requestIncomingHitResolutionForTarget } from "./incoming-hit-requests.mjs";
+export {
+  applyIncomingHit,
+  requestIncomingHitApplicationForTarget,
+  requestIncomingHitResolutionForTarget
+} from "./incoming-hit-requests.mjs";
 
 export async function showIncomingHitPrompt(payload = {}) {
   const defenderActor = await resolveDefensePromptActor(payload);
@@ -132,60 +131,4 @@ export async function showIncomingHitPrompt(payload = {}) {
       }
     }, { classes: ["pc-incoming-hit-dialog", "peasant-macro-dialog-force"] });
   });
-}
-
-export async function applyIncomingHit(payload = {}) {
-  const defenderActor = await resolveDefensePromptActor(payload);
-  if (!defenderActor) return null;
-
-  const damageAmount = Number(payload.damageAmount);
-  if (!Number.isFinite(damageAmount) || damageAmount <= 0) {
-    return { handled: false, applied: false, reason: "invalidDamage" };
-  }
-
-  const location = String(payload.location || "Torso").trim() || "Torso";
-  const armorPenHit = isArmorPenLocationLike({
-    isAP: payload.isAP,
-    rawText: payload.locationResultText,
-    locationResultText: payload.locationDisplay,
-    label: payload.location
-  });
-  let appliedType = normalizeAppliedDamageType(payload.damageType, "blunt");
-  if (appliedType === "flexible") appliedType = "blunt";
-
-  let applyResult = null;
-  try {
-    applyResult = await applyTargetedDamageWorkflow(defenderActor, {
-      amount: damageAmount,
-      type: appliedType,
-      location,
-      isAP: armorPenHit,
-      useArmorCharge: !!payload.useArmorCharge,
-      ignoreHaltReduction: !!payload.ignoreHaltReduction,
-      chatSpeaker: ChatMessage.getSpeaker({ actor: defenderActor })
-    });
-  } catch (error) {
-    console.error("Peasant Core | applyIncomingHit failed while applying targeted damage workflow", {
-      payload,
-      defender: defenderActor?.name,
-      error
-    });
-    return {
-      handled: true,
-      applied: false,
-      reason: "workflowError",
-      error: String(error?.message || error || "Unknown error")
-    };
-  }
-
-  return {
-    handled: true,
-    applied: !!applyResult?.ok,
-    useArmorCharge: !!payload.useArmorCharge,
-    ignoreHaltReduction: !!payload.ignoreHaltReduction,
-    appliedDamageType: appliedType,
-    location,
-    isAP: armorPenHit,
-    applyResult
-  };
 }

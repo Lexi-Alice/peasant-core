@@ -25,6 +25,7 @@ export const PC_PRIMAL_EVASION_FLAG = "primalEvasion";
 export const PC_DEFAULT_PRIMAL_EVASION = 0;
 export const PC_DEFENSE_FAVORITES_FLAG = "defenseFavorites";
 export const PC_ART_PANEL_COLLAPSED_FLAG = "artPanelCollapsed";
+export const PC_WINTER_EDGE_FLAG = "winterEdge";
 
 export const PC_ACTOR_SETTING_DEFINITIONS = Object.freeze([
   {
@@ -133,6 +134,13 @@ export const PC_ACTOR_SETTING_DEFINITIONS = Object.freeze([
     defaultValue: PC_DEFAULT_WOUND_TORSO_MULTIPLIER,
     min: 0.1,
     allowDecimal: true
+  },
+  {
+    group: "Miscellaneous",
+    label: "Use Winter's Edge?",
+    hint: "If checked, this actor's Edge resource is labeled Winter's Edge.",
+    type: "boolean",
+    flagKey: PC_WINTER_EDGE_FLAG
   }
 ]);
 

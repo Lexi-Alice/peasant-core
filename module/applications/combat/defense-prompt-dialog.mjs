@@ -20,7 +20,18 @@ import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remo
 
 export async function showDefensePromptDialog(payload = {}, { rollNotableCombat = null } = {}) {
   const defenderActor = await resolveDefensePromptActor(payload);
-  if (!defenderActor) return null;
+  if (!defenderActor) {
+    console.warn("Peasant Core | Defense prompt skipped: defender actor could not be resolved", {
+      attack: payload.attackCombatName,
+      targetingType: payload.attackTargetingType,
+      targetSceneId: payload.targetSceneId,
+      targetTokenId: payload.targetTokenId,
+      targetActorId: payload.targetActorId,
+      targetActorUuid: payload.targetActorUuid,
+      targetTokenUuid: payload.targetTokenUuid
+    });
+    return null;
+  }
   const promptId = String(payload.promptId || "").trim();
 
   const targetingType = String(payload.attackTargetingType || "").trim();
@@ -41,12 +52,26 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
       targetingType,
       attack: payload.attackCombatName
     });
+    pcLog.debug("Peasant Core | Defense prompt skipped: no matching defenses", {
+      defender: defenderActor.name,
+      targetingType,
+      attack: payload.attackCombatName,
+      defenses: (defenderActor.system?.notableCombats || [])
+        .map((combat, index) => ({ index, name: combat?.name, responses: combat?.defense?.responses || [] }))
+        .filter((entry) => entry.responses.length)
+    });
     return null;
   }
 
   const attackerName = String(payload.attackerTokenName || payload.attackerActorName || "Attacker").trim() || "Attacker";
   const titleTargetingType = targetingType || "Unknown";
   const title = `${attackerName} attacks you! | ${titleTargetingType}`;
+  pcLog.debug("Peasant Core | Opening defense prompt", {
+    defender: defenderActor.name,
+    targetingType,
+    attack: payload.attackCombatName,
+    defenses: matchingDefenses.map(({ combat, index }) => ({ index, name: combat?.name }))
+  });
   const previewByIndex = new Map(
     matchingDefenses.map(({ combat, index }) => [String(index), getNotableCombatRollPreview(defenderActor, combat)])
   );

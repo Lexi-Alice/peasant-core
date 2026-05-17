@@ -502,6 +502,193 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     cursor: not-allowed;
 }
 
+.application.peasant-core.pc-settings-config:not(.minimized, .minimizing, .maximizing),
+.window-app.peasant-core.pc-settings-config:not(.minimized, .minimizing, .maximizing) {
+    min-width: 520px;
+}
+
+.application.peasant-core.pc-settings-config .window-content,
+.window-app.peasant-core.pc-settings-config .window-content {
+    padding: 0;
+    color: #e0e0e0;
+}
+
+.pc-settings-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+    padding: 16px;
+}
+
+.pc-settings-menu .pc-settings-groups {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.pc-settings-menu .form-footer {
+    flex: 0 0 auto;
+    margin-top: auto;
+}
+
+.pc-settings-empty {
+    margin: 0;
+    padding: 10px 0;
+    color: #bca99a;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.pc-setting-control-text {
+    min-width: 82px;
+    padding: 6px 10px;
+    border: 1px solid var(--input-border-color, rgba(203, 191, 154, 0.72));
+    border-radius: 4px;
+    color: #bca99a;
+    text-align: center;
+    background: var(--input-background-color, rgba(49, 40, 49, 0.88));
+}
+
+.pc-settings-tag-list.current-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 30px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.pc-settings-tag.current-tag-item {
+    --button-size: 28px;
+    min-width: max-content;
+    min-height: var(--button-size) !important;
+    padding: 0 0.5rem !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.35rem;
+    background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+    border: 1px solid var(--button-border-color, #9a8462) !important;
+    color: var(--button-text-color, #e5cfaa) !important;
+    border-radius: 4px !important;
+    line-height: normal !important;
+    box-shadow: none !important;
+    cursor: grab;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pc-settings-add-tag {
+    --button-size: 22px;
+    width: var(--button-size) !important;
+    min-width: var(--button-size) !important;
+    height: var(--button-size) !important;
+    min-height: var(--button-size) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    align-self: flex-end !important;
+    flex: 0 0 auto !important;
+    font-size: var(--font-size-14) !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+    border: 1px solid var(--button-border-color, #9a8462) !important;
+    color: var(--button-text-color, #e5cfaa) !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+}
+
+.pc-settings-tag.current-tag-item.tag-hover-active {
+    background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
+    color: var(--button-hover-text-color, #f2dfbd) !important;
+    border-color: var(--button-hover-border-color, #c9b183) !important;
+}
+
+.pc-settings-tag.current-tag-item:active,
+.pc-settings-tag.current-tag-item.dragging {
+    cursor: grabbing;
+}
+
+.pc-settings-tag.current-tag-item.dragging,
+.pc-settings-tag.current-tag-item.drag-over-left,
+.pc-settings-tag.current-tag-item.drag-over-right,
+.pc-settings-tag-list.drag-over-end .pc-settings-add-tag {
+    background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
+    color: var(--button-hover-text-color, #f2dfbd) !important;
+    border-color: var(--button-hover-border-color, #c9b183) !important;
+}
+
+.pc-settings-add-tag:hover,
+.pc-settings-add-tag:focus-visible {
+    background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
+    color: var(--button-hover-text-color, #f2dfbd) !important;
+    border-color: var(--button-hover-border-color, #c9b183) !important;
+}
+
+.pc-settings-tag .current-tag-label {
+    color: inherit !important;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 1 !important;
+}
+
+.pc-settings-tag .pc-settings-tag-label-input {
+    height: 22px;
+    min-width: 10ch;
+    max-width: min(42ch, 360px);
+    margin: 0 !important;
+    padding: 0 4px !important;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 20px;
+    color: var(--input-text-color, #e5cfaa);
+    background: var(--input-background-color, rgba(12, 10, 10, 0.9));
+    border: 1px solid var(--input-border-color, #9a8462);
+    border-radius: 3px;
+    box-shadow: none;
+}
+
+.pc-settings-tag.is-editing {
+    cursor: text;
+}
+
+.pc-settings-tag .remove-tag-btn {
+    --button-size: 17px;
+    width: var(--button-size) !important;
+    min-width: var(--button-size) !important;
+    height: var(--button-size) !important;
+    min-height: var(--button-size) !important;
+    margin: 0 0 0 6px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    font-size: var(--font-size-14) !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+    border: 1px solid var(--button-border-color, #9a8462) !important;
+    color: var(--button-text-color, #e5cfaa) !important;
+    border-radius: 4px !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    cursor: var(--cursor-pointer) !important;
+}
+
+.pc-settings-tag .remove-tag-btn:hover,
+.pc-settings-tag .remove-tag-btn:focus-visible,
+.pc-settings-tag .remove-tag-btn.tag-hover-active {
+    background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
+    color: var(--button-hover-text-color, #f2dfbd) !important;
+    border-color: var(--button-hover-border-color, #c9b183) !important;
+}
+
 @media (max-width: 860px) {
     .pc-setting-row {
         grid-template-areas:
@@ -513,6 +700,13 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
     .pc-setting-control {
         justify-content: flex-start;
+    }
+}
+
+@media (max-width: 560px) {
+    .application.peasant-core.pc-settings-config:not(.minimized, .minimizing, .maximizing),
+    .window-app.peasant-core.pc-settings-config:not(.minimized, .minimizing, .maximizing) {
+        min-width: 0;
     }
 }
 

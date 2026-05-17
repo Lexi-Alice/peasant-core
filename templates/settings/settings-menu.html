@@ -1,0 +1,51 @@
+<section class="pc-settings-menu">
+  <div class="pc-settings-groups">
+    {{#each groups as |group|}}
+      <fieldset class="pc-settings-group">
+        <legend>{{group.label}}</legend>
+
+        {{#if group.tagGroup}}
+          <div class="current-tags-list pc-settings-tag-list" role="list">
+            {{#each group.tags as |tag|}}
+              <div class="current-tag-item combat-tag combat-tag-compact combat-tag-button pc-settings-tag" role="listitem" data-entry-key="{{tag.key}}" title="Right-click to edit {{tag.label}}" draggable="true">
+                <span class="current-tag-label">{{tag.label}}</span>
+                <input type="text" class="pc-settings-tag-label-input" value="{{tag.label}}" aria-label="Edit {{tag.label}}" autocomplete="off" draggable="false" hidden>
+                <button type="button" class="remove-tag-btn" title="Remove {{tag.label}}" aria-label="Remove {{tag.label}}" draggable="false">&times;</button>
+              </div>
+            {{/each}}
+            <button type="button" class="pc-settings-add-tag" title="Add {{group.addLabel}}" aria-label="Add {{group.addLabel}}">
+              +
+            </button>
+          </div>
+        {{else if group.settings.length}}
+          {{#each group.settings as |setting|}}
+            <div class="pc-setting-row">
+              <div class="pc-setting-copy">
+                <label class="pc-setting-label" for="{{setting.id}}">{{setting.label}}</label>
+                <p class="pc-setting-hint">{{setting.hint}}</p>
+              </div>
+              <div class="pc-setting-control">
+                {{#if setting.controlLabel}}
+                  <span class="pc-setting-control-text">{{setting.controlLabel}}</span>
+                {{/if}}
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <p class="pc-settings-empty">No editable options have been added yet.</p>
+        {{/if}}
+      </fieldset>
+    {{/each}}
+  </div>
+
+  <footer class="form-footer">
+    <button type="button" data-action="resetDefaults">
+      <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+      Reset
+    </button>
+    <button type="submit">
+      <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+      Save Changes
+    </button>
+  </footer>
+</section>

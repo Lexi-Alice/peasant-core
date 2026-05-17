@@ -1,6 +1,6 @@
 import { PC_SOCKET_NAMESPACE, PC_SOCKET_PROMPT_DEFENSE } from "../../socket/remote-prompts.mjs";
 import { pcLog } from "../../utils/logging.mjs";
-import { getPreferredActorToken, getPreferredDefensePromptRecipientUser } from "./actor-targets.mjs";
+import { getActiveNotableCombatTargets, getPreferredActorToken, getPreferredDefensePromptRecipientUser } from "./actor-targets.mjs";
 import { isChainCancelledResult, withWaitingForDefenderResponse } from "./prompt-dialogs.mjs";
 
 export async function emitDefensePromptRequestsForAttack({ actor, combat, combatIndex, attackerToken = null } = {}) {
@@ -14,7 +14,7 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
     return { totalAccuracyPenalty: 0, promptResults: [] };
   }
 
-  const targets = Array.from(game.user?.targets || []).filter((token) => token?.actor);
+  const targets = getActiveNotableCombatTargets();
   if (!targets.length) {
     pcLog.debug("Peasant Core | Defense prompt skipped: no targeted tokens", {
       actor: actor?.name,
@@ -24,6 +24,15 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
     });
     return { totalAccuracyPenalty: 0, promptResults: [] };
   }
+  pcLog.debug("Peasant Core | Defense prompt targets", {
+    attack: combat?.name || "Combat",
+    targetingType,
+    targets: targets.map((target) => ({
+      tokenId: target.tokenId,
+      actorId: target.actorId,
+      name: target.targetName
+    }))
+  });
 
   const resolvedAttackerToken = attackerToken || getPreferredActorToken(actor);
   const attackerTokenDocument = resolvedAttackerToken?.document ?? resolvedAttackerToken ?? null;
@@ -36,9 +45,10 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
 
   const promptResults = [];
 
-  for (const targetToken of targets) {
-    const targetTokenDocument = targetToken?.document ?? targetToken ?? null;
-    const targetActor = targetToken?.actor || targetTokenDocument?.actor || null;
+  for (const target of targets) {
+    const targetToken = target.token;
+    const targetTokenDocument = target.tokenDocument;
+    const targetActor = target.actor;
     if (!targetActor) continue;
     const recipient = getPreferredDefensePromptRecipientUser(targetActor, targetTokenDocument);
     if (!recipient?.id) {
@@ -65,12 +75,21 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
       targetSceneId: targetTokenDocument?.parent?.id || targetTokenDocument?.scene?.id || null,
       targetTokenId: targetTokenDocument?.id || null,
       targetTokenUuid: targetTokenDocument?.uuid || null,
-      targetTokenName: String(targetToken?.name || targetTokenDocument?.name || targetActor?.name || "").trim(),
+      targetTokenName: String(target.targetName || targetToken?.name || targetTokenDocument?.name || targetActor?.name || "").trim(),
       targetActorId: targetActor?.id || null,
       targetActorUuid: targetActor?.uuid || null
     };
+    pcLog.debug("Peasant Core | Requesting defense prompt", {
+      attack: payload.attackCombatName,
+      targetingType,
+      target: payload.targetTokenName || payload.targetActorId,
+      recipient: recipient.name,
+      recipientUserId: recipient.id,
+      currentUserId: game.user?.id || null
+    });
 
     const requestDefensePromptForUser = game.peasantCore?.requestDefensePromptForUser;
+    const showDefensePrompt = game.peasantCore?.showDefensePrompt;
     const cancelPromptForUser = game.peasantCore?.cancelPromptForUser;
     let promptResult = null;
     if (typeof requestDefensePromptForUser === "function") {
@@ -85,7 +104,22 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
           })
         }
       );
+    } else if ((recipient.id === game.user?.id || game.user?.isGM) && typeof showDefensePrompt === "function") {
+      console.warn("Peasant Core | Defense prompt API missing request handler; handling on current client.", {
+        attack: payload.attackCombatName,
+        target: payload.targetTokenName || payload.targetActorId,
+        intendedRecipientUserId: recipient.id
+      });
+      promptResult = await showDefensePrompt({
+        ...payload,
+        recipientUserId: game.user?.id || recipient.id
+      });
     } else {
+      console.warn("Peasant Core | Defense prompt using raw socket fallback; no synchronous defense result will be available.", {
+        attack: payload.attackCombatName,
+        target: payload.targetTokenName || payload.targetActorId,
+        recipientUserId: recipient.id
+      });
       game.socket.emit(PC_SOCKET_NAMESPACE, payload);
     }
 
@@ -99,7 +133,7 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
     promptResults.push({
       targetTokenId: targetTokenDocument?.id || null,
       targetActorId: targetActor?.id || null,
-      targetName: targetTokenDocument?.name || targetActor?.name || "",
+      targetName: target.targetName || targetTokenDocument?.name || targetActor?.name || "",
       recipientUserId: recipient.id,
       result: promptResult
     });

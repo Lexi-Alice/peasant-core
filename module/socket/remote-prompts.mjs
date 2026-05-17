@@ -18,8 +18,11 @@ const PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HIT = "applyIncomingHit";
 const PC_SOCKETLIB_HANDLER_CANCEL_REMOTE_PROMPT = "cancelRemotePrompt";
 const _pcPendingSeizeRequests = new Map();
 let _pcSocketlib = null;
+let _pcSocketlibInitializationQueued = false;
 
 function _initializePeasantSocketlib() {
+  if (_pcSocketlibInitializationQueued) return;
+  _pcSocketlibInitializationQueued = true;
   Hooks.once("socketlib.ready", () => {
     try {
       if (typeof socketlib === "undefined") {
@@ -99,6 +102,22 @@ async function _requestDefensePromptForUser(userId, payload = {}) {
     return false;
   }
 
+  const handleLocallyAsGM = async (reason) => {
+    if (!game.user?.isGM) return false;
+    const handler = _getPeasantCoreApiFunction("showDefensePrompt");
+    if (typeof handler !== "function") return false;
+    pcLog.warn("Peasant Core | Handling defense prompt on GM client", {
+      reason,
+      intendedRecipientUserId: userId,
+      attack: payload.attackCombatName,
+      target: payload.targetTokenName || payload.targetActorId
+    });
+    return await handler({
+      ...payload,
+      recipientUserId: game.user.id
+    });
+  };
+
   if (_pcSocketlib?.executeAsUser) {
     try {
       const result = await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_PROMPT_DEFENSE, userId, payload);
@@ -107,11 +126,20 @@ async function _requestDefensePromptForUser(userId, payload = {}) {
         attack: payload.attackCombatName,
         target: payload.targetTokenName || payload.targetActorId
       });
+      if (result === false || result == null) {
+        const localResult = await handleLocallyAsGM("remote-unhandled");
+        if (localResult !== false) return localResult;
+      }
       return result;
     } catch (err) {
       console.warn("Peasant Core | socketlib defense prompt failed, falling back to raw socket", err);
+      const localResult = await handleLocallyAsGM("socketlib-error");
+      if (localResult !== false) return localResult;
     }
   }
+
+  const localResult = await handleLocallyAsGM("socketlib-unavailable");
+  if (localResult !== false) return localResult;
 
   if (game?.socket) {
     game.socket.emit(PC_SOCKET_NAMESPACE, {

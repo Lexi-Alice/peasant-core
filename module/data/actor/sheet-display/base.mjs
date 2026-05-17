@@ -27,6 +27,12 @@ import {
 } from "../edge-resources.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isSimplifiedHpActor } from "../helpers.mjs";
 import {
+  getDefaultNationalOriginLabel,
+  getNationalOriginOptions,
+  getSirLocationRows,
+  resolveNationalOriginLabel
+} from "../identity-options.mjs";
+import {
   PC_ART_PANEL_COLLAPSED_FLAG,
   PC_DEFAULT_RUN_MULTIPLIER,
   PC_DEFAULT_SPRINT_MULTIPLIER,
@@ -44,6 +50,7 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
   data.artPanelCollapsed = !!actor?.getFlag?.("peasant-core", PC_ART_PANEL_COLLAPSED_FLAG);
   data.editable = isEditable && isEditMode;
   data.peasantCoreSettingGroups = getPeasantCoreSettingGroups(actor, data.editable !== false);
+  data.sirLocations = getSirLocationRows(actor);
 
   const bolsteredHpSafe = Math.max(0, Number(data?.actor?.system?.bolsteredHp) || 0);
   const runMultiplierRaw = Number(actor?.getFlag?.("peasant-core", PC_RUN_MULTIPLIER_FLAG));
@@ -101,8 +108,12 @@ export function prepareActorIdentityContext(data, actor, { isEditMode = false } 
   data.customOriginSelected = originSelection.isCustom;
   data.customSpecificOriginSelected = specificOriginSelection.isCustom;
   data.hasCustomIdentitySelection = !!isEditMode && (raceSelection.isCustom || originSelection.isCustom || specificOriginSelection.isCustom);
+  data.originOptions = getNationalOriginOptions(actor?.system?.origin);
   data.displayRace = raceSelection.display || "Human";
-  data.displayOrigin = originSelection.display || "Grimmstad";
+  data.displayOrigin = originSelection.isCustom
+    ? originSelection.display
+    : resolveNationalOriginLabel(originSelection.display);
+  if (!data.displayOrigin) data.displayOrigin = getDefaultNationalOriginLabel();
   data.displaySpecificOrigin = specificOriginSelection.display || "Soldier";
 }
 

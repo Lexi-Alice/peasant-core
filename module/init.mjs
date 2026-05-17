@@ -2,7 +2,9 @@
 import { configurePeasantCombat } from "./documents/_module.mjs";
 import { configureChatListeners } from "./applications/chat-listeners.mjs";
 import { configureCombatTracker } from "./applications/combat-tracker.mjs";
+import { registerPeasantCombatApi } from "./applications/combat/api.mjs";
 import { PC_WORLD_MIGRATION_VERSION_SETTING, migrateWorldNotableCombatData } from "./migration/world.mjs";
+import { registerPeasantCoreSettingsMenus } from "./settings.mjs";
 import { initializePeasantSockets, registerPeasantSocketHandler } from "./socket/remote-prompts.mjs";
 import { registerDebugLoggingSetting } from "./utils/logging.mjs";
 
@@ -15,6 +17,7 @@ Hooks.once('init', () => {
   configureChatListeners();
   configureCombatTracker();
   registerDebugLoggingSetting();
+  registerPeasantCoreSettingsMenus();
 
   game.settings.register("peasant-core", PC_WORLD_MIGRATION_VERSION_SETTING, {
     scope: "world",
@@ -31,6 +34,8 @@ Hooks.once('init', () => {
 
 Hooks.once('ready', () => {
   console.log('Peasant Core | Setting up combat system');
+  initializePeasantSockets();
+  registerPeasantCombatApi();
   registerPeasantSocketHandler();
   void migrateWorldNotableCombatData();
   if (game?.combats) {

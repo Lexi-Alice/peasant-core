@@ -5,11 +5,6 @@ const { fields } = foundry.data;
 export class PeasantCharacterModel extends foundry.abstract.DataModel {
   static migrateData(source) {
     const data = super.migrateData(source);
-    const migrateSirValue = (legacyKey, nextKey) => {
-      const currentValue = String(data?.[nextKey] ?? "").trim();
-      const legacyValue = String(data?.[legacyKey] ?? "").trim();
-      if (!currentValue && legacyValue) data[nextKey] = legacyValue;
-    };
     const migrateDiceBonus = (rollData) => {
       if (!rollData || typeof rollData !== "object") return rollData;
       const next = { ...rollData };
@@ -23,18 +18,6 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       }
       return next;
     };
-
-    migrateSirValue("sirGrimmstad", "sirFrenchRepublic");
-    migrateSirValue("sirSavonia", "sirUnitedKingdom");
-    migrateSirValue("sirThingollr", "sirHabsburgMonarchy");
-    migrateSirValue("sirRoyce", "sirKingdomOfSweden");
-    migrateSirValue("sirGarren", "sirRussianEmpire");
-    migrateSirValue("sirVestinia", "sirOttomanEmpire");
-    migrateSirValue("sirLupine", "sirDenmarkNorway");
-    migrateSirValue("sirLeon", "sirKingdomOfSpain");
-    migrateSirValue("sirUrsa", "sirStarborn");
-    migrateSirValue("sirDoomi", "sirAtlantis");
-    migrateSirValue("sirSkeever", "sirAtlantis");
 
     if (Array.isArray(data?.notableCombats)) {
       data.notableCombats = data.notableCombats.map((combat) => {
@@ -90,7 +73,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       
       race: new fields.StringField({ initial: "Human" }),
       customRace: new fields.StringField({ initial: "" }),
-      origin: new fields.StringField({ initial: "French Republic" }),
+      origin: new fields.StringField({ initial: "Grimmstad" }),
       customOrigin: new fields.StringField({ initial: "" }),
       specificOrigin: new fields.StringField({ initial: "Soldier" }),
       customSpecificOrigin: new fields.StringField({ initial: "" }),
@@ -158,17 +141,17 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         }), { initial: [] })
       }),
       // SIR fields
-      sirFrenchRepublic: new fields.StringField({ initial: "" }),
-      sirUnitedKingdom: new fields.StringField({ initial: "" }),
-      sirHabsburgMonarchy: new fields.StringField({ initial: "" }),
-      sirKingdomOfPrussia: new fields.StringField({ initial: "" }),
-      sirKingdomOfSweden: new fields.StringField({ initial: "" }),
-      sirRussianEmpire: new fields.StringField({ initial: "" }),
-      sirOttomanEmpire: new fields.StringField({ initial: "" }),
-      sirDenmarkNorway: new fields.StringField({ initial: "" }),
-      sirKingdomOfSpain: new fields.StringField({ initial: "" }),
-      sirStarborn: new fields.StringField({ initial: "" }),
-      sirAtlantis: new fields.StringField({ initial: "" }),
+      sirGrimmstad: new fields.StringField({ initial: "" }),
+      sirSavonia: new fields.StringField({ initial: "" }),
+      sirThingollr: new fields.StringField({ initial: "" }),
+      sirRoyce: new fields.StringField({ initial: "" }),
+      sirGarren: new fields.StringField({ initial: "" }),
+      sirVestinia: new fields.StringField({ initial: "" }),
+      sirLupine: new fields.StringField({ initial: "" }),
+      sirLeon: new fields.StringField({ initial: "" }),
+      sirUrsa: new fields.StringField({ initial: "" }),
+      sirDoomi: new fields.StringField({ initial: "" }),
+      sirSkeever: new fields.StringField({ initial: "" }),
       // Biography
       alignment: new fields.StringField({ initial: "" }),
       faith: new fields.StringField({ initial: "" }),

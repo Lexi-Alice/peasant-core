@@ -143,7 +143,7 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
   const staminaBar = buildResourceBar("stamina", "Stamina");
   const attunementBar = buildResourceBar("attunement", "Attunement");
   const capacityBar = buildResourceBar("capacity", "Capacity");
-  const edgeBar = buildResourceBar("edge", "Edge");
+  const edgeBar = buildResourceBar("edge", data.edgeDisplayLabel || "Edge");
   data.resourceBars = {
     stamina: staminaBar,
     attunement: attunementBar,

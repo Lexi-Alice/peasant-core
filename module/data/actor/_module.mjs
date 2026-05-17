@@ -13,6 +13,7 @@ export * from "./edge-resources.mjs";
 export * from "./helpers.mjs";
 export * from "./hp-commands.mjs";
 export * from "./hp-model.mjs";
+export * from "./identity-options.mjs";
 export * from "./sheet-settings.mjs";
 export * from "./sheet-display.mjs";
 export * from "./stress.mjs";

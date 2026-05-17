@@ -33,20 +33,9 @@
     {{#if @root.editable}}
       <div class="character-field-popover">
         <select name="system.origin" class="character-field">
-          <option value="French Republic" {{#if (eq actor.system.origin "French Republic")}} selected{{/if}}>French Republic</option>
-          <option value="United Kingdom of Great Britain and Ireland" {{#if (eq actor.system.origin "United Kingdom of Great Britain and Ireland")}} selected{{/if}}>United Kingdom of Great Britain and Ireland</option>
-          <option value="Habsburg Monarchy" {{#if (eq actor.system.origin "Habsburg Monarchy")}} selected{{/if}}>Habsburg Monarchy</option>
-          <option value="Kingdom of Prussia" {{#if (eq actor.system.origin "Kingdom of Prussia")}} selected{{/if}}>Kingdom of Prussia</option>
-          <option value="Kingdom of Sweden" {{#if (eq actor.system.origin "Kingdom of Sweden")}} selected{{/if}}>Kingdom of Sweden</option>
-          <option value="Russian Empire" {{#if (eq actor.system.origin "Russian Empire")}} selected{{/if}}>Russian Empire</option>
-          <option value="Ottoman Empire" {{#if (eq actor.system.origin "Ottoman Empire")}} selected{{/if}}>Ottoman Empire</option>
-          <option value="Denmark-Norway" {{#if (eq actor.system.origin "Denmark-Norway")}} selected{{/if}}>Denmark-Norway</option>
-          <option value="Kingdom of Spain" {{#if (eq actor.system.origin "Kingdom of Spain")}} selected{{/if}}>Kingdom of Spain</option>
-          <option value="Hearthless" {{#if (eq actor.system.origin "Hearthless")}} selected{{/if}}>Hearthless</option>
-          <option value="Starborn" {{#if (eq actor.system.origin "Starborn")}} selected{{/if}}>Starborn</option>
-          <option value="Atlantis" {{#if (eq actor.system.origin "Atlantis")}} selected{{/if}}>Atlantis</option>
-          <option value="Winter" {{#if (eq actor.system.origin "Winter")}} selected{{/if}}>Winter</option>
-          <option value="Port Noon" {{#if (eq actor.system.origin "Port Noon")}} selected{{/if}}>Port Noon</option>
+          {{#each originOptions as |origin|}}
+            <option value="{{origin.value}}" {{#if origin.selected}}selected{{/if}}>{{origin.label}}</option>
+          {{/each}}
           <option value="Custom" {{#if customOriginSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customOriginSelected}}
@@ -386,9 +375,9 @@
                   {{#if resourceBars.edge.show}}
                     <div class="pc-portrait-resource-bar-wrapper pc-resource-edge">
                       <div class="pc-portrait-resource-heading">
-                        <span>Edge</span>
+                        <span>{{resourceBars.edge.label}}</span>
                       </div>
-                      <div class="pc-portrait-resource-bar" data-resource="edge" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.edge.value}}" aria-valuemax="{{resourceBars.edge.max}}" title="Edge {{resourceBars.edge.value}} / {{resourceBars.edge.max}}">
+                      <div class="pc-portrait-resource-bar" data-resource="edge" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.edge.value}}" aria-valuemax="{{resourceBars.edge.max}}" title="{{resourceBars.edge.label}} {{resourceBars.edge.value}} / {{resourceBars.edge.max}}">
                         <div class="pc-portrait-resource-fill pc-portrait-resource-fill-edge" style="width: {{resourceBars.edge.pct}}%;"></div>
                         <span class="pc-portrait-resource-bar-label">
                           <span class="pc-portrait-resource-value">{{resourceBars.edge.value}}</span>
@@ -396,9 +385,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.edge.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input" data-resource="edge" value="{{resourceBars.edge.max}}" min="0" inputmode="numeric" aria-label="Edge maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input" data-resource="edge" value="{{resourceBars.edge.max}}" min="0" inputmode="numeric" aria-label="{{resourceBars.edge.label}} maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input" data-resource="edge" value="{{resourceBars.edge.value}}" min="0" max="{{resourceBars.edge.max}}" inputmode="numeric" aria-label="Edge current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input" data-resource="edge" value="{{resourceBars.edge.value}}" min="0" max="{{resourceBars.edge.max}}" inputmode="numeric" aria-label="{{resourceBars.edge.label}} current" hidden>
                           {{/if}}
                       </div>
                     </div>
