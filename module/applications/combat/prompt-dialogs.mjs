@@ -1,6 +1,6 @@
 import { normalizeAppliedDamageType } from "../../data/actor/targeted-damage.mjs";
 import { pcLog } from "../../utils/logging.mjs";
-import { renderDialogCompat } from "../dialogs.mjs";
+import { renderDialogV2 } from "../dialogs.mjs";
 
 function showWaitingForDefenderResponseDialog() {
   let dialogApp = null;
@@ -24,7 +24,7 @@ function showWaitingForDefenderResponseDialog() {
     </div>
   `;
 
-  dialogApp = renderDialogCompat({
+  dialogApp = renderDialogV2({
     title: "Waiting for Defender Response",
     content,
     buttons: {
@@ -44,7 +44,7 @@ function showWaitingForDefenderResponseDialog() {
       });
       html.find(".window-content, .dialog-content, form, .standard-form").css({ overflow: "hidden" });
       html.find(".dialog-buttons, .form-footer, footer").hide();
-      const renderedWindow = html.closest(".window-app, .application")[0] || html[0];
+      const renderedWindow = html.closest(".application, dialog")[0] || html[0];
       $(renderedWindow)
         .find('.header-control, [data-action="close"], [data-button="close"]')
         .off(".pcWaitingClose")
@@ -122,7 +122,7 @@ export async function showFlexibleDamageTypePrompt({
     <form class="pc-flexible-damage-type-form">
       <div class="form-group" style="margin-bottom: 10px;">
         <label style="display:block; margin-bottom:5px; color:#b0b0b0;">Damage Type:</label>
-        <select class="pc-defense-prompt-select" name="flexibleDamageType" style="width:100%; padding:8px 10px; min-height:38px; font-size:14px;">
+        <select class="pc-defense-prompt-select pc-select pc-dialog-field-full" name="flexibleDamageType">
           <option value="blunt">Blunt</option>
           <option value="lethal">Lethal</option>
         </select>
@@ -146,7 +146,7 @@ export async function showFlexibleDamageTypePrompt({
       return result;
     };
 
-    renderDialogCompat({
+    renderDialogV2({
       title: `Choose Damage Type: ${combatName}`,
       content,
       buttons: {
@@ -185,7 +185,7 @@ export async function showFlexibleDamageTypePrompt({
         });
         html.find(".window-content, .dialog-content").css({ overflowX: "hidden" });
 
-        renderedWindow = html.closest(".window-app, .application")[0] || html[0];
+        renderedWindow = html.closest(".application, dialog")[0] || html[0];
         $(renderedWindow)
           .find('.header-control, [data-action="close"], [data-button="close"]')
           .off(".pcFlexibleDamageClose")
@@ -224,7 +224,7 @@ export async function showForcePassPromptDialog({
       <div class="form-group" style="margin-bottom: 10px;">
         <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:#b0b0b0;">
           <span>Spend ${stressCost} stress to force pass?</span>
-          <select class="pc-defense-prompt-select" name="forcePassStressType" style="width: 180px; padding:8px 10px; min-height:38px; font-size:14px;">
+          <select class="pc-defense-prompt-select pc-select pc-dialog-field-md" name="forcePassStressType">
             <option value="physical">Physical Stress</option>
             <option value="mental">Mental Stress</option>
             <option value="general">General Stress</option>
@@ -250,7 +250,7 @@ export async function showForcePassPromptDialog({
       return result;
     };
 
-    renderDialogCompat({
+    renderDialogV2({
       title: rollLabel,
       content,
       buttons: {
@@ -281,7 +281,7 @@ export async function showForcePassPromptDialog({
         });
         html.find(".window-content, .dialog-content").css({ overflowX: "hidden" });
 
-        renderedWindow = html.closest(".window-app, .application")[0] || html[0];
+        renderedWindow = html.closest(".application, dialog")[0] || html[0];
         $(renderedWindow)
           .find('.header-control, [data-action="close"], [data-button="close"]')
           .off(".pcForcePassClose")

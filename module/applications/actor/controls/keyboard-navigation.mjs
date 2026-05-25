@@ -1,25 +1,23 @@
+import { qsa, toElement } from "../../dom.mjs";
+
 export function setupSheetKeyboardNavigation(sheet, html, { sheetDocument } = {}) {
   if (!sheetDocument) return;
 
   const getEditModeInputs = () => {
-    const allInputs = html.find('input:not([type="checkbox"]):not([type="hidden"]), select, .advantage-input, .editor-content[contenteditable="true"], .ProseMirror[contenteditable="true"]').toArray();
+    const allInputs = qsa(html, 'input:not([type="checkbox"]):not([type="hidden"]), select, .advantage-input, .editor-content[contenteditable="true"], .ProseMirror[contenteditable="true"]');
 
     const filtered = allInputs.filter(el => {
       try {
-        const $el = $(el);
+        if (el.closest(".hidden")) return false;
+        if (el.closest('[style*="display: none"]')) return false;
+        if (el.closest('[style*="display:none"]')) return false;
 
-        if ($el.closest(".hidden").length) return false;
-        if ($el.closest('[style*="display: none"]').length) return false;
-        if ($el.closest('[style*="display:none"]').length) return false;
+        if (el.classList.contains("skill-select")) return false;
 
-        if ($el.closest(".blessing-menu, .wounds-menu, .damage-controls, .heal-controls, .stress-damage-controls, .stress-heal-controls").length) return false;
-
-        if ($el.hasClass("skill-select")) return false;
-
-        const name = $el.attr("name") || "";
+        const name = el.getAttribute("name") || "";
         if (name === "system.race" || name === "system.origin" || name === "system.specificOrigin") return false;
 
-        if ($el.hasClass("edge-base-label-mode") || $el.hasClass("edge-resource-label-mode") || $el.hasClass("edge-label-mode")) return false;
+        if (el.classList.contains("edge-base-label-mode") || el.classList.contains("edge-resource-label-mode") || el.classList.contains("edge-label-mode")) return false;
 
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return false;
@@ -71,15 +69,13 @@ export function setupSheetKeyboardNavigation(sheet, html, { sheetDocument } = {}
       ".combat-tag-uses-current"
     ];
 
-    const allElements = html.find(selectors.join(", ")).toArray();
+    const allElements = qsa(html, selectors.join(", "));
 
     const filtered = allElements.filter(el => {
       try {
-        const $el = $(el);
-
-        if ($el.closest(".hidden").length) return false;
-        if ($el.closest('[style*="display: none"]').length) return false;
-        if ($el.closest('[style*="display:none"]').length) return false;
+        if (el.closest(".hidden")) return false;
+        if (el.closest('[style*="display: none"]')) return false;
+        if (el.closest('[style*="display:none"]')) return false;
 
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return false;
@@ -186,7 +182,7 @@ export function setupSheetKeyboardNavigation(sheet, html, { sheetDocument } = {}
   };
 
   const handleArrowKey = (ev) => {
-    const sheetRoot = html?.[0] ?? null;
+    const sheetRoot = toElement(html);
     const eventTarget = ev.target;
     if (sheetRoot && eventTarget && eventTarget !== sheetRoot && !sheetRoot.contains(eventTarget)) return;
 

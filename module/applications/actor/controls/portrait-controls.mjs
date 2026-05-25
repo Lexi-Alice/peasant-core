@@ -1,7 +1,8 @@
+import { qs, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
 const ImagePopoutClass = foundry?.applications?.apps?.ImagePopout;
-const FilePickerClass = foundry?.applications?.apps?.FilePicker ?? globalThis.FilePicker;
+const FilePickerClass = foundry.applications.apps.FilePicker;
 
 export function teardownPortraitBindings(sheet) {
   try {
@@ -11,24 +12,27 @@ export function teardownPortraitBindings(sheet) {
   } catch (e) { /* ignore */ }
   sheet._portraitRO = null;
 
-  const ns = sheet._portraitMouseupNamespace;
-  if (ns) {
-    try { $(sheet._portraitMouseupDocument ?? sheet._getElementDocument?.()).off(`mouseup${ns}`); } catch (e) { /* ignore */ }
-    sheet._portraitMouseupNamespace = null;
-    sheet._portraitMouseupDocument = null;
+  try {
+    sheet._portraitEventController?.abort?.();
+  } catch (e) {
+    /* ignore */
   }
+  sheet._portraitEventController = null;
+  sheet._portraitMouseupDocument = null;
 }
 
 export function setupPortraitControls(sheet, html) {
-  const sheetDocument = sheet._getElementDocument?.(html?.[0]) ?? document;
-  const portraitEl = html.find(".character-portrait")[0];
+  const sheetRoot = toElement(html);
+  const sheetDocument = sheet._getElementDocument?.(sheetRoot) ?? document;
+  const portraitEl = qs(sheetRoot, ".character-portrait");
+  try { sheet._portraitEventController?.abort?.(); } catch (e) { /* ignore */ }
+  const eventController = new AbortController();
+  const { signal } = eventController;
+  sheet._portraitEventController = eventController;
+
   if (portraitEl) {
     const debouncedSave = foundry.utils.debounce(() => savePortraitFromDOM(sheet), 400);
-    const portraitMouseupNamespace = `.peasant-portrait-save-${sheet.appId || sheet.id || "sheet"}`;
-    sheet._portraitMouseupNamespace = portraitMouseupNamespace;
-    const $portrait = $(portraitEl);
-    const $portraitImg = $portrait.find("img");
-    const portraitImg = $portraitImg[0];
+    const portraitImg = qs(portraitEl, "img");
     const portraitState = {
       offsetX: sheet.actor.system.portraitOffsetX || 0,
       offsetY: sheet.actor.system.portraitOffsetY || 0,
@@ -157,9 +161,7 @@ export function setupPortraitControls(sheet, html) {
     }
 
     sheet._portraitMouseupDocument = sheetDocument;
-    $(sheetDocument)
-      .off(`mouseup${portraitMouseupNamespace}`)
-      .on(`mouseup${portraitMouseupNamespace}`, () => debouncedSave());
+    sheetDocument.addEventListener("mouseup", () => debouncedSave(), { signal });
 
     if (portraitImg) {
       try { portraitImg.setAttribute("draggable", "false"); } catch (e) {}
@@ -167,21 +169,21 @@ export function setupPortraitControls(sheet, html) {
         portraitImg.addEventListener("load", () => {
           updatePortraitMetrics(portraitSize);
           ensurePortraitClamped();
-        }, { once: true });
+        }, { once: true, signal });
       } else {
         updatePortraitMetrics(portraitSize);
       }
 
-      $portraitImg.off("wheel.peasant-portrait").on("wheel.peasant-portrait", (ev) => {
+      portraitImg.addEventListener("wheel", (ev) => {
         if (!sheet.isEditMode) return;
         ev.preventDefault();
-        const delta = ev.originalEvent?.deltaY ?? ev.deltaY ?? 0;
+        const delta = ev.deltaY ?? 0;
         const step = delta > 0 ? -0.1 : 0.1;
         const maxScale = 4.0;
         const nextScale = Math.min(maxScale, Math.max(1.0, portraitState.scale + step));
         const clamped = clampPortraitTransform(portraitState.offsetX, portraitState.offsetY, nextScale);
         schedulePortraitTransform(clamped.offsetX, clamped.offsetY, clamped.scale);
-      });
+      }, { signal, passive: false });
 
       let isDragging = false;
       let activePointerId = null;
@@ -198,12 +200,12 @@ export function setupPortraitControls(sheet, html) {
         activePointerId = null;
         dragOffsetX = portraitState.offsetX;
         dragOffsetY = portraitState.offsetY;
-        $portraitImg.removeClass("draggable");
+        portraitImg.classList.remove("draggable");
         try { portraitImg.releasePointerCapture(ev?.pointerId); } catch (e) {}
         debouncedSave();
       };
 
-      $portraitImg.off("pointerdown.peasant-portrait").on("pointerdown.peasant-portrait", (ev) => {
+      portraitImg.addEventListener("pointerdown", (ev) => {
         if (!sheet.isEditMode) return;
         if (ev.button !== 0 && ev.pointerType !== "touch") return;
         if (portraitState.scale <= PAN_MIN_SCALE) return;
@@ -216,11 +218,11 @@ export function setupPortraitControls(sheet, html) {
         lastY = ev.clientY;
         isDragging = true;
         activePointerId = ev.pointerId;
-        $portraitImg.addClass("draggable");
+        portraitImg.classList.add("draggable");
         try { portraitImg.setPointerCapture(ev.pointerId); } catch (e) {}
-      });
+      }, { signal });
 
-      $portraitImg.off("pointermove.peasant-portrait").on("pointermove.peasant-portrait", (ev) => {
+      portraitImg.addEventListener("pointermove", (ev) => {
         if (!isDragging) return;
         if (activePointerId !== null && ev.pointerId !== activePointerId) return;
         ev.preventDefault();
@@ -232,20 +234,21 @@ export function setupPortraitControls(sheet, html) {
         dragOffsetX = clamped.offsetX;
         dragOffsetY = clamped.offsetY;
         schedulePortraitTransform(clamped.offsetX, clamped.offsetY, clamped.scale);
-      });
+      }, { signal });
 
-      $portraitImg
-        .off("pointerup.peasant-portrait pointercancel.peasant-portrait lostpointercapture.peasant-portrait")
-        .on("pointerup.peasant-portrait pointercancel.peasant-portrait lostpointercapture.peasant-portrait", stopDragging);
+      portraitImg.addEventListener("pointerup", stopDragging, { signal });
+      portraitImg.addEventListener("pointercancel", stopDragging, { signal });
+      portraitImg.addEventListener("lostpointercapture", stopDragging, { signal });
     }
 
     ensurePortraitClamped();
   }
 
   try {
-    $(portraitEl).on("click", "img", (ev) => {
+    portraitEl?.addEventListener("click", (ev) => {
+      if (!ev.target?.closest?.("img")) return;
       if (sheet.isEditMode) return;
-      const img = ev.currentTarget;
+      const img = ev.target.closest("img");
       const src = img.getAttribute && (img.getAttribute("src") || img.dataset?.src) || img.src;
       if (!src) return;
       try {
@@ -262,13 +265,14 @@ export function setupPortraitControls(sheet, html) {
       } catch (err) {
         window.open(src, "_blank");
       }
-    });
+    }, { signal });
   } catch (err) {
     pcLog.debug("PeasantActorSheet: failed to attach portrait click handler", err);
   }
 
   try {
-    $(portraitEl).on("contextmenu", "img", async (ev) => {
+    portraitEl?.addEventListener("contextmenu", async (ev) => {
+      if (!ev.target?.closest?.("img")) return;
       if (!sheet.isEditMode) return;
       ev.preventDefault();
       ev.stopPropagation();
@@ -289,7 +293,7 @@ export function setupPortraitControls(sheet, html) {
       } catch (err) {
         console.warn("Failed to reset actor image:", err);
       }
-    });
+    }, { signal });
   } catch (err) {
     pcLog.debug("PeasantActorSheet: failed to attach portrait reset handler", err);
   }
@@ -336,7 +340,9 @@ export function setupPortraitControls(sheet, html) {
       fp.render(true);
     };
 
-    html.on("click", ".select-portrait-btn", openPortraitPicker);
+    for (const button of (sheetRoot?.querySelectorAll?.(".select-portrait-btn") ?? [])) {
+      button.addEventListener("click", openPortraitPicker, { signal });
+    }
   } catch (err) {
     console.warn("Failed to bind portrait change handler:", err);
   }
@@ -344,12 +350,13 @@ export function setupPortraitControls(sheet, html) {
 
 export async function savePortraitFromDOM(sheet) {
   try {
-    const portrait = sheet._getSheetJQ().find(".character-portrait");
-    const img = portrait.find("img");
-    if (!portrait.length || !img.length) return;
+    const sheetRoot = toElement(sheet.element) ?? sheet._getSheetJQ?.()?.[0] ?? null;
+    const portrait = qs(sheetRoot, ".character-portrait");
+    const img = qs(portrait, "img");
+    if (!portrait || !img) return;
 
-    const currentWidth = portrait.outerWidth();
-    const currentHeight = portrait.outerHeight();
+    const currentWidth = portrait.offsetWidth;
+    const currentHeight = portrait.offsetHeight;
 
     let offsetX = sheet.actor.system.portraitOffsetX || 0;
     let offsetY = sheet.actor.system.portraitOffsetY || 0;
@@ -363,7 +370,7 @@ export async function savePortraitFromDOM(sheet) {
       offsetY = state.offsetY;
       scale = Math.max(1.0, state.scale || scale);
     } else {
-      transformStr = img[0].style?.transform || getComputedStyle(img[0]).transform || "";
+      transformStr = img.style?.transform || getComputedStyle(img).transform || "";
 
       const t3 = transformStr.match(/translate3d\(\s*([-0-9.]+)px,\s*([-0-9.]+)px,\s*[-0-9.]+px\)/i);
       if (t3) {

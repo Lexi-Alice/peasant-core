@@ -7,7 +7,10 @@ export function createNotableCombatTagEditorState($container) {
 
   const syncUi = () => {
     const isEditing = state.mode === "edit" && !!state.tagType;
-    $container.find(".peasant-tag-add").text(isEditing ? "Save Tag" : "Add Tag");
+    const $addButton = $container.find(".peasant-tag-add");
+    const $addLabel = $addButton.find("span").first();
+    if ($addLabel.length) $addLabel.text(isEditing ? "Save Tag" : "Add Tag");
+    else $addButton.text(isEditing ? "Save Tag" : "Add Tag");
     $container.find(".add-tag-section-label").text(isEditing ? "Edit Tag:" : "Add New Tag:");
   };
 

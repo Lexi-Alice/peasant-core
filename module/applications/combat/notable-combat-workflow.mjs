@@ -20,7 +20,8 @@ export async function performNotableCombatRoll({
   promptForTargets = true,
   rollOverrides = null,
   targetLabel = "",
-  selectedDamageType = null
+  selectedDamageType = null,
+  cardClass = ""
 } = {}) {
   try {
     if (!actor) return false;
@@ -98,7 +99,8 @@ export async function performNotableCombatRoll({
         rollOverrides,
         defenseAccuracyPenalty: 0,
         defenseToHitPenalty: 0,
-        targetLabel: "Multiple Targets"
+        targetLabel: "Multiple Targets",
+        cardClass
       });
       if (isChainCancelledResult(sharedAttackRoll)) {
         await consumeNotableCombatRollUse(actor, combatIndex, sheet);
@@ -213,7 +215,8 @@ export async function performNotableCombatRoll({
         rollOverrides,
         defenseAccuracyPenalty: 0,
         defenseToHitPenalty: 0,
-        targetLabel: resolvedTargetLabel
+        targetLabel: resolvedTargetLabel,
+        cardClass
       });
       if (isChainCancelledResult(singleRoll)) {
         await consumeNotableCombatRollUse(actor, combatIndex, sheet);
@@ -227,7 +230,7 @@ export async function performNotableCombatRoll({
           chainCancelled: true
         };
       }
-      if (singleRoll?.rollResult && (defenseAccuracyPenalty > 0 || defenseToHitPenalty > 0)) {
+      if (singleRoll?.rollResult && (Math.abs(defenseAccuracyPenalty) > 0 || Math.abs(defenseToHitPenalty) > 0)) {
         const penaltyApplication = applyDefensePenaltiesToRollResult(singleRoll.rollResult, {
           defenseAccuracyPenalty,
           defenseToHitPenalty,
@@ -298,7 +301,8 @@ export async function startNotableCombatRoll({
   promptForTargets = true,
   rollOverrides = null,
   targetLabel = "",
-  selectedDamageType = null
+  selectedDamageType = null,
+  cardClass = ""
 } = {}) {
   if (!actor) return false;
 
@@ -308,7 +312,7 @@ export async function startNotableCombatRoll({
 
   const hasRangeRate = !!combat.rangeRate && combat.rangeRate !== "///";
   if (!hasRangeRate) {
-    return await performNotableCombatRoll({ actor, combatIndex, sheet, promptForTargets, rollOverrides, targetLabel, selectedDamageType });
+    return await performNotableCombatRoll({ actor, combatIndex, sheet, promptForTargets, rollOverrides, targetLabel, selectedDamageType, cardClass });
   }
 
   return showRangeRatePrompt({
@@ -320,6 +324,7 @@ export async function startNotableCombatRoll({
     rollOverrides,
     targetLabel,
     selectedDamageType,
+    cardClass,
     rollNotableCombat: performNotableCombatRoll
   });
 }

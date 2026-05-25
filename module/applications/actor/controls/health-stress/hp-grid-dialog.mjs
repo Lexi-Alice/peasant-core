@@ -1,7 +1,9 @@
 import { isSimplifiedHpActor } from "../../../../data/actor/helpers.mjs";
 import { performConsciousnessCheck } from "../../../../dice/rolls.mjs";
+import { qs, qsa, toElement } from "../../../dom.mjs";
 
 const PC_CONSCIOUSNESS_SAVE_FLAG = "rollConsciousnessAsSaves";
+const hpGridControllers = new WeakMap();
 
 export function openHpGridDialog(sheet, trigger = null) {
   const dialog = sheet._renderDialog({
@@ -9,9 +11,10 @@ export function openHpGridDialog(sheet, trigger = null) {
     content: renderHpGridDialogContent(sheet),
     buttons: {},
     render: (html) => {
-      html.addClass("pc-hp-grid-dialog-window");
-      html.find(".dialog-buttons, .form-footer, footer").hide();
-      bindHpGridDialog(sheet, html);
+      const root = toElement(html);
+      root?.classList.add("pc-hp-grid-dialog-window");
+      for (const element of qsa(root, ".dialog-buttons, .form-footer, footer")) element.style.display = "none";
+      bindHpGridDialog(sheet, root);
     }
   }, {
     classes: ["peasant-core", "pc-hp-grid-dialog"],
@@ -87,9 +90,11 @@ function renderHpGridDialogContent(sheet) {
 }
 
 function refreshHpGridDialog(sheet, root) {
-  const jq = root instanceof jQuery ? root : $(root);
-  jq.find(".pc-hp-grid-dialog-body").html(renderHpGridDialogBody(sheet));
-  bindHpGridDialog(sheet, jq);
+  const rootElement = toElement(root);
+  const body = qs(rootElement, ".pc-hp-grid-dialog-body");
+  if (!body) return;
+  body.innerHTML = renderHpGridDialogBody(sheet);
+  bindHpGridDialog(sheet, rootElement);
 }
 
 async function changeHpGridSize(sheet, rowDelta = 0, colDelta = 0) {
@@ -101,68 +106,66 @@ async function setHpGridCell(sheet, row, col, value) {
 }
 
 function bindHpGridDialog(sheet, root) {
-  const jq = root instanceof jQuery ? root : $(root);
+  const rootElement = toElement(root);
+  if (!rootElement) return;
 
-  jq.find(".hp-col-plus").off("click.pcHpGrid").on("click.pcHpGrid", async (ev) => {
-    ev.preventDefault();
-    await changeHpGridSize(sheet, 0, 1);
+  hpGridControllers.get(rootElement)?.abort();
+  const controller = new AbortController();
+  hpGridControllers.set(rootElement, controller);
+  const { signal } = controller;
+
+  const refresh = async () => {
     await sheet.render(false);
-    refreshHpGridDialog(sheet, jq);
-  });
+    refreshHpGridDialog(sheet, rootElement);
+  };
 
-  jq.find(".hp-col-minus").off("click.pcHpGrid").on("click.pcHpGrid", async (ev) => {
-    ev.preventDefault();
-    await changeHpGridSize(sheet, 0, -1);
-    await sheet.render(false);
-    refreshHpGridDialog(sheet, jq);
-  });
+  const bindResize = (selector, rowDelta, colDelta) => {
+    for (const button of qsa(rootElement, selector)) {
+      button.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        await changeHpGridSize(sheet, rowDelta, colDelta);
+        await refresh();
+      }, { signal });
+    }
+  };
 
-  jq.find(".hp-row-plus").off("click.pcHpGrid").on("click.pcHpGrid", async (ev) => {
-    ev.preventDefault();
-    await changeHpGridSize(sheet, 1, 0);
-    await sheet.render(false);
-    refreshHpGridDialog(sheet, jq);
-  });
+  bindResize(".hp-col-plus", 0, 1);
+  bindResize(".hp-col-minus", 0, -1);
+  bindResize(".hp-row-plus", 1, 0);
+  bindResize(".hp-row-minus", -1, 0);
 
-  jq.find(".hp-row-minus").off("click.pcHpGrid").on("click.pcHpGrid", async (ev) => {
-    ev.preventDefault();
-    await changeHpGridSize(sheet, -1, 0);
-    await sheet.render(false);
-    refreshHpGridDialog(sheet, jq);
-  });
+  for (const cell of qsa(rootElement, ".hp-cell:not(.stress-cell)")) {
+    cell.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const row = Number.parseInt(cell.dataset.row, 10);
+      const col = Number.parseInt(cell.dataset.col, 10);
+      if (Number.isNaN(row) || Number.isNaN(col)) return;
+      const current = Number(sheet.actor.system?.hp?.grid?.[row]?.[col]) || 0;
+      await setHpGridCell(sheet, row, col, (current + 1) % 4);
+      await refresh();
+    }, { signal });
 
-  jq.find(".hp-cell:not(.stress-cell)").off("click.pcHpGrid").on("click.pcHpGrid", async (ev) => {
-    ev.preventDefault();
-    const cell = $(ev.currentTarget);
-    const row = Number.parseInt(cell.data("row"), 10);
-    const col = Number.parseInt(cell.data("col"), 10);
-    if (Number.isNaN(row) || Number.isNaN(col)) return;
-    const current = Number(sheet.actor.system?.hp?.grid?.[row]?.[col]) || 0;
-    await setHpGridCell(sheet, row, col, (current + 1) % 4);
-    await sheet.render(false);
-    refreshHpGridDialog(sheet, jq);
-  });
+    cell.addEventListener("contextmenu", async (ev) => {
+      ev.preventDefault();
+      const row = Number.parseInt(cell.dataset.row, 10);
+      const col = Number.parseInt(cell.dataset.col, 10);
+      if (Number.isNaN(row) || Number.isNaN(col)) return;
+      await setHpGridCell(sheet, row, col, 0);
+      await refresh();
+    }, { signal });
+  }
 
-  jq.find(".hp-cell:not(.stress-cell)").off("contextmenu.pcHpGrid").on("contextmenu.pcHpGrid", async (ev) => {
-    ev.preventDefault();
-    const cell = $(ev.currentTarget);
-    const row = Number.parseInt(cell.data("row"), 10);
-    const col = Number.parseInt(cell.data("col"), 10);
-    if (Number.isNaN(row) || Number.isNaN(col)) return;
-    await setHpGridCell(sheet, row, col, 0);
-    await sheet.render(false);
-    refreshHpGridDialog(sheet, jq);
-  });
-
-  jq.find(".hp-tn-clickable").off("click.pcHpGrid").on("click.pcHpGrid", async (ev) => {
-    ev.preventDefault();
-    const th = Number.parseInt($(ev.currentTarget).data("th"), 10);
-    if (!Number.isFinite(th)) return;
-    const asSave = !!sheet.actor?.getFlag?.("peasant-core", PC_CONSCIOUSNESS_SAVE_FLAG);
-    await performConsciousnessCheck({
-      tn: th,
-      asSave,
-      speaker: ChatMessage.getSpeaker({ actor: sheet.actor })
-    });
-  });
+  for (const button of qsa(rootElement, ".hp-tn-clickable")) {
+    button.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const th = Number.parseInt(button.dataset.th, 10);
+      if (!Number.isFinite(th)) return;
+      const asSave = !!sheet.actor?.getFlag?.("peasant-core", PC_CONSCIOUSNESS_SAVE_FLAG);
+      await performConsciousnessCheck({
+        tn: th,
+        asSave,
+        speaker: ChatMessage.getSpeaker({ actor: sheet.actor })
+      });
+    }, { signal });
+  }
 }

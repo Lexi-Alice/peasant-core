@@ -1,3 +1,14 @@
+export const PC_DAMAGE_RESISTANCE_BLUNT_MULTIPLIER_FLAG = "damageResistanceBluntMultiplier";
+export const PC_DAMAGE_RESISTANCE_LETHAL_MULTIPLIER_FLAG = "damageResistanceLethalMultiplier";
+export const PC_DAMAGE_RESISTANCE_CRITICAL_MULTIPLIER_FLAG = "damageResistanceCriticalMultiplier";
+export const PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER = 1;
+
+export const PC_DAMAGE_RESISTANCE_MULTIPLIER_FLAGS = Object.freeze({
+  blunt: PC_DAMAGE_RESISTANCE_BLUNT_MULTIPLIER_FLAG,
+  lethal: PC_DAMAGE_RESISTANCE_LETHAL_MULTIPLIER_FLAG,
+  critical: PC_DAMAGE_RESISTANCE_CRITICAL_MULTIPLIER_FLAG
+});
+
 export function splitDamageCounts(amount, type) {
   const total = Math.max(0, Number(amount) || 0);
   const counts = { critical: 0, lethal: 0, blunt: 0 };
@@ -25,11 +36,44 @@ export function splitDamageCounts(amount, type) {
   return counts;
 }
 
-export function toSimplifiedHpDamage(amount, type, hardLocation = false) {
-  const raw = Math.max(0, Number(amount) || 0);
-  if (raw <= 0) return 0;
+export function sanitizeDamageResistanceMultiplier(value, fallback = PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER, min = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return Math.max(min, fallback);
+  return Math.max(min, parsed);
+}
 
-  const counts = splitDamageCounts(raw, String(type || "").toLowerCase());
+export function getDamageResistanceMultipliers(actor) {
+  return {
+    blunt: sanitizeDamageResistanceMultiplier(
+      actor?.getFlag?.("peasant-core", PC_DAMAGE_RESISTANCE_BLUNT_MULTIPLIER_FLAG),
+      PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER
+    ),
+    lethal: sanitizeDamageResistanceMultiplier(
+      actor?.getFlag?.("peasant-core", PC_DAMAGE_RESISTANCE_LETHAL_MULTIPLIER_FLAG),
+      PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER
+    ),
+    critical: sanitizeDamageResistanceMultiplier(
+      actor?.getFlag?.("peasant-core", PC_DAMAGE_RESISTANCE_CRITICAL_MULTIPLIER_FLAG),
+      PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER
+    )
+  };
+}
+
+export function applyDamageResistanceToCounts(counts, actor) {
+  const multipliers = getDamageResistanceMultipliers(actor);
+  return {
+    critical: Math.floor(Math.max(0, Number(counts?.critical) || 0) * multipliers.critical),
+    lethal: Math.floor(Math.max(0, Number(counts?.lethal) || 0) * multipliers.lethal),
+    blunt: Math.floor(Math.max(0, Number(counts?.blunt) || 0) * multipliers.blunt)
+  };
+}
+
+export function toSimplifiedHpDamageFromCounts(counts, hardLocation = false) {
+  counts = {
+    blunt: Math.max(0, Math.floor(Number(counts?.blunt) || 0)),
+    lethal: Math.max(0, Math.floor(Number(counts?.lethal) || 0)),
+    critical: Math.max(0, Math.floor(Number(counts?.critical) || 0))
+  };
   if (hardLocation && counts.lethal > 0) {
     const convertedToBlunt = Math.floor(counts.lethal / 2);
     counts.lethal -= convertedToBlunt;
@@ -37,6 +81,12 @@ export function toSimplifiedHpDamage(amount, type, hardLocation = false) {
   }
 
   return (counts.blunt || 0) + ((counts.lethal || 0) * 2) + ((counts.critical || 0) * 4);
+}
+
+export function toSimplifiedHpDamage(amount, type, hardLocation = false) {
+  const raw = Math.max(0, Number(amount) || 0);
+  if (raw <= 0) return 0;
+  return toSimplifiedHpDamageFromCounts(splitDamageCounts(raw, String(type || "").toLowerCase()), hardLocation);
 }
 
 export function sumDamageCounts(counts) {

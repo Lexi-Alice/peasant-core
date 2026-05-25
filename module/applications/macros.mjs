@@ -1,5 +1,6 @@
 // Mark macro-related dialogs with a stable class so CSS can style them
 // without replacing Foundry's default dialog classes.
+import { qsa, toElement } from "./dom.mjs";
 import { pcLog } from "../utils/logging.mjs";
 
 function _isPeasantMacroDialogTitle(title) {
@@ -13,49 +14,23 @@ function _isPeasantMacroDialogTitle(title) {
     || t.endsWith(" - description");
 }
 
-function _applyPeasantMacroFieldStyling($scope, $window = $()) {
-  if (!$scope?.length) return;
-  if ($window?.length) {
-    $window.addClass("peasant-macro-dialog peasant-macro-dialog-force");
+function _applyPeasantMacroFieldStyling(scope, windowEl = null) {
+  if (!scope) return;
+  if (windowEl) {
+    windowEl.classList.add("peasant-macro-dialog", "peasant-macro-dialog-force");
   }
 
-  const sampleInput = document.querySelector(
-    '.window-app.peasant-core .actor-sheet .combat-input,' +
-    '.window-app.peasant-core .actor-sheet .skill-input,' +
-    '.window-app.peasant-core .actor-sheet .resource-input,' +
-    '.window-app.peasant-core .actor-sheet input[type="number"],' +
-    '.window-app.peasant-core .actor-sheet input[type="text"]:not(.character-name)'
-  );
-  const sampleStyle = sampleInput ? getComputedStyle(sampleInput) : null;
-  const fallbackBackground = "var(--color-cool-4, #302831)";
-  const fallbackText = "var(--input-text-color, #e0e0e0)";
-  const fallbackBorder = "1px solid var(--color-cool-4, #302831)";
-  const backgroundValue = sampleStyle?.backgroundColor || fallbackBackground;
-  const textValue = sampleStyle?.color || fallbackText;
-  const borderColor = sampleStyle?.borderTopColor;
-  const borderWidth = sampleStyle?.borderTopWidth && sampleStyle.borderTopWidth !== "0px" ? sampleStyle.borderTopWidth : "1px";
-  const borderStyle = sampleStyle?.borderTopStyle && sampleStyle.borderTopStyle !== "none" ? sampleStyle.borderTopStyle : "solid";
-  const borderValue = borderColor ? `${borderWidth} ${borderStyle} ${borderColor}` : fallbackBorder;
-  const radiusValue = sampleStyle?.borderRadius || "3px";
-  const paddingValue = sampleStyle?.padding || "6px 8px";
-
   const applyInputStyles = () => {
-    const $inputs = $scope.find('input[type="number"], input[type="text"], select');
-    $inputs.addClass("pc-macro-input");
-    for (const el of $inputs.toArray()) {
-      el.style.setProperty("background", backgroundValue, "important");
-      el.style.setProperty("color", textValue, "important");
-      el.style.setProperty("border", borderValue, "important");
-      el.style.setProperty("border-radius", radiusValue, "important");
-      el.style.setProperty("padding", paddingValue, "important");
-      el.style.setProperty("box-shadow", "none", "important");
-      el.style.setProperty("outline", "none", "important");
+    for (const el of qsa(scope, 'input[type="number"], input[type="text"], textarea, select')) {
+      el.classList.add("pc-macro-input");
+      if (el.tagName === "SELECT") el.classList.add("pc-select");
+      else if (el.tagName === "TEXTAREA") el.classList.add("pc-textarea");
+      else el.classList.add("pc-input");
     }
   };
 
   const applyButtonIcons = () => {
-    const $buttons = $scope.find(".dialog-buttons button, .form-footer button, footer button");
-    for (const btn of $buttons.toArray()) {
+    for (const btn of qsa(scope, ".dialog-buttons button, .form-footer button, footer button")) {
       if (!btn || btn.querySelector("i, svg")) continue;
 
       const action = String(btn.getAttribute("data-action") || btn.getAttribute("data-button") || "")
@@ -86,28 +61,8 @@ function _applyPeasantMacroFieldStyling($scope, $window = $()) {
   setTimeout(applyButtonIcons, 50);
 }
 
-function _stylePeasantMacroWindowElement(element) {
-  if (!element) return;
-  const el = element instanceof jQuery ? element[0] : element;
-  if (!el) return;
-  const titleText = String(
-    el.querySelector?.('.window-title')?.textContent
-    || el.querySelector?.('.window-header h4')?.textContent
-    || ""
-  ).trim().toLowerCase();
-  if (!_isPeasantMacroDialogTitle(titleText)) return;
-  const $window = $(el);
-  const $scope = $window;
-  _applyPeasantMacroFieldStyling($scope, $window);
-}
-
 function _getApplicationElement(appOrElement) {
-  const source = appOrElement?.element ?? appOrElement;
-  if (!source) return null;
-  if (source instanceof HTMLElement) return source;
-  if (source instanceof jQuery) return source[0] ?? null;
-  if (Array.isArray(source)) return _getApplicationElement(source[0]);
-  return source?.[0] instanceof HTMLElement ? source[0] : null;
+  return toElement(appOrElement);
 }
 
 function _stylePeasantMacroDialog(app, html) {
@@ -115,55 +70,20 @@ function _stylePeasantMacroDialog(app, html) {
     const title = String(app?.title ?? app?.options?.title ?? "").trim().toLowerCase();
     if (!_isPeasantMacroDialogTitle(title)) return;
 
-    const $html = html
-      ? (html instanceof jQuery ? html : $(html))
-      : $();
-    let $window = $();
+    const htmlEl = toElement(html);
     const windowEl = _getApplicationElement(app);
-    if (windowEl) $window = $(windowEl);
-    if (!$window.length && $html.length) {
-      $window = $html.closest(".window-app, .application");
-    }
+    const dialogEl = windowEl ?? htmlEl?.closest?.(".application, dialog") ?? null;
 
-    const $scope = $window.length ? $window : $html;
-    if (!$scope.length) return;
-    _applyPeasantMacroFieldStyling($scope, $window);
+    const scope = dialogEl ?? htmlEl;
+    if (!scope) return;
+    _applyPeasantMacroFieldStyling(scope, dialogEl);
   } catch (e) {
     pcLog.debug("Peasant Core | Failed to mark/style macro dialog", e);
   }
 }
 
-Hooks.on('renderDialog', (app, html) => {
-  _stylePeasantMacroDialog(app, html);
-});
-Hooks.on('renderApplication', (app, html) => {
-  _stylePeasantMacroDialog(app, html);
-});
 Hooks.on('renderApplicationV2', (app, html) => {
   _stylePeasantMacroDialog(app, html);
-});
-
-Hooks.once('ready', () => {
-  try {
-    // Immediate pass for any already-open macro dialogs.
-    document.querySelectorAll('.window-app, .application').forEach((el) => _stylePeasantMacroWindowElement(el));
-
-    // DOM-level fallback for any render paths that bypass standard hooks.
-    if (window.__peasantMacroDialogObserver) return;
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue;
-          _stylePeasantMacroWindowElement(node);
-          node.querySelectorAll?.('.window-app, .application').forEach((el) => _stylePeasantMacroWindowElement(el));
-        }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    window.__peasantMacroDialogObserver = observer;
-  } catch (e) {
-    pcLog.debug("Peasant Core | Failed to start macro dialog observer", e);
-  }
 });
 
 // Keep world macro script commands in sync with system macro source files.

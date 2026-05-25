@@ -72,6 +72,7 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
       attackCombatIndex: combatIndex,
       attackCombatName: String(combat?.name || "Attack").trim() || "Attack",
       attackTargetingType: targetingType,
+      attackOverkill: !!combat?.overkill,
       targetSceneId: targetTokenDocument?.parent?.id || targetTokenDocument?.scene?.id || null,
       targetTokenId: targetTokenDocument?.id || null,
       targetTokenUuid: targetTokenDocument?.uuid || null,

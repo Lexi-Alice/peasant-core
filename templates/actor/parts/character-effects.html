@@ -6,17 +6,17 @@
     <div class="combat-modifiers pc-effects-modifiers">
       <div class="combat-modifier-box">
         <label>To-Hit</label>
-        <input type="number" name="system.combatMods.toHit" value="{{#if actor.system.combatMods.toHit}}{{actor.system.combatMods.toHit}}{{else}}0{{/if}}" class="combat-mod-input" tabindex="0">
+        <input type="number" name="system.combatMods.toHit" value="{{#if actor.system.combatMods.toHit}}{{actor.system.combatMods.toHit}}{{else}}0{{/if}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
         <p class="pc-effect-hint">Adjusts attack and save target numbers.</p>
       </div>
       <div class="combat-modifier-box">
         <label>Accuracy</label>
-        <input type="number" name="system.combatMods.accuracy" value="{{#if actor.system.combatMods.accuracy}}{{actor.system.combatMods.accuracy}}{{else}}0{{/if}}" class="combat-mod-input" tabindex="0">
+        <input type="number" name="system.combatMods.accuracy" value="{{#if actor.system.combatMods.accuracy}}{{actor.system.combatMods.accuracy}}{{else}}0{{/if}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
         <p class="pc-effect-hint">Adds accuracy to notable combat and skill rolls.</p>
       </div>
       <div class="combat-modifier-box">
         <label>Die-Rate</label>
-        <input type="number" name="system.combatMods.diceRate" value="{{#if actor.system.combatMods.diceRate}}{{actor.system.combatMods.diceRate}}{{else}}0{{/if}}" class="combat-mod-input" tabindex="0">
+        <input type="number" name="system.combatMods.diceRate" value="{{#if actor.system.combatMods.diceRate}}{{actor.system.combatMods.diceRate}}{{else}}0{{/if}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
         <p class="pc-effect-hint">Adjusts die-rate progression for damage, healing, and similar effects.</p>
       </div>
 
@@ -27,7 +27,7 @@
             <input
               type="text"
               value="{{buff.values}}"
-              class="combat-mod-input halt-input combat-halt-buff-input"
+              class="combat-mod-input halt-input combat-halt-buff-input pc-input"
               data-buff-index="{{buff.index}}"
               tabindex="0">
             <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
@@ -39,8 +39,11 @@
             <input
               type="number"
               value="{{buff.value}}"
-              class="combat-mod-input combat-flat-buff-input"
+              class="combat-mod-input combat-flat-buff-input pc-input"
               data-buff-index="{{buff.index}}"
+              data-dtype="Number"
+              inputmode="numeric"
+              pattern="[+=\-]?\d*"
               tabindex="0">
             <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
           </div>
@@ -49,7 +52,7 @@
           <div class="combat-modifier-box combat-extra-buff-inline combat-cost-buff-inline" data-buff-index="{{buff.index}}">
             <label class="combat-halt-buff-label">{{buff.label}}</label>
             <select
-              class="combat-cost-buff-resource"
+              class="combat-cost-buff-resource pc-select"
               data-buff-index="{{buff.index}}"
               tabindex="0">
               <option value="Stamina" {{#if (eq buff.resourceType "Stamina")}}selected{{/if}}>Stamina</option>
@@ -61,8 +64,11 @@
             <input
               type="number"
               value="{{buff.value}}"
-              class="combat-mod-input combat-cost-buff-value"
+              class="combat-mod-input combat-cost-buff-value pc-input"
               data-buff-index="{{buff.index}}"
+              data-dtype="Number"
+              inputmode="numeric"
+              pattern="[+=\-]?\d*"
               tabindex="0">
             <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
           </div>
@@ -72,7 +78,7 @@
             <input
               type="text"
               value="{{buff.customName}}"
-              class="combat-custom-buff-name"
+              class="combat-custom-buff-name pc-input"
               data-buff-index="{{buff.index}}"
               placeholder="Custom"
               tabindex="0">
@@ -80,8 +86,11 @@
             <input
               type="number"
               value="{{buff.value}}"
-              class="combat-mod-input combat-custom-buff-value"
+              class="combat-mod-input combat-custom-buff-value pc-input"
               data-buff-index="{{buff.index}}"
+              data-dtype="Number"
+              inputmode="numeric"
+              pattern="[+=\-]?\d*"
               tabindex="0">
             <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.customName}}">-</button>
           </div>

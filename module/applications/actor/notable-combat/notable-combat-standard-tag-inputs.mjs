@@ -1,55 +1,61 @@
 import { getCombatCustomTags } from "../../../data/actor/combat-tags.mjs";
-import { formatCombatDiceValue } from "../../../dice/combat-dice.mjs";
+import { formatCombatDiceValue, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { escapeHtml } from "../../../utils/chat.mjs";
 import { renderResourceCostTagInputs } from "./notable-combat-resource-tag-inputs.mjs";
 import { renderSpeedTagInputs } from "./notable-combat-speed-tag-inputs.mjs";
+import {
+  PC_TAG_INPUT_CLASS,
+  PC_TAG_INTEGER_ATTRS,
+  PC_TAG_SELECT_CLASS
+} from "./notable-combat-tag-form-controls.mjs";
 
-export function renderStandardNotableCombatTagInputs($area, tagType, combatData, { inputStyle, labelStyle, selectStyle, tagEditorState } = {}) {
+export function renderStandardNotableCombatTagInputs($area, tagType, combatData, { tagEditorState } = {}) {
   switch (tagType) {
     case "resourceCosts":
-      renderResourceCostTagInputs($area, combatData, { inputStyle, selectStyle });
+      renderResourceCostTagInputs($area, combatData);
       return true;
     case "speed":
-      renderSpeedTagInputs($area, combatData, { inputStyle, labelStyle, selectStyle });
+      renderSpeedTagInputs($area, combatData);
       return true;
     case "range":
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="${labelStyle}">Range:</label>
-          <input type="number" class="tag-range" value="${combatData.range || ""}" style="${inputStyle}" min="0" placeholder="#">
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Range:</label>
+          <input type="number" class="tag-range ${PC_TAG_INPUT_CLASS}" value="${combatData.range || ""}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;
     case "rangeRate": {
       const rangeRateParts = String(combatData.rangeRate || "").split("/");
       $area.html(`
-        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-          <label style="${labelStyle}">Range-Rate:</label>
-          <input type="number" class="tag-rr-1" value="${rangeRateParts[0] || ""}" style="${inputStyle}width:45px;" placeholder="1st">
-          <span style="color:#666;">/</span>
-          <input type="number" class="tag-rr-2" value="${rangeRateParts[1] || ""}" style="${inputStyle}width:45px;" placeholder="2nd">
-          <span style="color:#666;">/</span>
-          <input type="number" class="tag-rr-3" value="${rangeRateParts[2] || ""}" style="${inputStyle}width:45px;" placeholder="3rd">
-          <span style="color:#666;">/</span>
-          <input type="number" class="tag-rr-4" value="${rangeRateParts[3] || ""}" style="${inputStyle}width:45px;" placeholder="4th">
+        <div class="pc-tag-field-row" style="gap:4px;">
+          <label class="pc-tag-field-label">Range-Rate:</label>
+          <input type="number" class="tag-rr-1 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[0] || ""}" placeholder="1st" ${PC_TAG_INTEGER_ATTRS}>
+          <span class="pc-tag-separator">/</span>
+          <input type="number" class="tag-rr-2 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[1] || ""}" placeholder="2nd" ${PC_TAG_INTEGER_ATTRS}>
+          <span class="pc-tag-separator">/</span>
+          <input type="number" class="tag-rr-3 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[2] || ""}" placeholder="3rd" ${PC_TAG_INTEGER_ATTRS}>
+          <span class="pc-tag-separator">/</span>
+          <input type="number" class="tag-rr-4 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[3] || ""}" placeholder="4th" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;
     }
     case "damage": {
       const currentDamage = combatData.damage || {};
+      const hasCurrentDamage = hasCombatDice(currentDamage);
       $area.html(`
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <input type="number" class="tag-dmg-dice" value="${currentDamage.diceCount || ""}" style="${inputStyle}width:45px;" min="1" placeholder="#">
+        <div class="pc-tag-field-stack">
+          <div class="pc-tag-field-row">
+            <input type="number" class="tag-dmg-dice ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${combatDiceIntegerInputValue(currentDamage, "diceCount", hasCurrentDamage)}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
             <span style="color:#e0e0e0;">d</span>
-            <input type="text" class="tag-dmg-value" value="${formatCombatDiceValue(currentDamage.diceValue, currentDamage.diceBonus)}" style="${inputStyle}width:58px;" placeholder="#">
+            <input type="text" class="tag-dmg-value ${PC_TAG_INPUT_CLASS} pc-tag-input-md" value="${formatCombatDiceValue(currentDamage.diceValue, currentDamage.diceBonus, { allowZero: hasCurrentDamage })}" placeholder="#">
             <span style="color:#e0e0e0;">+</span>
-            <input type="number" class="tag-dmg-flat" value="${currentDamage.flat || ""}" style="${inputStyle}width:50px;" placeholder="flat">
+            <input type="number" class="tag-dmg-flat ${PC_TAG_INPUT_CLASS} pc-tag-input-sm" value="${currentDamage.flat || ""}" placeholder="flat" ${PC_TAG_INTEGER_ATTRS}>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label style="${labelStyle}">Type:</label>
-            <select class="tag-dmg-type" style="${selectStyle}">
+          <div class="pc-tag-field-row">
+            <label class="pc-tag-field-label">Type:</label>
+            <select class="tag-dmg-type ${PC_TAG_SELECT_CLASS}">
               <option value="">-- Select --</option>
               <option value="Blunt" ${currentDamage.type === "Blunt" ? "selected" : ""}>Blunt</option>
               <option value="Lethal" ${currentDamage.type === "Lethal" ? "selected" : ""}>Lethal</option>
@@ -64,18 +70,19 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     }
     case "heal": {
       const currentHeal = combatData.heal || {};
+      const hasCurrentHeal = hasCombatDice(currentHeal);
       $area.html(`
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <input type="number" class="tag-heal-dice" value="${currentHeal.diceCount || ""}" style="${inputStyle}width:45px;" min="1" placeholder="#">
+        <div class="pc-tag-field-stack">
+          <div class="pc-tag-field-row">
+            <input type="number" class="tag-heal-dice ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${combatDiceIntegerInputValue(currentHeal, "diceCount", hasCurrentHeal)}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
             <span style="color:#e0e0e0;">d</span>
-            <input type="text" class="tag-heal-value" value="${formatCombatDiceValue(currentHeal.diceValue, currentHeal.diceBonus)}" style="${inputStyle}width:58px;" placeholder="#">
+            <input type="text" class="tag-heal-value ${PC_TAG_INPUT_CLASS} pc-tag-input-md" value="${formatCombatDiceValue(currentHeal.diceValue, currentHeal.diceBonus, { allowZero: hasCurrentHeal })}" placeholder="#">
             <span style="color:#e0e0e0;">+</span>
-            <input type="number" class="tag-heal-flat" value="${currentHeal.flat || ""}" style="${inputStyle}width:50px;" placeholder="flat">
+            <input type="number" class="tag-heal-flat ${PC_TAG_INPUT_CLASS} pc-tag-input-sm" value="${currentHeal.flat || ""}" placeholder="flat" ${PC_TAG_INTEGER_ATTRS}>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label style="${labelStyle}">Type:</label>
-            <select class="tag-heal-type" style="${selectStyle}">
+          <div class="pc-tag-field-row">
+            <label class="pc-tag-field-label">Type:</label>
+            <select class="tag-heal-type ${PC_TAG_SELECT_CLASS}">
               <option value="">-- Select --</option>
               <option value="Temporary" ${currentHeal.type === "Temporary" ? "selected" : ""}>Temporary</option>
               <option value="Greater" ${currentHeal.type === "Greater" ? "selected" : ""}>Greater</option>
@@ -87,40 +94,41 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     }
     case "manifest": {
       const currentManifest = combatData.manifest || {};
+      const hasCurrentManifest = hasCombatDice(currentManifest);
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <input type="number" class="tag-mani-dice" value="${currentManifest.diceCount || ""}" style="${inputStyle}width:45px;" min="1" placeholder="#">
+        <div class="pc-tag-field-row">
+          <input type="number" class="tag-mani-dice ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${combatDiceIntegerInputValue(currentManifest, "diceCount", hasCurrentManifest)}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
           <span style="color:#e0e0e0;">d</span>
-          <input type="text" class="tag-mani-value" value="${formatCombatDiceValue(currentManifest.diceValue, currentManifest.diceBonus)}" style="${inputStyle}width:58px;" placeholder="#">
+          <input type="text" class="tag-mani-value ${PC_TAG_INPUT_CLASS} pc-tag-input-md" value="${formatCombatDiceValue(currentManifest.diceValue, currentManifest.diceBonus, { allowZero: hasCurrentManifest })}" placeholder="#">
           <span style="color:#e0e0e0;">+</span>
-          <input type="number" class="tag-mani-flat" value="${currentManifest.flat || ""}" style="${inputStyle}width:50px;" placeholder="flat">
+          <input type="number" class="tag-mani-flat ${PC_TAG_INPUT_CLASS} pc-tag-input-sm" value="${currentManifest.flat || ""}" placeholder="flat" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;
     }
     case "tagUses":
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="${labelStyle}">Max Uses:</label>
-          <input type="number" class="tag-uses-max" value="${combatData.tagUses?.max || ""}" style="${inputStyle}" min="1" placeholder="#">
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Max Uses:</label>
+          <input type="number" class="tag-uses-max ${PC_TAG_INPUT_CLASS}" value="${combatData.tagUses?.max || ""}" min="1" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;
     case "sections":
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="${labelStyle}">Max Sections:</label>
-          <input type="number" class="tag-sections-max" value="${combatData.sections?.max || ""}" style="${inputStyle}" min="1" placeholder="#">
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Max Sections:</label>
+          <input type="number" class="tag-sections-max ${PC_TAG_INPUT_CLASS}" value="${combatData.sections?.max || ""}" min="1" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;
     case "aoe": {
       const currentAoe = combatData.aoe || {};
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <label style="${labelStyle}">AoE Value:</label>
-          <input type="number" class="tag-aoe-value" value="${currentAoe.value || ""}" style="${inputStyle}" min="1" placeholder="#">
-          <select class="tag-aoe-type" style="${selectStyle}">
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">AoE Value:</label>
+          <input type="number" class="tag-aoe-value ${PC_TAG_INPUT_CLASS}" value="${currentAoe.value || ""}" min="1" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
+          <select class="tag-aoe-type ${PC_TAG_SELECT_CLASS}">
             <option value="Area" ${currentAoe.type === "Area" || !currentAoe.type ? "selected" : ""}>Area</option>
             <option value="Blast" ${currentAoe.type === "Blast" ? "selected" : ""}>Blast</option>
             <option value="Tile" ${currentAoe.type === "Tile" ? "selected" : ""}>Tile</option>
@@ -131,9 +139,9 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     }
     case "targetingType":
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="${labelStyle}">Targeting Type:</label>
-          <select class="tag-targeting-type" style="${selectStyle}">
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Targeting Type:</label>
+          <select class="tag-targeting-type ${PC_TAG_SELECT_CLASS}">
             <option value="">-- Select --</option>
             <option value="Melee" ${combatData.targetingType === "Melee" ? "selected" : ""}>Melee</option>
             <option value="Projectile" ${combatData.targetingType === "Projectile" ? "selected" : ""}>Projectile</option>
@@ -145,22 +153,37 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
       return true;
     case "reach":
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="${labelStyle}">Reach:</label>
-          <input type="number" class="tag-reach" value="${combatData.reach || ""}" style="${inputStyle}" min="0" placeholder="#">
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Reach:</label>
+          <input type="number" class="tag-reach ${PC_TAG_INPUT_CLASS}" value="${combatData.reach || ""}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;
     case "stability":
       $area.html(`
-        <div style="color:#e0e0e0;padding:8px;text-align:center;background:#2a2a2a;border-radius:4px;">
+        <div class="pc-tag-message">
           <p style="margin:0;">Click <strong>Add Tag</strong> to add the <em>Stability</em> tag.</p>
+        </div>
+      `);
+      return true;
+    case "overkill":
+      $area.html(`
+        <div class="pc-tag-message">
+          <p style="margin:0;">Click <strong>Add Tag</strong> to add the <em>Overkill</em> tag.</p>
+        </div>
+      `);
+      return true;
+    case "magnetism":
+      $area.html(`
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Grade:</label>
+          <input type="text" class="tag-magnetism-grade ${PC_TAG_INPUT_CLASS}" value="${combatData.magnetism?.grade || ""}" placeholder="1">
         </div>
       `);
       return true;
     case "strengthen":
       $area.html(`
-        <div style="color:#e0e0e0;padding:8px;text-align:center;background:#2a2a2a;border-radius:4px;">
+        <div class="pc-tag-message">
           <p style="margin:0 0 6px 0;">Requires <strong>Stability</strong>.</p>
           <p style="margin:0;">Click <strong>Add Tag</strong> to add the <em>Strengthen</em> tag.</p>
         </div>
@@ -172,14 +195,14 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
         ? (getCombatCustomTags(combatData)[tagEditorState.customIndex] || { name: "", value: "" })
         : { name: "", value: "" };
       $area.html(`
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label style="${labelStyle}">Name:</label>
-            <input type="text" class="tag-custom-name" value="${escapeHtml(editingCustomTag.name)}" style="${inputStyle}flex:1;text-align:left;" placeholder="Name">
+        <div class="pc-tag-field-stack">
+          <div class="pc-tag-field-row">
+            <label class="pc-tag-field-label">Name:</label>
+            <input type="text" class="tag-custom-name ${PC_TAG_INPUT_CLASS} pc-tag-input-fill" value="${escapeHtml(editingCustomTag.name)}" placeholder="Name">
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label style="${labelStyle}">Value:</label>
-            <input type="text" class="tag-custom-value" value="${escapeHtml(editingCustomTag.value)}" style="${inputStyle}flex:1;text-align:left;" placeholder="Value (optional)">
+          <div class="pc-tag-field-row">
+            <label class="pc-tag-field-label">Value:</label>
+            <input type="text" class="tag-custom-value ${PC_TAG_INPUT_CLASS} pc-tag-input-fill" value="${escapeHtml(editingCustomTag.value)}" placeholder="Value (optional)">
           </div>
         </div>
       `);
@@ -187,7 +210,7 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     }
     case "self":
       $area.html(`
-        <div style="color:#e0e0e0;padding:8px;text-align:center;background:#2a2a2a;border-radius:4px;">
+        <div class="pc-tag-message">
           <p style="margin:0;">Click <strong>Add Tag</strong> to add the <em>Self</em> tag.</p>
         </div>
       `);
@@ -195,4 +218,10 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     default:
       return false;
   }
+}
+
+function combatDiceIntegerInputValue(rollData, field, hasRollData) {
+  if (!hasRollData) return "";
+  const value = Number.parseInt(rollData?.[field], 10);
+  return Number.isFinite(value) ? String(value) : "0";
 }

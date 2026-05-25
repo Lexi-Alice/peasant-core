@@ -12,6 +12,11 @@ export const COMBAT_DEFENSE_BLOCK_TYPES = Object.freeze([
   "Mage"
 ]);
 
+export const COMBAT_DEFENSE_SHIELD_ARM_OPTIONS = Object.freeze([
+  { key: "LeftArm", label: "Left Arm" },
+  { key: "RightArm", label: "Right Arm" }
+]);
+
 export function getCombatDefenseResponseOption(value) {
   const normalized = String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
   if (!normalized) return null;
@@ -55,8 +60,10 @@ export function createDefaultCombatDefense() {
     },
     block: false,
     blockType: "Shield",
+    shieldArm: "LeftArm",
     hardness: 0,
     hp: 0,
+    masteryBonus: false,
     appliesDebuff: false,
     debuffToHit: 0,
     appliesBefore: false
@@ -68,6 +75,12 @@ export function normalizeCombatDefenseBlockType(rawType) {
   if (raw === "weapon") return "Weapon";
   if (raw === "mage") return "Mage";
   return "Shield";
+}
+
+export function normalizeCombatDefenseShieldArm(rawArm) {
+  const raw = String(rawArm || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (raw === "right" || raw === "rightarm") return "RightArm";
+  return "LeftArm";
 }
 
 export function normalizeCombatDefenseEffectivenessEntry(entry) {
@@ -105,8 +118,10 @@ export function normalizeCombatDefense(rawDefense) {
     effectiveness,
     block,
     blockType,
-    hardness: block && blockType !== "Mage" ? Math.max(0, Number.isFinite(hardnessRaw) ? hardnessRaw : 0) : 0,
+    shieldArm: normalizeCombatDefenseShieldArm(safe.shieldArm),
+    hardness: block && blockType === "Shield" ? Math.max(0, Number.isFinite(hardnessRaw) ? hardnessRaw : 0) : 0,
     hp: block ? Math.max(0, Number.isFinite(hpRaw) ? hpRaw : 0) : 0,
+    masteryBonus: block && blockType === "Weapon" ? !!safe.masteryBonus : false,
     appliesDebuff,
     debuffToHit: appliesDebuff ? debuffToHitRaw : 0,
     appliesBefore: appliesDebuff ? !!safe.appliesBefore : false

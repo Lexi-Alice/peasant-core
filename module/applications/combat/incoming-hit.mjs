@@ -3,7 +3,7 @@ import {
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
 import { pcLog } from "../../utils/logging.mjs";
-import { renderDialogCompat } from "../dialogs.mjs";
+import { renderDialogV2 } from "../dialogs.mjs";
 import { resolveDefensePromptActor } from "./actor-targets.mjs";
 import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remote-prompt-registry.mjs";
 
@@ -82,7 +82,7 @@ export async function showIncomingHitPrompt(payload = {}) {
     };
     if (promptId) registerActiveRemotePrompt(promptId, remoteCloser);
 
-    dialogApp = renderDialogCompat({
+    dialogApp = renderDialogV2({
       title,
       content,
       buttons: {
@@ -112,7 +112,7 @@ export async function showIncomingHitPrompt(payload = {}) {
         });
         html.find(".window-content, .dialog-content").css({ overflowX: "hidden" });
 
-        renderedWindow = html.closest(".window-app, .application")[0] || html[0];
+        renderedWindow = html.closest(".application, dialog")[0] || html[0];
         $(renderedWindow)
           .find('.header-control, [data-action="close"], [data-button="close"]')
           .off(".pcIncomingHitClose")

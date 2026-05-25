@@ -1,4 +1,5 @@
-﻿import { pcLog } from "../utils/logging.mjs";
+﻿import { rollPeasantCriticalExplosion } from "../dice/exploding.mjs";
+import { pcLog } from "../utils/logging.mjs";
 
 const sortCombatantsAscending = function(a, b) {
   const ia = Number.isNumeric(a.initiative) ? a.initiative : -Infinity;
@@ -206,35 +207,10 @@ function installPeasantCombatMethods() {
       }
 
       let diceTotal = baseDiceTotal;
-      let extraDice = [];
-      let criticalType = null;
-      
-      // Check for critical success (double 6s)
-      if (dice[0] === 6 && dice[1] === 6) {
-        criticalType = 'success';
-        let keepRolling = true;
-        while (keepRolling) {
-          const extraRoll = new Roll("1d6");
-          await extraRoll.evaluate();
-          const extraValue = extraRoll.total;
-          extraDice.push(extraValue);
-          diceTotal += extraValue;
-          if (extraValue !== 6) keepRolling = false;
-        }
-      }
-      // Check for critical failure (double 1s)
-      else if (dice[0] === 1 && dice[1] === 1) {
-        criticalType = 'failure';
-        let keepRolling = true;
-        while (keepRolling) {
-          const extraRoll = new Roll("1d6");
-          await extraRoll.evaluate();
-          const extraValue = extraRoll.total;
-          extraDice.push(extraValue);
-          diceTotal -= extraValue;
-          if (extraValue !== 6) keepRolling = false;
-        }
-      }
+      const critical = await rollPeasantCriticalExplosion(dice);
+      const extraDice = critical.dice;
+      const criticalType = critical.type;
+      diceTotal += critical.sign * critical.total;
       
       const total = diceTotal + initiativeValue;
       
@@ -383,15 +359,17 @@ function installPeasantCombatMethods() {
       
       detailsHTML += `<div>Initiative Score: <span style="cursor: pointer; padding: 2px 6px; background: #2a2a2a; border-radius: 3px; font-weight: bold; color: #9370db; border: 2px solid #7b68ee;">${r.initiativeValue >= 0 ? '+' : ''}${r.initiativeValue}</span></div>`;
       
-      const chatContent = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+      const chatContent = `<div class="skill-roll-card pc-initiative-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+        <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+          Initiative
+        </div>
         <div style="display: flex; flex-direction: column; gap: 6px;">
-          <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
-            <span style="color: #ffffff; font-weight: bold; font-size: 11px;">Initiative:</span>
+          <div class="pc-initiative-result-row" style="display: flex; justify-content: flex-start; align-items: center; padding: 6px 0 2px; background: transparent; border-radius: 3px;">
             <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #9370db; border: 2px solid #7b68ee;">
               ${r.total}
             </button>
           </div>
-          <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+          <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
             ${detailsHTML}
           </div>
         </div>

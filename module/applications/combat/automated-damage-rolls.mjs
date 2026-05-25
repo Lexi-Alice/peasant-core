@@ -1,5 +1,5 @@
 import { buildAutomatedCombatDamageData } from "../../data/actor/combat-damage.mjs";
-import { applyRollMode, escapeHtml } from "../../utils/chat.mjs";
+import { applyMessageMode, escapeHtml } from "../../utils/chat.mjs";
 import { getActorRollSpeaker } from "./actor-targets.mjs";
 
 export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "", attackerToken = null, appliedDamageType = null } = {}) {
@@ -44,13 +44,13 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
   const rollTitle = targetLabel ? `${combatName} vs ${targetLabel}` : combatName;
   const rollId = `automated-damage-roll-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  const chatHtml = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  const chatHtml = `<div class="skill-roll-card pc-damage-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
       ${escapeHtml(rollTitle)}
     </div>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">Damage:</span>
           <div style="display: flex; align-items: center; gap: 6px;">
             <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #4ade80; border: 2px solid #22c55e;">
@@ -59,7 +59,7 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
           </div>
         </div>
       </div>
-      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
         <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
         ${diceDetailLine}${flat !== 0 ? `
         <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}
@@ -67,7 +67,7 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
     </div>
   </div>`;
 
-  await ChatMessage.create(applyRollMode({
+  await ChatMessage.create(applyMessageMode({
     user: game.user.id,
     speaker,
     content: chatHtml,

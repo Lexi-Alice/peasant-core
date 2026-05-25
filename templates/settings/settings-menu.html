@@ -9,7 +9,7 @@
             {{#each group.tags as |tag|}}
               <div class="current-tag-item combat-tag combat-tag-compact combat-tag-button pc-settings-tag" role="listitem" data-entry-key="{{tag.key}}" title="Right-click to edit {{tag.label}}" draggable="true">
                 <span class="current-tag-label">{{tag.label}}</span>
-                <input type="text" class="pc-settings-tag-label-input" value="{{tag.label}}" aria-label="Edit {{tag.label}}" autocomplete="off" draggable="false" hidden>
+                <input type="text" class="pc-settings-tag-label-input pc-input" value="{{tag.label}}" aria-label="Edit {{tag.label}}" autocomplete="off" draggable="false" hidden>
                 <button type="button" class="remove-tag-btn" title="Remove {{tag.label}}" aria-label="Remove {{tag.label}}" draggable="false">&times;</button>
               </div>
             {{/each}}

@@ -1,14 +1,21 @@
 import {
   COMBAT_DEFENSE_BLOCK_TYPES,
   COMBAT_DEFENSE_RESPONSE_OPTIONS,
+  COMBAT_DEFENSE_SHIELD_ARM_OPTIONS,
   getCombatDefenseResponseKey,
   normalizeCombatDefense,
   normalizeCombatDefenseEffectivenessEntry,
   parseCombatDefenseMosPer
 } from "../../../data/actor/combat-defense.mjs";
 import { escapeHtml } from "../../../utils/chat.mjs";
+import {
+  PC_TAG_DECIMAL_ATTRS,
+  PC_TAG_INPUT_CLASS,
+  PC_TAG_INTEGER_ATTRS,
+  PC_TAG_SELECT_CLASS
+} from "./notable-combat-tag-form-controls.mjs";
 
-export function renderDefenseTagInputs($area, combatData, { inputStyle, selectStyle } = {}) {
+export function renderDefenseTagInputs($area, combatData) {
   const defenseData = normalizeCombatDefense(combatData.defense);
   const isBlock = !!defenseData.block;
   const responseOptionsHtml = COMBAT_DEFENSE_RESPONSE_OPTIONS.map((option) => `
@@ -45,18 +52,30 @@ export function renderDefenseTagInputs($area, combatData, { inputStyle, selectSt
         <div class="defense-structure-fields" style="display:${isBlock ? "grid" : "none"};">
           <label class="defense-inline-field" style="grid-column: 1 / -1;">
             <span>Type</span>
-            <select class="tag-defense-block-type" style="${selectStyle}width:140px;">
+            <select class="tag-defense-block-type ${PC_TAG_SELECT_CLASS}" style="width:140px;">
               ${COMBAT_DEFENSE_BLOCK_TYPES.map((blockType) => `<option value="${escapeHtml(blockType)}" ${defenseData.blockType === blockType ? "selected" : ""}>${escapeHtml(blockType)}</option>`).join("")}
             </select>
           </label>
-          <label class="defense-inline-field defense-hardness-field" style="display:${defenseData.blockType === "Mage" ? "none" : "flex"};">
-            <span class="defense-hardness-label" style="display:${defenseData.blockType === "Mage" ? "none" : "inline"};">Hardness</span>
-            <input type="number" class="tag-defense-hardness" value="${defenseData.hardness || ""}" style="${inputStyle}width:72px; display:${defenseData.blockType === "Mage" ? "none" : "inline-block"};" min="0" step="1" placeholder="0">
+          <label class="defense-inline-field defense-shield-arm-field" style="grid-column: 1 / -1; display:${defenseData.blockType === "Shield" ? "flex" : "none"};">
+            <span>Shield Arm</span>
+            <select class="tag-defense-shield-arm ${PC_TAG_SELECT_CLASS}" style="width:140px;">
+              ${COMBAT_DEFENSE_SHIELD_ARM_OPTIONS.map((option) => `<option value="${escapeHtml(option.key)}" ${defenseData.shieldArm === option.key ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="defense-inline-field defense-hardness-field" style="display:${defenseData.blockType === "Shield" ? "flex" : "none"};">
+            <span class="defense-hardness-label">Hardness</span>
+            <input type="number" class="tag-defense-hardness ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.hardness || ""}" min="0" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
           </label>
           <label class="defense-inline-field">
             <span>HP</span>
-            <input type="number" class="tag-defense-hp" value="${defenseData.hp || ""}" style="${inputStyle}width:72px;" min="0" step="1" placeholder="0">
+            <input type="number" class="tag-defense-hp ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.hp || ""}" min="0" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
           </label>
+          <div class="defense-toggle-row defense-mastery-bonus-row" style="grid-column: 1 / -1; display:${defenseData.blockType === "Weapon" ? "flex" : "none"}; margin-top:10px;">
+            <span>Mastery Bonus?</span>
+            <div class="defense-checkbox-cell" style="flex: 0 0 24px; text-align: center; display: flex; align-items: center; justify-content: center;">
+              <input type="checkbox" class="tag-defense-mastery-bonus" ${defenseData.masteryBonus ? "checked" : ""}>
+            </div>
+          </div>
         </div>
       </div>
       <div class="defense-section">
@@ -69,7 +88,7 @@ export function renderDefenseTagInputs($area, combatData, { inputStyle, selectSt
         <div class="defense-debuff-fields" style="display:${defenseData.appliesDebuff ? "block" : "none"};">
           <label class="defense-inline-field" style="margin-top:10px; justify-content:flex-start;">
             <span>To-Hit</span>
-            <input type="number" class="tag-defense-debuff-tohit" value="${defenseData.debuffToHit || ""}" style="${inputStyle}width:72px;" step="1" placeholder="0">
+            <input type="number" class="tag-defense-debuff-tohit ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.debuffToHit || ""}" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
           </label>
           <div class="defense-toggle-row defense-inline-toggle-row" style="margin-top:10px;">
             <span>Applies before?</span>
@@ -119,8 +138,8 @@ export function renderDefenseTagInputs($area, combatData, { inputStyle, selectSt
       return `
         <div class="defense-effectiveness-row" data-defense-key="${key}">
           <div class="defense-effectiveness-type">${label}</div>
-          <input type="number" class="tag-defense-mos-per" value="${entry.mosPer || ""}" style="${inputStyle}width:88px;" step="0.25" min="0" placeholder="0">
-          <input type="number" class="tag-defense-accuracy-penalty" value="${entry.accuracyPenalty || ""}" style="${inputStyle}width:110px;" step="1" placeholder="0">
+          <input type="number" class="tag-defense-mos-per ${PC_TAG_INPUT_CLASS} pc-tag-input-xl" value="${entry.mosPer || ""}" step="0.25" min="0" placeholder="0" ${PC_TAG_DECIMAL_ATTRS}>
+          <input type="number" class="tag-defense-accuracy-penalty ${PC_TAG_INPUT_CLASS} pc-tag-input-xxl" value="${entry.accuracyPenalty || ""}" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `;
     }).join("");
@@ -133,8 +152,11 @@ export function renderDefenseTagInputs($area, combatData, { inputStyle, selectSt
     $area.find(".defense-structure-fields").toggle(blockSelected);
     if (!blockSelected) return;
     const blockType = String($area.find(".tag-defense-block-type").val() || "Shield").trim();
-    const isMage = blockType === "Mage";
-    $area.find(".defense-hardness-field").css("display", isMage ? "none" : "flex");
+    const isShield = blockType === "Shield";
+    const isWeapon = blockType === "Weapon";
+    $area.find(".defense-shield-arm-field").css("display", isShield ? "flex" : "none");
+    $area.find(".defense-hardness-field").css("display", isShield ? "flex" : "none");
+    $area.find(".defense-mastery-bonus-row").css("display", isWeapon ? "flex" : "none");
   };
 
   const updateDefenseDebuffVisibility = () => {
@@ -158,7 +180,7 @@ export function renderDefenseTagInputs($area, combatData, { inputStyle, selectSt
   $area.on("change.defenseTagEditor", ".tag-defense-applies-debuff", () => {
     updateDefenseDebuffVisibility();
   });
-  $area.on("mousedown.defenseTagEditor", ".tag-defense-response, .tag-defense-block, .tag-defense-applies-before, .tag-defense-applies-debuff", (ev) => {
+  $area.on("mousedown.defenseTagEditor", ".tag-defense-response, .tag-defense-block, .tag-defense-applies-before, .tag-defense-applies-debuff, .tag-defense-mastery-bonus", (ev) => {
     // Match the sheet's feel more closely by preventing mouse clicks from leaving
     // the checkbox focused, which causes the persistent highlight in this popup.
     if (ev.button === 0) ev.preventDefault();

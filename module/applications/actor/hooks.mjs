@@ -7,7 +7,6 @@ export function configurePeasantActorSheetHooks({
   actorClass,
   characterModel,
   documentSheetConfig,
-  coreActorSheetClass,
   tokenHudClass,
   isPeasantCharacterType
 } = {}) {
@@ -18,6 +17,7 @@ export function configurePeasantActorSheetHooks({
     if (!documentSheetConfig) {
       throw new Error("Peasant Core requires Foundry's DocumentSheetConfig.");
     }
+    const coreActorSheetClass = CONFIG.Actor.sheetClasses?.character?.core?.cls;
     if (coreActorSheetClass) documentSheetConfig.unregisterSheet(Actor, "core", coreActorSheetClass);
     documentSheetConfig.registerSheet(Actor, "peasant-core", sheetClass, {
       types: ["character"],

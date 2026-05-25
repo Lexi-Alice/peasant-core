@@ -13,7 +13,7 @@ import {
 } from "../../data/actor/defense-favorites.mjs";
 import { escapeHtml } from "../../utils/chat.mjs";
 import { pcLog } from "../../utils/logging.mjs";
-import { renderDialogCompat } from "../dialogs.mjs";
+import { renderDialogV2 } from "../dialogs.mjs";
 import { resolveDefensePromptActor } from "./actor-targets.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
 import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remote-prompt-registry.mjs";
@@ -35,10 +35,18 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
   const promptId = String(payload.promptId || "").trim();
 
   const targetingType = String(payload.attackTargetingType || "").trim();
-  const matchingDefenses = getMatchingDefenseNotables(defenderActor, targetingType);
+  const isOverkillAttack = !!payload.attackOverkill;
+  const isBracedBlockingDefenseMatch = (defenseMatch) => {
+    const defense = normalizeCombatDefense(defenseMatch?.defense);
+    return !!(defense.block && (defense.blockType === "Shield" || defense.blockType === "Mage"));
+  };
+  const allMatchingDefenses = getMatchingDefenseNotables(defenderActor, targetingType);
+  const matchingDefenses = isOverkillAttack
+    ? allMatchingDefenses.filter(isBracedBlockingDefenseMatch)
+    : allMatchingDefenses;
   const primalEvasionResult = createPrimalEvasionDefenseResult(defenderActor, targetingType);
   if (!matchingDefenses.length) {
-    if (primalEvasionResult.activeDefense) {
+    if (!isOverkillAttack && primalEvasionResult.activeDefense) {
       pcLog.debug("Peasant Core | Defense prompt auto-resolved with Primal Evasion", {
         defender: defenderActor.name,
         targetingType,
@@ -50,7 +58,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     pcLog.debug("Peasant Core | Defense prompt skipped: only None available", {
       defender: defenderActor.name,
       targetingType,
-      attack: payload.attackCombatName
+      attack: payload.attackCombatName,
+      overkill: isOverkillAttack
     });
     pcLog.debug("Peasant Core | Defense prompt skipped: no matching defenses", {
       defender: defenderActor.name,
@@ -78,6 +87,10 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
   const preferredDefenseMatch = getPreferredDefenseMatch(defenderActor, targetingType, matchingDefenses);
   const preferredDefenseValue = preferredDefenseMatch ? String(preferredDefenseMatch.index) : "";
   const defaultDefenseValue = preferredDefenseValue || "__none__";
+  const isShieldBlockDefenseMatch = (defenseMatch) => {
+    const defense = normalizeCombatDefense(defenseMatch?.defense);
+    return !!(defense.block && defense.blockType === "Shield");
+  };
   const optionsHtml = [
     ...matchingDefenses.map(({ combat, index }) => {
       const label = String(combat?.name || `Defense ${index + 1}`).trim() || `Defense ${index + 1}`;
@@ -93,7 +106,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
       </div>
       <div class="form-group">
         <label style="display:block; margin-bottom:5px; color:#b0b0b0;">Defense:</label>
-        <select class="pc-defense-prompt-select" name="defenseCombatIndex" style="width:100%; padding:8px 10px; min-height:38px; font-size:14px;">
+        <select class="pc-defense-prompt-select pc-select pc-dialog-field-full" name="defenseCombatIndex">
           ${optionsHtml}
         </select>
       </div>
@@ -103,14 +116,20 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
           <input type="checkbox" name="defenseFavoriteForTargeting">
         </label>
       </div>
+      <div class="form-group pc-defense-brace" style="display:none;">
+        <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; color:#b0b0b0;">
+          <span>Brace?</span>
+          <input type="checkbox" name="shieldBlockBrace">
+        </label>
+      </div>
       <div class="form-group pc-defense-preview" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
         <label style="display:block; color:#b0b0b0;">
           <span style="display:block; margin-bottom:5px;">To-Hit</span>
-          <input type="number" name="defensePreviewToHit" value="" step="1">
+          <input type="number" class="pc-input pc-dialog-field-full" name="defensePreviewToHit" value="" step="1" data-dtype="Number" inputmode="numeric" pattern="[+=\\-]?\\d*">
         </label>
         <label style="display:block; color:#b0b0b0;">
           <span style="display:block; margin-bottom:5px;">Accuracy</span>
-          <input type="number" name="defensePreviewAccuracy" value="" step="1">
+          <input type="number" class="pc-input pc-dialog-field-full" name="defensePreviewAccuracy" value="" step="1" data-dtype="Number" inputmode="numeric" pattern="[+=\\-]?\\d*">
         </label>
       </div>
     </form>
@@ -140,6 +159,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         appliedToHitPenalty: 0,
         activeDefense: false,
         primalEvasionPenalty: 0,
+        shieldBlockBraced: false,
         ...result
       });
       return result;
@@ -164,7 +184,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     };
     if (promptId) registerActiveRemotePrompt(promptId, remoteCloser);
 
-    dialogApp = renderDialogCompat({
+    dialogApp = renderDialogV2({
       title,
       content,
       buttons: {
@@ -173,7 +193,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
           callback: async (html) => {
             const selectedValue = String(html.find('[name="defenseCombatIndex"]').val() || "");
             if (selectedValue === "__none__") {
-              finalize(createPrimalEvasionDefenseResult(defenderActor, targetingType));
+              finalize(isOverkillAttack ? {} : createPrimalEvasionDefenseResult(defenderActor, targetingType));
               return true;
             }
 
@@ -204,6 +224,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
             }
 
             const favoriteChecked = !!html.find('[name="defenseFavoriteForTargeting"]').prop("checked");
+            const shieldBlockBraced = isShieldBlockDefenseMatch(selectedDefenseMatch)
+              && (isOverkillAttack || !!html.find('[name="shieldBlockBrace"]').prop("checked"));
             try {
               if (favoriteChecked) {
                 await setPreferredDefenseMatch(defenderActor, targetingType, selectedDefenseMatch);
@@ -224,6 +246,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               combatIndex: selectedIndex,
               promptForTargets: false,
               targetLabel: attackerName,
+              cardClass: "pc-defense-roll-card",
               rollOverrides: {
                 toHit: overrideToHit,
                 accuracy: overrideAccuracy
@@ -260,7 +283,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               appliedAccuracyPenalty,
               appliedToHitPenalty,
               activeDefense: true,
-              primalEvasionPenalty: 0
+              primalEvasionPenalty: 0,
+              shieldBlockBraced
             });
             return true;
           }
@@ -290,7 +314,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         });
         html.find(".window-content, .dialog-content").css({ overflowX: "hidden" });
 
-        renderedWindow = html.closest(".window-app, .application")[0] || html[0];
+        renderedWindow = html.closest(".application, dialog")[0] || html[0];
         $(renderedWindow)
           .find('.header-control, [data-action="close"], [data-button="close"]')
           .off(".pcDefensePromptClose")
@@ -326,6 +350,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         const $select = html.find('[name="defenseCombatIndex"]');
         const $favorite = html.find('[name="defenseFavoriteForTargeting"]');
         const $favoriteRow = html.find(".pc-defense-favorite");
+        const $brace = html.find('[name="shieldBlockBrace"]');
+        const $braceRow = html.find(".pc-defense-brace");
         const $toHit = html.find('[name="defensePreviewToHit"]');
         const $accuracy = html.find('[name="defensePreviewAccuracy"]');
         const $roll = html.find('[data-action="roll"], [data-button="roll"]');
@@ -338,17 +364,25 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
             $accuracy.val("");
             $favorite.prop("checked", false);
             $favoriteRow.hide();
+            $brace.prop("checked", false);
+            $brace.prop("disabled", false);
+            $braceRow.hide();
             $preview.hide();
             $roll.prop("disabled", false);
             return;
           }
 
           const preview = previewByIndex.get(selectedValue);
+          const selectedDefenseMatch = matchingDefenses.find(({ index }) => String(index) === selectedValue) || null;
+          const isShieldBlock = isShieldBlockDefenseMatch(selectedDefenseMatch);
           if (!preview) {
             $toHit.val("");
             $accuracy.val("");
             $favorite.prop("checked", false);
             $favoriteRow.show();
+            $brace.prop("disabled", isOverkillAttack && isShieldBlock);
+            $brace.prop("checked", isOverkillAttack && isShieldBlock);
+            $braceRow.toggle(isShieldBlock);
             $preview.show();
             $roll.prop("disabled", true);
             return;
@@ -356,6 +390,10 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
 
           $favoriteRow.show();
           $favorite.prop("checked", selectedValue === preferredDefenseValue);
+          $braceRow.toggle(isShieldBlock);
+          $brace.prop("disabled", isOverkillAttack && isShieldBlock);
+          if (isOverkillAttack && isShieldBlock) $brace.prop("checked", true);
+          else if (!isShieldBlock) $brace.prop("checked", false);
           $preview.show();
           $toHit.val(preview.hasToHit ? `${preview.modifiedTohit}` : "");
           $accuracy.val(preview.hasAccuracy ? `${preview.accuracyNum}` : "0");

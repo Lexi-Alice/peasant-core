@@ -9,7 +9,7 @@
           {{#each flexibleAdvantages as |advantage index|}}
             <li class="advantage-item" data-advantage-index="{{index}}" draggable="true">
               <span class="advantage-drag-handle" title="Drag to reorder">&bull;</span>
-              <input type="text" value="{{advantage.name}}" class="advantage-input" data-index="{{index}}" placeholder="Enter advantage...">
+              <input type="text" value="{{advantage.name}}" class="advantage-input pc-input" data-index="{{index}}" placeholder="Enter advantage...">
               <input type="hidden" class="advantage-description-hidden" value="{{advantage.description}}">
               <button type="button" class="advantage-desc-btn" title="Edit Description">+</button>
               <button type="button" class="advantage-delete" title="Delete">&times;</button>

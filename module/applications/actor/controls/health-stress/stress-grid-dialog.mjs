@@ -1,3 +1,7 @@
+import { qs, qsa, toElement } from "../../../dom.mjs";
+
+const stressGridControllers = new WeakMap();
+
 export function openStressGridDialog(sheet, activeType = "physical", trigger = null) {
   const active = normalizeStressType(activeType);
   sheet._stressGridDialogActive = active;
@@ -6,9 +10,10 @@ export function openStressGridDialog(sheet, activeType = "physical", trigger = n
     content: renderStressGridDialogContent(sheet, active),
     buttons: {},
     render: (html) => {
-      html.addClass("pc-stress-grid-dialog-window");
-      html.find(".dialog-buttons, .form-footer, footer").hide();
-      bindStressGridDialog(sheet, html);
+      const root = toElement(html);
+      root?.classList.add("pc-stress-grid-dialog-window");
+      for (const element of qsa(root, ".dialog-buttons, .form-footer, footer")) element.style.display = "none";
+      bindStressGridDialog(sheet, root);
     }
   }, {
     classes: ["peasant-core", "pc-stress-grid-dialog"],
@@ -109,11 +114,13 @@ function renderStressGridDialogContent(sheet, activeType = "physical") {
 }
 
 function refreshStressGridDialog(sheet, root, activeType = null) {
-  const jq = root instanceof jQuery ? root : $(root);
-  const active = normalizeStressType(activeType || sheet._stressGridDialogActive || jq.find(".pc-stress-grid-tab.active").data("stress-tab"));
+  const rootElement = toElement(root);
+  const active = normalizeStressType(activeType || sheet._stressGridDialogActive || qs(rootElement, ".pc-stress-grid-tab.active")?.dataset.stressTab);
   sheet._stressGridDialogActive = active;
-  jq.find(".pc-stress-grid-dialog-body").html(renderStressGridDialogBody(sheet, active));
-  bindStressGridDialog(sheet, jq);
+  const body = qs(rootElement, ".pc-stress-grid-dialog-body");
+  if (!body) return;
+  body.innerHTML = renderStressGridDialogBody(sheet, active);
+  bindStressGridDialog(sheet, rootElement);
 }
 
 async function setStressGridCell(sheet, stressType, index, value) {
@@ -125,62 +132,84 @@ async function changeStressGridSize(sheet, stressType, delta = 0) {
 }
 
 function bindStressGridDialog(sheet, root) {
-  const jq = root instanceof jQuery ? root : $(root);
+  const rootElement = toElement(root);
+  if (!rootElement) return;
 
-  jq.find(".pc-stress-grid-tab").off("click.pcStressGrid").on("click.pcStressGrid", (ev) => {
-    ev.preventDefault();
-    const active = normalizeStressType(ev.currentTarget?.dataset?.stressTab);
+  stressGridControllers.get(rootElement)?.abort();
+  const controller = new AbortController();
+  stressGridControllers.set(rootElement, controller);
+  const { signal } = controller;
+
+  const setActiveTab = (activeType) => {
+    const active = normalizeStressType(activeType);
     sheet._stressGridDialogActive = active;
-    jq.find(".pc-stress-grid-tab").removeClass("active").attr("aria-selected", "false");
-    jq.find(`.pc-stress-grid-tab[data-stress-tab="${active}"]`).addClass("active").attr("aria-selected", "true");
-    jq.find(".pc-stress-grid-pane").removeClass("active");
-    jq.find(`.pc-stress-grid-pane[data-stress-pane="${active}"]`).addClass("active");
-  });
+    for (const tab of qsa(rootElement, ".pc-stress-grid-tab")) {
+      const selected = tab.dataset.stressTab === active;
+      tab.classList.toggle("active", selected);
+      tab.setAttribute("aria-selected", selected ? "true" : "false");
+    }
+    for (const pane of qsa(rootElement, ".pc-stress-grid-pane")) {
+      pane.classList.toggle("active", pane.dataset.stressPane === active);
+    }
+  };
 
-  jq.find(".stress-add").off("click.pcStressGrid").on("click.pcStressGrid", async (ev) => {
-    ev.preventDefault();
-    const stressType = ev.currentTarget?.dataset?.stressType;
-    await changeStressGridSize(sheet, stressType, 1);
+  const refresh = async (stressType) => {
     await sheet.render(false);
-    refreshStressGridDialog(sheet, jq, stressType);
-  });
+    refreshStressGridDialog(sheet, rootElement, stressType);
+  };
 
-  jq.find(".stress-remove").off("click.pcStressGrid").on("click.pcStressGrid", async (ev) => {
-    ev.preventDefault();
-    const stressType = ev.currentTarget?.dataset?.stressType;
-    await changeStressGridSize(sheet, stressType, -1);
-    await sheet.render(false);
-    refreshStressGridDialog(sheet, jq, stressType);
-  });
+  for (const tab of qsa(rootElement, ".pc-stress-grid-tab")) {
+    tab.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      setActiveTab(tab.dataset.stressTab);
+    }, { signal });
+  }
 
-  jq.find(".stress-cell").off("click.pcStressGrid").on("click.pcStressGrid", async (ev) => {
-    ev.preventDefault();
-    const cell = ev.currentTarget;
-    const stressType = cell?.dataset?.stressType;
-    const index = Number.parseInt(cell?.dataset?.index, 10);
-    if (!stressType || Number.isNaN(index)) return;
-    const currentState = Number(sheet.actor?.system?.[`${stressType}${index}`]) || 0;
-    await setStressGridCell(sheet, stressType, index, (currentState + 1) % 4);
-    await sheet.render(false);
-    refreshStressGridDialog(sheet, jq, stressType);
-  });
+  for (const button of qsa(rootElement, ".stress-add")) {
+    button.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const stressType = button.dataset.stressType;
+      await changeStressGridSize(sheet, stressType, 1);
+      await refresh(stressType);
+    }, { signal });
+  }
 
-  jq.find(".stress-cell").off("contextmenu.pcStressGrid").on("contextmenu.pcStressGrid", async (ev) => {
-    ev.preventDefault();
-    const cell = ev.currentTarget;
-    const stressType = cell?.dataset?.stressType;
-    const index = Number.parseInt(cell?.dataset?.index, 10);
-    if (!stressType || Number.isNaN(index)) return;
-    await setStressGridCell(sheet, stressType, index, 0);
-    await sheet.render(false);
-    refreshStressGridDialog(sheet, jq, stressType);
-  });
+  for (const button of qsa(rootElement, ".stress-remove")) {
+    button.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const stressType = button.dataset.stressType;
+      await changeStressGridSize(sheet, stressType, -1);
+      await refresh(stressType);
+    }, { signal });
+  }
 
-  jq.find(".pc-stress-grid-refresh").off("click.pcStressGrid").on("click.pcStressGrid", async (ev) => {
-    ev.preventDefault();
-    const stressType = normalizeStressType(ev.currentTarget?.dataset?.stressType);
-    await sheet.actor.refreshPeasantStressTrack?.(stressType);
-    await sheet.render(false);
-    refreshStressGridDialog(sheet, jq, stressType);
-  });
+  for (const cell of qsa(rootElement, ".stress-cell")) {
+    cell.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const stressType = cell.dataset.stressType;
+      const index = Number.parseInt(cell.dataset.index, 10);
+      if (!stressType || Number.isNaN(index)) return;
+      const currentState = Number(sheet.actor?.system?.[`${stressType}${index}`]) || 0;
+      await setStressGridCell(sheet, stressType, index, (currentState + 1) % 4);
+      await refresh(stressType);
+    }, { signal });
+
+    cell.addEventListener("contextmenu", async (ev) => {
+      ev.preventDefault();
+      const stressType = cell.dataset.stressType;
+      const index = Number.parseInt(cell.dataset.index, 10);
+      if (!stressType || Number.isNaN(index)) return;
+      await setStressGridCell(sheet, stressType, index, 0);
+      await refresh(stressType);
+    }, { signal });
+  }
+
+  for (const button of qsa(rootElement, ".pc-stress-grid-refresh")) {
+    button.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const stressType = normalizeStressType(button.dataset.stressType);
+      await sheet.actor.refreshPeasantStressTrack?.(stressType);
+      await refresh(stressType);
+    }, { signal });
+  }
 }

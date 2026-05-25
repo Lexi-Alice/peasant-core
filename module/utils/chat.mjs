@@ -13,68 +13,28 @@ const MESSAGE_MODES = Object.freeze({
   self: "self"
 });
 
-const LEGACY_ROLL_MODES = Object.freeze({
-  public: "roll",
-  roll: "roll",
-  gm: "gmroll",
-  gmroll: "gmroll",
-  blind: "blindroll",
-  blindroll: "blindroll",
-  self: "selfroll",
-  selfroll: "selfroll"
-});
-
-function normalizeMode(mode, mapping, fallback) {
+function normalizeMessageMode(mode, fallback = "public") {
   const key = String(mode ?? "").trim().toLowerCase();
-  return mapping[key] || fallback;
+  return MESSAGE_MODES[key] || fallback;
 }
 
-function getCurrentMessageMode() {
+export function getCurrentMessageMode() {
   try {
-    return normalizeMode(game?.settings?.get?.("core", "messageMode"), MESSAGE_MODES, "public");
+    return normalizeMessageMode(game.settings.get("core", "messageMode"));
   } catch (e) {
     return "public";
   }
 }
 
-function getCurrentLegacyRollMode() {
-  try {
-    return normalizeMode(game?.settings?.get?.("core", "rollMode"), LEGACY_ROLL_MODES, "roll");
-  } catch (e) {
-    return "roll";
-  }
+export function getCurrentRollMode() {
+  return getCurrentMessageMode();
 }
 
-export function getCurrentRollMode() {
-  if (typeof ChatMessage?.applyMode === "function") return getCurrentMessageMode();
-  return getCurrentLegacyRollMode();
+export function applyMessageMode(chatData, mode) {
+  const messageMode = normalizeMessageMode(mode || getCurrentMessageMode());
+  return ChatMessage.applyMode(chatData, messageMode) || chatData;
 }
 
 export function applyRollMode(chatData, rollMode) {
-  if (typeof ChatMessage?.applyMode === "function") {
-    const mode = normalizeMode(rollMode || getCurrentMessageMode(), MESSAGE_MODES, "public");
-    return ChatMessage.applyMode(chatData, mode) || chatData;
-  }
-
-  const mode = normalizeMode(rollMode || getCurrentLegacyRollMode(), LEGACY_ROLL_MODES, "roll");
-  if (typeof ChatMessage?.applyRollMode === "function") {
-    ChatMessage.applyRollMode(chatData, mode);
-  } else {
-    switch (mode) {
-      case "gmroll":
-        chatData.whisper = ChatMessage.getWhisperRecipients("GM");
-        break;
-      case "blindroll":
-        chatData.whisper = ChatMessage.getWhisperRecipients("GM");
-        chatData.blind = true;
-        break;
-      case "selfroll":
-        chatData.whisper = [game.user?.id].filter(Boolean);
-        break;
-      default:
-        break;
-    }
-  }
-  chatData.rollMode = mode;
-  return chatData;
+  return applyMessageMode(chatData, rollMode);
 }

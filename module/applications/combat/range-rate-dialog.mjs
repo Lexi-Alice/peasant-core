@@ -1,5 +1,5 @@
 import { escapeHtml } from "../../utils/chat.mjs";
-import { renderDialogCompat } from "../dialogs.mjs";
+import { renderDialogV2 } from "../dialogs.mjs";
 
 export async function showRangeRatePrompt({
   combat = null,
@@ -10,6 +10,7 @@ export async function showRangeRatePrompt({
   rollOverrides = null,
   targetLabel = "",
   selectedDamageType = null,
+  cardClass = "",
   rollNotableCombat = null
 } = {}) {
   const rrValues = String(combat?.rangeRate || "").split("/");
@@ -24,7 +25,7 @@ export async function showRangeRatePrompt({
     <form>
       <div class="form-group" style="margin-bottom: 10px;">
         <label style="display: block; margin-bottom: 5px; color: #b0b0b0;">Range-Rate?</label>
-        <select name="rangeRateIndex" style="width: 100%; padding: 8px 10px; min-height: 38px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+        <select class="pc-defense-prompt-select pc-select pc-dialog-field-full" name="rangeRateIndex">
           ${optionsHtml}
         </select>
       </div>
@@ -47,7 +48,7 @@ export async function showRangeRatePrompt({
       return result;
     };
 
-    renderDialogCompat({
+    renderDialogV2({
       title: "Range-Rate",
       content: dialogContent,
       buttons: {
@@ -71,7 +72,8 @@ export async function showRangeRatePrompt({
               promptForTargets,
               rollOverrides,
               targetLabel,
-              selectedDamageType
+              selectedDamageType,
+              cardClass
             });
             finalize(result);
             return true;
@@ -87,7 +89,7 @@ export async function showRangeRatePrompt({
       },
       default: "roll",
       render: (html) => {
-        renderedWindow = html.closest(".window-app, .application")[0] || html[0];
+        renderedWindow = html.closest(".application, dialog")[0] || html[0];
         $(renderedWindow)
           .find('.header-control, [data-action="close"], [data-button="close"]')
           .off(".pcRangeRateClose")
@@ -100,6 +102,6 @@ export async function showRangeRatePrompt({
           }, 150);
         }
       }
-    });
+    }, { classes: ["peasant-macro-dialog", "peasant-macro-dialog-force"] });
   });
 }

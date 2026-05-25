@@ -25,16 +25,36 @@
                   {{#if setting.checked}}checked{{/if}}
                   {{#unless setting.editable}}disabled{{/unless}}>
               {{else}}
-                <input
-                  type="number"
-                  id="{{setting.id}}"
-                  class="pc-sheet-setting-input"
-                  data-pc-setting="{{setting.flagKey}}"
-                  value="{{setting.value}}"
-                  step="{{setting.step}}"
-                  inputmode="{{setting.inputMode}}"
-                  {{#if setting.hasMin}}min="{{setting.min}}"{{/if}}
-                  {{#unless setting.editable}}disabled{{/unless}}>
+                {{#if setting.hasSuffix}}
+                  <div class="pc-setting-number-suffix-control">
+                    <input
+                      type="number"
+                      id="{{setting.id}}"
+                      class="pc-sheet-setting-input pc-input"
+                      data-pc-setting="{{setting.flagKey}}"
+                      value="{{setting.value}}"
+                      step="{{setting.step}}"
+                      inputmode="{{setting.inputMode}}"
+                      data-dtype="Number"
+                      pattern="{{setting.pattern}}"
+                      {{#if setting.hasMin}}min="{{setting.min}}"{{/if}}
+                      {{#unless setting.editable}}disabled{{/unless}}>
+                    <span class="pc-setting-number-suffix" aria-hidden="true">{{setting.suffix}}</span>
+                  </div>
+                {{else}}
+                  <input
+                    type="number"
+                    id="{{setting.id}}"
+                    class="pc-sheet-setting-input pc-input"
+                    data-pc-setting="{{setting.flagKey}}"
+                    value="{{setting.value}}"
+                    step="{{setting.step}}"
+                    inputmode="{{setting.inputMode}}"
+                    data-dtype="Number"
+                    pattern="{{setting.pattern}}"
+                    {{#if setting.hasMin}}min="{{setting.min}}"{{/if}}
+                    {{#unless setting.editable}}disabled{{/unless}}>
+                {{/if}}
               {{/if}}
             </div>
           </div>

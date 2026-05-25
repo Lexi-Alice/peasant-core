@@ -1,12 +1,12 @@
-﻿import { renderDialogCompat } from "../dialogs.mjs";
+﻿import { renderDialogV2 } from "../dialogs.mjs";
 import { applyDieRate } from "../../dice/combat-dice.mjs";
 import { applyToHitAccuracy } from "../../dice/roll-targets.mjs";
 import { performSkillRoll, performUntrainedSkillRoll } from "../../dice/rolls.mjs";
-import { applyRollMode, escapeHtml } from "../../utils/chat.mjs";
+import { applyMessageMode, escapeHtml } from "../../utils/chat.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 
 export async function renderNotableCombatsChat() {
-  const TextEditorImplementation = foundry?.applications?.ux?.TextEditor?.implementation ?? globalThis.TextEditor;
+  const TextEditorImplementation = foundry.applications.ux.TextEditor.implementation;
 
   const actor = canvas?.tokens?.controlled?.[0]?.actor ?? game.user?.character;
   if (!actor) {
@@ -33,7 +33,7 @@ export async function renderNotableCombatsChat() {
       return `<span class="combat-uses-display combat-tag-uses-display">
         <span class="uses-label">${label}</span>
         <span class="combat-uses-box">
-          <input type="number" class="combat-uses-current combat-tag-uses-current" data-index="${combatIndex}" value="${tag.current}" readonly tabindex="-1">
+          <input type="number" class="combat-uses-current combat-tag-uses-current pc-input-plain" data-index="${combatIndex}" value="${tag.current}" readonly tabindex="-1" data-dtype="Number" inputmode="numeric" pattern="[+=\\-]?\\d*">
           <span class="uses-separator">/ ${tag.max}</span>
         </span>
       </span>`;
@@ -41,14 +41,14 @@ export async function renderNotableCombatsChat() {
     if (tag.isSections) {
       return `<span class="combat-tag combat-tag-compact combat-tag-sections">
         ${label}:
-        <input type="number" class="combat-tag-sections-current" data-index="${combatIndex}" value="${tag.current}" readonly tabindex="-1">
+        <input type="number" class="combat-tag-sections-current pc-input-plain" data-index="${combatIndex}" value="${tag.current}" readonly tabindex="-1" data-dtype="Number" inputmode="numeric" pattern="[+=\\-]?\\d*">
         <span>/ ${tag.max}</span>
       </span>`;
     }
     if (tag.isSplitSecond) {
       return `<span class="combat-tag combat-tag-compact combat-tag-speed">
         ${value}:
-        <input type="number" class="combat-tag-splitsecond-current" data-index="${combatIndex}" value="${tag.splitSecondCurrent}" readonly tabindex="-1">
+        <input type="number" class="combat-tag-splitsecond-current pc-input-plain" data-index="${combatIndex}" value="${tag.splitSecondCurrent}" readonly tabindex="-1" data-dtype="Number" inputmode="numeric" pattern="[+=\\-]?\\d*">
         <span>/ ${tag.splitSecondMax}</span>
       </span>`;
     }
@@ -95,7 +95,7 @@ export async function renderNotableCombatsChat() {
       <span class="combat-uses-display">
         <span class="uses-label">Uses</span>
         <span class="combat-uses-box">
-          <input type="number" class="combat-uses-current" data-index="${index}" value="${combat.usesCurrent}" readonly tabindex="-1">
+          <input type="number" class="combat-uses-current pc-input-plain" data-index="${index}" value="${combat.usesCurrent}" readonly tabindex="-1" data-dtype="Number" inputmode="numeric" pattern="[+=\\-]?\\d*">
           <span class="uses-separator">/ ${combat.usesMax}</span>
         </span>
       </span>` : '';
@@ -155,12 +155,12 @@ export async function renderNotableCombatsChat() {
 
         const enriched = await TextEditorImplementation.enrichHTML(description, { async: true });
 
-        renderDialogCompat({
+        renderDialogV2({
           title: `${combatName} - Description`,
           content: `<div style="padding:10px;min-height:100px;color:#e0e0e0;">${enriched}</div>`,
           buttons: {},
           default: null
-        }, { classes: ["peasant-macro-dialog"] });
+        }, { classes: ["peasant-macro-dialog", "peasant-macro-dialog-force"] });
       } catch (e) {
         pcLog.debug('combat-name-view click failed', e);
       }
@@ -221,7 +221,7 @@ export async function renderNotableCombatsChat() {
 
           const roll = await new Roll('2d6').evaluate();
           const content = `<strong>${escapeHtml(combatName)}</strong>: Rolled <strong>${roll.total}</strong> vs TN <strong>${finalTohit}+</strong>`;
-          await ChatMessage.create(applyRollMode({ user: game.user.id, speaker, content }));
+          await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content }));
         };
 
         if (hasRangeRate) {
@@ -237,14 +237,14 @@ export async function renderNotableCombatsChat() {
             <form>
               <div class="form-group" style="margin-bottom: 10px;">
                 <label style="display: block; margin-bottom: 5px; color: #b0b0b0;">Range-Rate?</label>
-                <select name="rangeRateIndex" style="width: 100%; padding: 8px 10px; min-height: 38px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                <select class="pc-defense-prompt-select pc-select pc-dialog-field-full" name="rangeRateIndex">
                   ${optionsHtml}
                 </select>
               </div>
             </form>
           `;
 
-          renderDialogCompat({
+          renderDialogV2({
             title: 'Range-Rate',
             content: dialogContent,
             buttons: {
@@ -261,7 +261,7 @@ export async function renderNotableCombatsChat() {
               cancel: { icon: '<i class="fas fa-times"></i>', label: 'Cancel' }
             },
             default: 'roll'
-          }, { classes: ["peasant-macro-dialog"] });
+          }, { classes: ["peasant-macro-dialog", "peasant-macro-dialog-force"] });
           return;
         }
 
@@ -329,15 +329,14 @@ export async function renderNotableCombatsChat() {
           typeLabel = '';
         }
 
-        if (diceCount <= 0 || diceValue <= 0) return;
-
-        let formula = `${diceCount}d${diceValue}`;
-        if (flat !== 0) formula += flat > 0 ? `+${flat}` : `${flat}`;
+        const canRollDice = diceCount > 0 && diceValue > 0;
+        let formula = canRollDice ? `${diceCount}d${diceValue}` : "0";
+        if (flat !== 0) formula = canRollDice ? `${formula}${flat > 0 ? '+' : ''}${flat}` : `${flat}`;
 
         const roll = await new Roll(formula).evaluate();
         const total = roll.total;
 
-        const diceResults = roll.dice.map(d => d.results.map(r => r.result));
+        const diceResults = canRollDice ? roll.dice.map(d => d.results.map(r => r.result)) : [];
         const allDice = diceResults.flat();
         const diceBreakdown = allDice.join(', ');
         const diceSum = allDice.reduce((a, b) => a + b, 0);
@@ -346,14 +345,15 @@ export async function renderNotableCombatsChat() {
         const rollTitle = `${combatName}`;
         const typeDisplay = typeLabel ? `<span style="color: #aaa; font-size: 11px; margin-left: 6px;">${escapeHtml(typeLabel)}</span>` : '';
         const rollId = `dice-roll-${Date.now()}`;
+        const rollCardClass = rollType === 'damage' ? ' pc-damage-roll-card' : (rollType === 'heal' ? ' pc-heal-roll-card' : (rollType === 'manifest' ? ' pc-manifest-roll-card' : ''));
 
-        const chatHtml = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+        const chatHtml = `<div class="skill-roll-card${rollCardClass}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
   <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
     ${escapeHtml(rollTitle)}
   </div>
   <div style="display: flex; flex-direction: column; gap: 6px;">
     <div style="display: flex; gap: 6px;">
-      <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+      <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
         <span style="color: #ffffff; font-weight: bold; font-size: 11px;">${rollLabel}:</span>
         <div style="display: flex; align-items: center; gap: 6px;">
           <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #4ade80; border: 2px solid #22c55e;">
@@ -362,7 +362,7 @@ export async function renderNotableCombatsChat() {
         </div>
       </div>
     </div>
-    <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+    <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
       <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
       <div>Dice: [${diceBreakdown}] = ${diceSum}</div>${flat !== 0 ? `
       <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}
@@ -370,7 +370,7 @@ export async function renderNotableCombatsChat() {
   </div>
 </div>`;
 
-        await ChatMessage.create(applyRollMode({
+        await ChatMessage.create(applyMessageMode({
           user: game.user.id,
           speaker,
           content: chatHtml,

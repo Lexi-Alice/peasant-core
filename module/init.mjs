@@ -2,10 +2,12 @@
 import { configurePeasantCombat } from "./documents/_module.mjs";
 import { configureChatListeners } from "./applications/chat-listeners.mjs";
 import { configureCombatTracker } from "./applications/combat-tracker.mjs";
+import { drawLocationTableLikeMacro } from "./applications/actor/location-table.mjs";
 import { registerPeasantCombatApi } from "./applications/combat/api.mjs";
 import { PC_WORLD_MIGRATION_VERSION_SETTING, migrateWorldNotableCombatData } from "./migration/world.mjs";
 import { registerPeasantCoreSettingsMenus } from "./settings.mjs";
 import { initializePeasantSockets, registerPeasantSocketHandler } from "./socket/remote-prompts.mjs";
+import { registerPeasantCoreApi } from "./utils/api.mjs";
 import { registerDebugLoggingSetting } from "./utils/logging.mjs";
 
 initializePeasantSockets();
@@ -35,6 +37,7 @@ Hooks.once('init', () => {
 Hooks.once('ready', () => {
   console.log('Peasant Core | Setting up combat system');
   initializePeasantSockets();
+  registerPeasantCoreApi({ drawLocationTable: drawLocationTableLikeMacro });
   registerPeasantCombatApi();
   registerPeasantSocketHandler();
   void migrateWorldNotableCombatData();

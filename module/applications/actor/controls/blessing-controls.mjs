@@ -1,36 +1,26 @@
 import { pcLog } from "../../../utils/logging.mjs";
+import { delegate, qs, qsa, toElement } from "../../dom.mjs";
+import { renderSheetResourceDialog } from "./resource-dialogs.mjs";
 
 export function setupBlessingControls(sheet, html) {
-  html.find(".blessing-menu").addClass("hidden");
-
-  html.on("click", ".attr-label[data-attr] > span, .attr-label[data-attr]", (ev) => {
+  delegate(html, "click", ".attr-label[data-attr] > span, .attr-label[data-attr]", (ev, target) => {
     ev.preventDefault();
     ev.stopPropagation();
 
     if (!sheet.isEditMode) return;
 
-    const $label = $(ev.currentTarget).closest(".attr-label[data-attr]");
-    const attr = $label.data("attr");
-    const menu = html.find(".blessing-menu");
-    if (!menu.length) {
-      pcLog.debug("Blessing menu element not found in DOM");
-      return;
-    }
-
-    positionBlessingMenu(html, menu, $label);
-    loadBlessingState(sheet, menu, attr);
-    menu.removeClass("hidden");
-    if (menu[0]) menu[0].style.display = "";
+    const label = target.closest(".attr-label[data-attr]");
+    const attr = label?.dataset.attr;
+    openBlessingDialog(sheet, attr, label);
   });
 
-  html.on("click", ".characteristic-label", async (ev) => {
+  delegate(html, "click", ".characteristic-label", async (ev, target) => {
     try {
       if (!sheet.isEditMode) return;
       ev.preventDefault();
       ev.stopPropagation();
 
-      const el = $(ev.currentTarget);
-      const characteristic = el.data("characteristic");
+      const characteristic = target.dataset.characteristic;
 
       try {
         const result = await sheet.actor.togglePeasantToHitPenaltyTarget?.(characteristic);
@@ -45,121 +35,95 @@ export function setupBlessingControls(sheet, html) {
     }
   });
 
-  html.find(".blessing-menu").on("change", "input[name=blessingType]", (ev) => {
-    const $input = $(ev.currentTarget);
-    const menu = $input.closest(".blessing-menu");
-    const isChecked = $input.is(":checked");
-    if (isChecked) {
-      menu.find("input[name=blessingType]").not($input).prop("checked", false);
-    } else {
-      const anyChecked = menu.find("input[name=blessingType]:checked").length > 0;
-      if (!anyChecked) menu.data("blessingTarget", "");
-    }
-  });
+}
 
-  html.find(".blessing-menu").on("click", ".clear-blessing", async (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const menu = html.find(".blessing-menu");
-    try {
-      await sheet.actor.clearPeasantBlessing?.();
-    } catch (err) {
-      console.warn("Failed to clear blessing:", err);
-    }
-    menu.addClass("hidden");
-    sheet.render(false);
-  });
+function openBlessingDialog(sheet, attr, trigger) {
+  const blessing = sheet.actor.system.blessing || { type: "", target: "" };
+  const blessingTarget = blessing.target || attr || "";
 
-  html.find(".blessing-menu").on("click", ".close-blessing", (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    html.find(".blessing-menu").addClass("hidden");
-  });
+  return renderSheetResourceDialog(sheet, "blessing", {
+    title: "Blessings",
+    content: `
+      <div class="pc-resource-form pc-blessing-form">
+        <div class="pc-blessing-grid">
+          ${renderBlessingOption("spring", "Blessing of Spring", blessing.type)}
+          ${renderBlessingOption("summer", "Blessing of Summer", blessing.type)}
+          ${renderBlessingOption("fall", "Blessing of Fall", blessing.type)}
+          ${renderBlessingOption("winter", "Blessing of Winter", blessing.type)}
+        </div>
+      </div>
+    `,
+    buttons: {
+      apply: {
+        icon: "fa-solid fa-check",
+        label: "Apply",
+        default: true,
+        callback: async (html) => {
+          const form = qs(html, ".pc-blessing-form");
+          const chosenType = qs(form, "input[name=blessingType]:checked")?.value || "";
+          const chosenTarget = blessingTarget;
 
-  html.find(".blessing-menu").on("click", ".apply-blessing", async (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const menu = html.find(".blessing-menu");
-    const chosenType = menu.find("input[name=blessingType]:checked").val() || "";
-    const chosenTarget = menu.data("blessingTarget") || "";
+          if (chosenType && (chosenType === "spring" || chosenType === "fall" || chosenType === "summer")) {
+            if (!chosenTarget) {
+              ui.notifications.warn("Please select a basic attribute target for this Blessing.");
+              return false;
+            }
+          }
 
-    if (chosenType && (chosenType === "spring" || chosenType === "fall" || chosenType === "summer")) {
-      if (!chosenTarget) {
-        ui.notifications.warn("Please select a basic attribute target for this Blessing.");
-        return;
+          await sheet.actor.setPeasantBlessing?.(chosenType, chosenTarget);
+          sheet.render(false);
+          return true;
+        }
+      },
+      clear: {
+        icon: "fa-solid fa-eraser",
+        label: "Clear",
+        callback: async () => {
+          try {
+            await sheet.actor.clearPeasantBlessing?.();
+          } catch (err) {
+            console.warn("Failed to clear blessing:", err);
+            return false;
+          }
+          sheet.render(false);
+          return true;
+        }
+      }
+    },
+    default: "apply",
+    render: (html) => {
+      for (const input of qsa(html, "input[name=blessingType]")) {
+        input.addEventListener("change", (ev) => {
+          if (!ev.currentTarget.checked) return;
+          for (const otherInput of qsa(html, "input[name=blessingType]")) {
+            if (otherInput !== ev.currentTarget) otherInput.checked = false;
+          }
+        });
       }
     }
-
-    await sheet.actor.setPeasantBlessing?.(chosenType, chosenTarget);
-
-    menu.addClass("hidden");
-    sheet.render(false);
+  }, trigger, {
+    width: 360,
+    height: 220,
+    classes: ["pc-blessing-dialog"]
   });
 }
 
-function positionBlessingMenu(html, menu, $label) {
-  const container = html.find(".attributes-table");
-  if (container.length) {
-    menu.appendTo(container);
-    menu.css({ position: "absolute", display: "block", visibility: "hidden" });
-    const labelPos = $label.position();
-    const nudgeDown = 12;
-    const menuWidth = menu.outerWidth() || 260;
-    const menuHeight = menu.outerHeight() || 160;
-    const containerWidth = container.innerWidth() || html.width() || 720;
-
-    let left = Math.min(containerWidth - menuWidth - 6, Math.max(6, labelPos.left || 0));
-    let top = (labelPos.top || 0) + $label.outerHeight() + nudgeDown;
-
-    const containerHeight = container.innerHeight() || html.height() || 700;
-    if (top + menuHeight > containerHeight - 6) {
-      top = Math.max(6, (labelPos.top || 0) - menuHeight - 6);
-    }
-
-    menu.css({
-      position: "absolute",
-      top: `${Math.round(top)}px`,
-      left: `${Math.round(left)}px`,
-      visibility: "",
-      display: ""
-    });
-    return;
-  }
-
-  const sheetOffset = html.offset() || { top: 0, left: 0 };
-  const labelOffset = $label.offset() || { top: 0, left: 0 };
-  const extraOffset = 18;
-  const top = (labelOffset.top - sheetOffset.top) + $label.outerHeight() + 6 + extraOffset;
-  let left = (labelOffset.left - sheetOffset.left) || 0;
-  const menuWidth = menu.outerWidth() || 260;
-  const containerWidth = html.width() || (html[0] && html[0].clientWidth) || 720;
-  left = Math.min(containerWidth - menuWidth - 10, Math.max(6, left));
-  const menuHeight = menu.outerHeight() || 200;
-  const containerHeight = html.height() || (html[0] && html[0].clientHeight) || 700;
-  const maxTop = Math.max(6, containerHeight - menuHeight - 10);
-  const finalTop = Math.min(maxTop, top);
-  menu.css({ top: `${finalTop}px`, left: `${left}px`, position: "absolute" });
-}
-
-function loadBlessingState(sheet, menu, attr) {
-  const blessing = sheet.actor.system.blessing || { type: "", target: "" };
-  menu.find("input[name=blessingType]").prop("checked", false);
-  if (blessing.type) menu.find(`input[name=blessingType][value=${blessing.type}]`).prop("checked", true);
-  menu.data("blessingTarget", blessing.target || attr);
-
-  try {
-    menu.find(".apply-blessing").prop("disabled", false).show();
-  } catch (err) {
-    pcLog.debug("Blessing menu apply button missing or cannot be shown", err);
-  }
+function renderBlessingOption(type, label, selectedType) {
+  const checked = type === selectedType ? " checked" : "";
+  return `
+    <label>
+      <input type="checkbox" name="blessingType" value="${type}"${checked}>
+      <span>${label}</span>
+    </label>
+  `;
 }
 
 function updateCharacteristicToHitDisplay(sheet, html, newTarget) {
   try {
-    const labels = html.find(".characteristic-label");
-    labels.removeClass("blessed");
-    if (newTarget) {
-      html.find(`.characteristic-label[data-characteristic="${newTarget}"]`).addClass("blessed");
+    const root = toElement(html);
+    if (!root) return;
+    for (const label of qsa(root, ".characteristic-label")) {
+      label.classList.toggle("blessed", !!newTarget && label.dataset.characteristic === newTarget);
     }
 
     const build = sheet.actor.system.build || 0;
@@ -184,9 +148,10 @@ function updateCharacteristicToHitDisplay(sheet, html, newTarget) {
       Social: newTarget === "Social" ? (socBase - 1) : socBase
     };
 
+    const toHitElements = qsa(root, ".attr-tohit-clickable[data-characteristic]");
     Object.entries(mapping).forEach(([char, val]) => {
-      const toHit = html.find(`.attr-tohit-clickable[data-characteristic="${char}"]`);
-      if (toHit.length) toHit.text(`${val}+`);
+      const toHit = toHitElements.find((element) => element.dataset.characteristic === char);
+      if (toHit) toHit.textContent = `${val}+`;
     });
   } catch (domErr) {
     pcLog.debug("Failed to update characteristic to-hit display", domErr);

@@ -4,17 +4,38 @@ import { PC_CONSCIOUSNESS_SAVE_FLAG, PC_SAVE_MODIFIER_FLAG } from "../../../data
 import { applyDieRate } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 import { performConsciousnessCheck, performSavingRoll, performSkillRoll, performUntrainedSkillRoll } from "../../../dice/rolls.mjs";
-import { applyRollMode, escapeHtml } from "../../../utils/chat.mjs";
+import { applyMessageMode, escapeHtml } from "../../../utils/chat.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 import { startNotableCombatRoll } from "../../combat/notable-combat-workflow.mjs";
+
+function getActionElement(sheet, event, target) {
+  return sheet?._getActionTarget?.(event, target) ?? target ?? event?.currentTarget ?? null;
+}
+
+function dataKeyToAttribute(key) {
+  return `data-${String(key).replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`;
+}
+
+function readDataValue(element, key) {
+  if (!element) return undefined;
+  if (element.dataset && element.dataset[key] !== undefined) return element.dataset[key];
+  return element.getAttribute?.(dataKeyToAttribute(key));
+}
+
+function readDataInt(element, ...keys) {
+  for (const key of keys) {
+    const value = Number.parseInt(readDataValue(element, key), 10);
+    if (Number.isFinite(value)) return value;
+  }
+  return NaN;
+}
 
 export async function rollConsciousnessFromElement(sheet, event, target) {
   try {
     if (!sheet?._prepareSheetRollEvent?.(event, "consciousness-roll", target)) return;
-    const el = $(sheet._getActionTarget(event, target));
-    const th = Number.isFinite(parseInt(el.data("th")))
-      ? parseInt(el.data("th"))
-      : (Number.isFinite(parseInt(el.data("tn"))) ? parseInt(el.data("tn")) : null);
+    const el = getActionElement(sheet, event, target);
+    const parsedTh = readDataInt(el, "th", "tn");
+    const th = Number.isFinite(parsedTh) ? parsedTh : null;
     if (th === null) return;
     const asSave = !!sheet.actor?.getFlag?.("peasant-core", PC_CONSCIOUSNESS_SAVE_FLAG);
     await performConsciousnessCheck({
@@ -87,8 +108,8 @@ export async function rollInitiativeFromElement(sheet, event, target) {
 export async function rollCombatFromElement(sheet, event, target) {
   try {
     if (!sheet?._prepareSheetRollEvent?.(event, "combat-roll", target)) return;
-    const el = $(sheet._getActionTarget(event, target));
-    const idx = parseInt(el.data("index"));
+    const el = getActionElement(sheet, event, target);
+    const idx = readDataInt(el, "index");
     if (Number.isNaN(idx)) return;
     pcLog.debug("Peasant Core | combat-roll-clickable clicked", {
       actor: sheet.actor?.name,
@@ -110,16 +131,16 @@ export async function rollCombatTagFromElement(sheet, event, target) {
 
   try {
     if (!sheet._prepareSheetRollEvent(event, "combat-tag-roll", target)) return;
-    const $el = $(sheet._getActionTarget(event, target));
-    let idx = parseInt($el.data("combatIndex")) || parseInt($el.data("combat-index")) || parseInt($el.attr("data-combat-index"));
+    const el = getActionElement(sheet, event, target);
+    let idx = readDataInt(el, "combatIndex");
     if (Number.isNaN(idx)) {
-      const container = $el.closest(".combat-tags-inline");
-      idx = parseInt(container.data("combatIndex")) || parseInt(container.attr("data-combat-index"));
+      const container = el?.closest?.(".combat-tags-inline");
+      idx = readDataInt(container, "combatIndex");
     }
-    if (Number.isNaN(idx)) idx = parseInt($el.data("index"));
+    if (Number.isNaN(idx)) idx = readDataInt(el, "index");
 
-    const rollType = $el.data("rollType") || $el.attr("data-roll-type");
-    pcLog.debug("combat-tag-rollable action", { idx, rollType, el: $el[0] });
+    const rollType = readDataValue(el, "rollType");
+    pcLog.debug("combat-tag-rollable action", { idx, rollType, el });
 
     if (Number.isNaN(idx) || !rollType) {
       pcLog.debug("combat-tag-rollable: invalid idx or rollType", { idx, rollType });
@@ -179,15 +200,14 @@ export async function rollCombatTagFromElement(sheet, event, target) {
       rollLabel = "Manifest";
     }
 
-    if (diceCount <= 0 || diceValue <= 0) return;
-
-    const naturalDiceCount = diceCount;
-    const useStability = !!combat.stability && (rollType === "damage" || rollType === "heal" || rollType === "manifest");
+    const canRollDice = diceCount > 0 && diceValue > 0;
+    const naturalDiceCount = canRollDice ? diceCount : 0;
+    const useStability = canRollDice && !!combat.stability && (rollType === "damage" || rollType === "heal" || rollType === "manifest");
     const useStrengthen = useStability && !!combat.strengthen;
     const rolledDiceCount = useStability ? (naturalDiceCount * 2) : naturalDiceCount;
-    const roll = await new Roll(`${rolledDiceCount}d${diceValue}`).evaluate();
+    const roll = await new Roll(canRollDice ? `${rolledDiceCount}d${diceValue}` : "0").evaluate();
 
-    const diceResults = roll.dice.map(d => d.results.map(r => r.result));
+    const diceResults = canRollDice ? roll.dice.map(d => d.results.map(r => r.result)) : [];
     const allDice = diceResults.flat();
     const diceBreakdown = allDice.join(", ");
     const diceSum = allDice.reduce((a, b) => a + b, 0);
@@ -213,13 +233,14 @@ export async function rollCombatTagFromElement(sheet, event, target) {
     const speaker = ChatMessage.getSpeaker({ actor: sheet.actor });
     const typeDisplay = typeLabel ? `<span style="color: #aaa; font-size: 11px; margin-left: 6px;">${typeLabel}</span>` : "";
     const rollId = `dice-roll-${Date.now()}`;
-    const chatHtml = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+    const rollCardClass = rollType === "damage" ? " pc-damage-roll-card" : (rollType === "heal" ? " pc-heal-roll-card" : (rollType === "manifest" ? " pc-manifest-roll-card" : ""));
+    const chatHtml = `<div class="skill-roll-card${rollCardClass}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
   <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
     ${escapeHtml(combatName)}
   </div>
   <div style="display: flex; flex-direction: column; gap: 6px;">
     <div style="display: flex; gap: 6px;">
-      <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+      <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
         <span style="color: #ffffff; font-weight: bold; font-size: 11px;">${rollLabel}:</span>
         <div style="display: flex; align-items: center; gap: 6px;">
           <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #4ade80; border: 2px solid #22c55e;">
@@ -228,7 +249,7 @@ export async function rollCombatTagFromElement(sheet, event, target) {
         </div>
       </div>
     </div>
-    <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+    <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
       <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
       ${diceDetailLine}${flat !== 0 ? `
       <div>Flat Modifier: ${flat > 0 ? "+" : ""}${flat}</div>` : ""}
@@ -236,7 +257,7 @@ export async function rollCombatTagFromElement(sheet, event, target) {
   </div>
 </div>`;
 
-    await ChatMessage.create(applyRollMode({
+    await ChatMessage.create(applyMessageMode({
       user: game.user.id,
       speaker,
       content: chatHtml,
@@ -250,8 +271,8 @@ export async function rollCombatTagFromElement(sheet, event, target) {
 export async function rollSkillFromElement(sheet, event, target) {
   try {
     if (!sheet?._prepareSheetRollEvent?.(event, "skill-roll", target)) return;
-    const el = $(sheet._getActionTarget(event, target));
-    const idx = parseInt(el.data("index"));
+    const el = getActionElement(sheet, event, target);
+    const idx = readDataInt(el, "index");
     if (Number.isNaN(idx)) return;
     const skills = sheet.actor.system.skills || [];
     const skill = skills[idx] || {};
@@ -293,8 +314,8 @@ export async function rollSkillFromElement(sheet, event, target) {
 export async function rollAttributeToHitFromElement(sheet, event, target) {
   try {
     if (!sheet?._prepareSheetRollEvent?.(event, "attr-tohit-roll", target)) return;
-    const el = $(sheet._getActionTarget(event, target));
-    const characteristic = el.data("characteristic") || "Untrained";
+    const el = getActionElement(sheet, event, target);
+    const characteristic = readDataValue(el, "characteristic") || "Untrained";
     const combatMods = sheet.actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
     const toHitMod = parseInt(combatMods.toHit) || 0;
     const baseMap = computeBaseAttrToHits(sheet.actor.system);
@@ -313,16 +334,16 @@ export async function rollAttributeToHitFromElement(sheet, event, target) {
 export async function rollAttributeSaveFromElement(sheet, event, target) {
   try {
     if (!sheet?._prepareSheetRollEvent?.(event, "attr-save-roll", target)) return;
-    const el = $(sheet._getActionTarget(event, target));
-    const saveKey = el.data("save") || "";
-    const explicitTnRaw = Number.parseInt(el.data("tn"), 10);
+    const el = getActionElement(sheet, event, target);
+    const saveKey = readDataValue(el, "save") || "";
+    const explicitTnRaw = Number.parseInt(readDataValue(el, "tn"), 10);
     const hasExplicitTn = Number.isFinite(explicitTnRaw);
 
     let tn = 7;
     let skillName = "Saving Roll";
     if (hasExplicitTn) {
       tn = Math.max(2, explicitTnRaw);
-      const customSkillName = String(el.data("saveLabel") || "").trim();
+      const customSkillName = String(readDataValue(el, "saveLabel") || "").trim();
       skillName = customSkillName || "AoE Reflex Save";
     } else {
       const combatMods = sheet.actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };

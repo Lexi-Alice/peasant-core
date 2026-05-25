@@ -1,4 +1,10 @@
 import {
+  PC_DAMAGE_RESISTANCE_BLUNT_MULTIPLIER_FLAG,
+  PC_DAMAGE_RESISTANCE_CRITICAL_MULTIPLIER_FLAG,
+  PC_DAMAGE_RESISTANCE_LETHAL_MULTIPLIER_FLAG,
+  PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER
+} from "./damage.mjs";
+import {
   PC_ARMOR_CHARGE_MULTIPLIER_FLAG,
   PC_DEFAULT_ARMOR_CHARGE_MULTIPLIER,
   PC_DEFAULT_WOUND_ARMS_MULTIPLIER,
@@ -66,6 +72,42 @@ export const PC_ACTOR_SETTING_DEFINITIONS = Object.freeze([
     flagKey: PC_PRIMAL_EVASION_FLAG,
     defaultValue: PC_DEFAULT_PRIMAL_EVASION,
     min: 0
+  },
+  {
+    group: "Damage Resistances",
+    label: "Blunt",
+    hint: "Multiplies blunt damage taken before it is applied.",
+    type: "number",
+    flagKey: PC_DAMAGE_RESISTANCE_BLUNT_MULTIPLIER_FLAG,
+    defaultValue: PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER,
+    min: 0,
+    allowDecimal: true,
+    step: "any",
+    suffix: "x"
+  },
+  {
+    group: "Damage Resistances",
+    label: "Lethal",
+    hint: "Multiplies lethal damage taken before it is applied.",
+    type: "number",
+    flagKey: PC_DAMAGE_RESISTANCE_LETHAL_MULTIPLIER_FLAG,
+    defaultValue: PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER,
+    min: 0,
+    allowDecimal: true,
+    step: "any",
+    suffix: "x"
+  },
+  {
+    group: "Damage Resistances",
+    label: "Critical",
+    hint: "Multiplies critical damage taken before it is applied.",
+    type: "number",
+    flagKey: PC_DAMAGE_RESISTANCE_CRITICAL_MULTIPLIER_FLAG,
+    defaultValue: PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER,
+    min: 0,
+    allowDecimal: true,
+    step: "any",
+    suffix: "x"
   },
   {
     group: "Movement",
@@ -184,8 +226,11 @@ export function getPeasantCoreSettingGroups(actor, editable = true) {
       checked: value === true,
       value,
       editable,
-      step: setting.allowDecimal ? "0.1" : "1",
+      step: setting.step || (setting.allowDecimal ? "0.1" : "1"),
       inputMode: setting.allowDecimal ? "decimal" : "numeric",
+      pattern: setting.allowDecimal ? "[+=\\-]?\\d*(\\.\\d*)?" : "[+=\\-]?\\d*",
+      suffix: setting.suffix || "",
+      hasSuffix: !!setting.suffix,
       hasMin,
       min: hasMin ? setting.min : null
     });

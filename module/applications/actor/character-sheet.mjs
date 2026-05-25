@@ -6,10 +6,11 @@ import { setupCombatModifierControls } from "./controls/combat-modifier-controls
 import { configurePeasantActorSheetHooks } from "./hooks.mjs";
 import { drawLocationTableLikeMacro } from "./location-table.mjs";
 import { setupDamageHealControls } from "./controls/damage-heal-controls.mjs";
-import { setupSheetDraggablePopups } from "./controls/draggable.mjs";
 import { setupHealthStressControls } from "./controls/health-stress-controls.mjs";
 import { setupSheetKeyboardNavigation } from "./controls/keyboard-navigation.mjs";
 import { setupPortraitControls, teardownPortraitBindings } from "./controls/portrait-controls.mjs";
+import { closeSheetResourceDialogs } from "./controls/resource-dialogs.mjs";
+import { closeSheetOwnedApplications } from "./controls/sheet-owned-apps.mjs";
 import { confirmPeasantResourceRefresh, confirmPeasantRest } from "./controls/rest-controls.mjs";
 import { setupResourceControls } from "./controls/resource-controls.mjs";
 import { rollAttributeSaveFromElement, rollAttributeToHitFromElement, rollCombatFromElement, rollCombatTagFromElement, rollConsciousnessFromElement, rollInitiativeFromElement, rollSkillFromElement } from "./controls/roll-actions.mjs";
@@ -23,7 +24,7 @@ import { setupBasicSkillAdvantageControls } from "./skills/skill-advantage-contr
 import { setupSkillAdvantageDescriptionEditors } from "./skills/skill-advantage-description-editors.mjs";
 import { setupSkillAdvantageDragDropControls } from "./skills/skill-advantage-drag-drop.mjs";
 import { ensureSlideToggleElement } from "../components/slide-toggle.mjs";
-import { renderDialogCompat } from "../dialogs.mjs";
+import { renderDialogV2 } from "../dialogs.mjs";
 import { registerPeasantCoreApi } from "../../utils/api.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 
@@ -34,10 +35,8 @@ if (!ActorSheetV2Class || !HandlebarsApplicationMixin) {
 }
 const ActorSheetBase = HandlebarsApplicationMixin(ActorSheetV2Class);
 const DocumentSheetConfig = foundry?.applications?.apps?.DocumentSheetConfig;
-// Core's fallback actor sheet is still AppV1; this reference only unregisters it.
-const CoreActorSheetClass = foundry?.appv1?.sheets?.ActorSheet;
-const TokenHUDClass = foundry?.applications?.hud?.TokenHUD ?? globalThis.TokenHUD;
-const TextEditorImplementation = foundry?.applications?.ux?.TextEditor?.implementation ?? globalThis.TextEditor;
+const TokenHUDClass = foundry.applications.hud.TokenHUD;
+const TextEditorImplementation = foundry.applications.ux.TextEditor.implementation;
 const PC_DEFAULT_SHEET_TEMPLATE = "systems/peasant-core/templates/actor/character-sheet.html";
 
 ensureSlideToggleElement();
@@ -70,7 +69,7 @@ export class PeasantActorSheet extends ActorSheetBase {
   }
 
   static get SHEET_CLASSES() {
-    return ["peasant-core", "peasant-actor-sheet"];
+    return ["peasant-core", "peasant-actor-sheet", "actor", "character"];
   }
 
   static get SHEET_WIDTH() {
@@ -255,7 +254,7 @@ export class PeasantActorSheet extends ActorSheetBase {
 
   static get SHEET_PARTIALS() {
     const tabPartials = this.TAB_DEFINITIONS.map(({ partial }) => `${this.SHEET_PARTIAL_PATH}/${partial}`);
-    return [...tabPartials, `${this.SHEET_PARTIAL_PATH}/character-blessing-menu.html`];
+    return tabPartials;
   }
 
   static get TABS() {
@@ -372,6 +371,8 @@ export class PeasantActorSheet extends ActorSheetBase {
         try { await this._flushQueuedSaves(); } catch (e) { /* ignore */ }
       }
     }
+    closeSheetResourceDialogs(this);
+    closeSheetOwnedApplications(this);
     teardownPortraitBindings(this);
     this._teardownSheetEventBindings();
     return super.close(options);
@@ -379,7 +380,7 @@ export class PeasantActorSheet extends ActorSheetBase {
 
   _detachOptions() {
     const windowId = (this.parent ?? this).window?.windowId;
-    return windowId ? { window: { detached: true, windowId } } : {};
+    return windowId ? { window: { windowId } } : {};
   }
 
   _withDetachedOptions(options = {}) {
@@ -395,7 +396,10 @@ export class PeasantActorSheet extends ActorSheetBase {
   }
 
   _renderDialog(data, options = {}) {
-    return renderDialogCompat(data, this._withDetachedOptions(options));
+    return renderDialogV2(data, this._withDetachedOptions({
+      ...options,
+      parent: this
+    }));
   }
 
   _teardownSheetEventBindings() {
@@ -679,22 +683,23 @@ export class PeasantActorSheet extends ActorSheetBase {
   }
 
   _escapeHtml(value) {
-    if (foundry?.utils?.escapeHTML) return foundry.utils.escapeHTML(String(value ?? ""));
-    const div = document.createElement("div");
-    div.textContent = String(value ?? "");
-    return div.innerHTML;
+    return foundry.utils.escapeHTML(String(value ?? ""));
   }
 
   _getDialogPositionNearTrigger(trigger, width = 420, height = 320) {
-    const viewportWidth = Math.max(document.documentElement?.clientWidth || 0, window.innerWidth || 0);
-    const viewportHeight = Math.max(document.documentElement?.clientHeight || 0, window.innerHeight || 0);
-    const fallback = {
+    const triggerWindow = trigger?.isConnected !== false ? trigger?.ownerDocument?.defaultView : null;
+    const hostWindow = triggerWindow ?? this.element?.ownerDocument?.defaultView ?? window;
+    const hostDocument = hostWindow.document ?? document;
+    const viewportWidth = Math.max(hostDocument.documentElement?.clientWidth || 0, hostWindow.innerWidth || 0);
+    const viewportHeight = Math.max(hostDocument.documentElement?.clientHeight || 0, hostWindow.innerHeight || 0);
+    const centeredPosition = {
       width,
       left: Math.max(16, Math.round((viewportWidth - width) / 2)),
       top: Math.max(16, Math.round((viewportHeight - height) / 2))
     };
     const rect = trigger?.getBoundingClientRect?.();
-    if (!rect) return fallback;
+    if (!rect) return centeredPosition;
+    if (trigger?.isConnected === false || (rect.width <= 0 && rect.height <= 0)) return centeredPosition;
 
     const gap = 12;
     const edge = 16;
@@ -713,39 +718,9 @@ export class PeasantActorSheet extends ActorSheetBase {
     };
   }
 
-  _positionSheetPopupNearTrigger(html, selector, trigger) {
-    const popup = html.find(selector).first();
-    const popupEl = popup[0];
-    const triggerRect = trigger?.getBoundingClientRect?.();
-    if (!popupEl || !triggerRect) return;
-
-    const parent = popupEl.offsetParent || html.find(".hp-grid-container")[0] || this._getSheetJQ()[0];
-    const parentRect = parent?.getBoundingClientRect?.();
-    if (!parentRect) return;
-
-    const popupWidth = popup.outerWidth() || 280;
-    const sheetRect = this._getSheetJQ()[0]?.getBoundingClientRect?.() || parentRect;
-    let left = triggerRect.left - parentRect.left;
-    let top = triggerRect.bottom - parentRect.top + 8;
-
-    const minLeft = sheetRect.left - parentRect.left + 8;
-    const maxLeft = sheetRect.right - parentRect.left - popupWidth - 8;
-    if (Number.isFinite(maxLeft) && maxLeft > minLeft) left = Math.max(minLeft, Math.min(left, maxLeft));
-    top = Math.max(sheetRect.top - parentRect.top + 8, top);
-
-    popup.css({
-      left: `${Math.round(left)}px`,
-      top: `${Math.round(top)}px`
-    });
-  }
-
   _getHeaderControls() {
-    if (typeof super._getHeaderControls !== "function") {
-      if (typeof super._getHeaderControls === "function") return super._getHeaderControls();
-      return [];
-    }
-
-    const controls = Array.isArray(super._getHeaderControls()) ? super._getHeaderControls() : [];
+    const superControls = typeof super._getHeaderControls === "function" ? super._getHeaderControls() : [];
+    const controls = Array.isArray(superControls) ? [...superControls] : [];
     const canConfigure = game.user.isGM || this.actor.isOwner;
     if (canConfigure) {
       const hasRefreshResources = controls.some(control => String(control?.action || "").trim().toLowerCase() === "refreshresources");
@@ -758,7 +733,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       }
     }
 
-    // Foundry V13 compatibility can surface duplicate controls via mixed providers.
+    // Foundry can surface duplicate controls via mixed providers.
     // Keep first instance by visible label, then by action key for unlabeled entries.
     const seenLabels = new Set();
     const seenActions = new Set();
@@ -1037,8 +1012,6 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     setupBlessingControls(this, html);
 
-    setupSheetDraggablePopups(html);
-
     setupPortraitControls(this, html);
 
     setupBasicSkillAdvantageControls(this, html, { blurActiveEditableInSheet, collectAdvantagesFromDOM, enqueueSheetUpdate, runQueuedInputUpdate });
@@ -1056,7 +1029,6 @@ configurePeasantActorSheetHooks({
   actorClass: PeasantActor,
   characterModel: PeasantCharacterModel,
   documentSheetConfig: DocumentSheetConfig,
-  coreActorSheetClass: CoreActorSheetClass,
   tokenHudClass: TokenHUDClass,
   isPeasantCharacterType
 });

@@ -1,3 +1,5 @@
+import { qsa, qs, toElement } from "../../dom.mjs";
+
 export function initializeSheetSaveQueues(sheet) {
   if (sheet._skillsSaveQueue === undefined) sheet._skillsSaveQueue = Promise.resolve();
   if (sheet._combatSaveQueue === undefined) sheet._combatSaveQueue = Promise.resolve();
@@ -26,13 +28,14 @@ export function createSheetUpdateQueue(sheet) {
 }
 
 export function collectAdvantagesFromSheet(sheet) {
-  const items = sheet._getSheetJQ().find(".advantages-list .advantage-item");
+  const root = sheet._getSheetJQ?.()?.[0] ?? sheet.element ?? null;
+  const items = qsa(root, ".advantages-list .advantage-item");
   const actorNames = (JSON.parse(JSON.stringify(sheet.actor.system.flexibleAdvantages || [])) || []).map(entry => {
     if (typeof entry === "string") return entry;
     return String(entry?.name ?? "");
   });
   const actorDescriptions = JSON.parse(JSON.stringify(sheet.actor.system.flexibleAdvantageDescriptions || []));
-  if (!items.length) {
+  if (items.length === 0) {
     return {
       names: actorNames,
       descriptions: actorDescriptions
@@ -41,13 +44,12 @@ export function collectAdvantagesFromSheet(sheet) {
 
   const names = [];
   const descriptions = [];
-  items.each((_, el) => {
-    const $el = $(el);
-    const nameValue = $el.find(".advantage-input").val();
-    const descValue = $el.find(".advantage-description-hidden").val();
+  for (const el of items) {
+    const nameValue = qs(el, ".advantage-input")?.value;
+    const descValue = qs(el, ".advantage-description-hidden")?.value;
     names.push(nameValue == null ? "" : String(nameValue));
     descriptions.push(descValue == null ? "" : String(descValue));
-  });
+  }
   return { names, descriptions };
 }
 
@@ -65,7 +67,7 @@ export async function blurActiveEditableInSheet(sheet) {
 }
 
 export async function runQueuedInputUpdate(sheet, input, queueKey, label, task, { enqueueSheetUpdate = null } = {}) {
-  const inputEl = input?.[0] || null;
+  const inputEl = toElement(input);
   const ownerDocument = sheet._getElementDocument(inputEl);
   const hadFocus = !!(inputEl && ownerDocument?.activeElement === inputEl);
   const canTrackSelection = !!(inputEl && typeof inputEl.selectionStart === "number");
@@ -75,7 +77,7 @@ export async function runQueuedInputUpdate(sheet, input, queueKey, label, task, 
   const selDir = canTrackSelection ? inputEl.selectionDirection : null;
 
   if (!hadFocus) {
-    try { input?.prop?.("disabled", true); } catch (e) { /* ignore */ }
+    try { if (inputEl) inputEl.disabled = true; } catch (e) { /* ignore */ }
   }
 
   try {
@@ -83,7 +85,7 @@ export async function runQueuedInputUpdate(sheet, input, queueKey, label, task, 
     await enqueue(queueKey, label, task);
   } finally {
     if (!hadFocus) {
-      try { input?.prop?.("disabled", false); } catch (e) { /* ignore */ }
+      try { if (inputEl) inputEl.disabled = false; } catch (e) { /* ignore */ }
       return;
     }
 

@@ -1,3 +1,4 @@
+import { delegate, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
 export function setupSkillAdvantageDragDropControls(sheet, html, {
@@ -7,11 +8,14 @@ export function setupSkillAdvantageDragDropControls(sheet, html, {
   collectAdvantagesFromDOM,
   enqueueSheetUpdate
 } = {}) {
-  const doc = sheetDocument ?? sheet?._getElementDocument?.(html?.[0]) ?? document;
+  const root = toElement(html);
+  if (!root) return;
+
+  const doc = sheetDocument ?? sheet?._getElementDocument?.(root) ?? root.ownerDocument ?? document;
   const body = sheetBody ?? doc?.body ?? document.body;
 
-  setupSkillDragDropControls(sheet, html, doc);
-  setupAdvantageDragDropControls(sheet, html, {
+  setupSkillDragDropControls(sheet, root, doc);
+  setupAdvantageDragDropControls(sheet, root, {
     sheetDocument: doc,
     sheetBody: body,
     blurActiveEditableInSheet,
@@ -20,28 +24,27 @@ export function setupSkillAdvantageDragDropControls(sheet, html, {
   });
 }
 
-function setupSkillDragDropControls(sheet, html, sheetDocument) {
-  html.on("dragstart", ".skills-list .skill-item", (ev) => {
+function setupSkillDragDropControls(sheet, root, sheetDocument) {
+  delegate(root, "dragstart", ".skills-list .skill-item", (ev, item) => {
     try {
-      const el = $(ev.currentTarget);
-      let index = parseInt(el.attr("data-skill-index"));
-      if (Number.isNaN(index)) index = el.index();
+      let index = resolveElementIndex(item, "data-skill-index");
       if (Number.isNaN(index)) return;
-      const dt = ev.originalEvent.dataTransfer;
+      const dt = ev.dataTransfer;
       if (dt) {
         dt.effectAllowed = "move";
         dt.setData("text/plain", String(index));
       }
-      el.addClass("dragging");
-      try { el.css("opacity", "0.5"); } catch (e) {}
+      item.classList.add("dragging");
+      item.style.opacity = "0.5";
 
       try {
         if (sheet._skillDragState && sheet._skillDragState.placeholder) {
           try { sheet._skillDragState.placeholder.remove(); } catch (e) {}
           sheet._skillDragState = null;
         }
-        const placeholder = $(`<div class="skill-placeholder" style="height: 8px; background: rgba(33,150,243,0.6); border-radius: 4px; margin: 6px 0; width: calc(100% - 12px);"></div>`);
-        placeholder.css("pointer-events", "none");
+        const placeholder = sheetDocument.createElement("div");
+        placeholder.className = "skill-placeholder";
+        placeholder.style.pointerEvents = "none";
         sheet._skillDragState = { fromIndex: index, placeholder, placeholderInserted: false };
         pcLog.debug("skill dragstart prepared placeholder at", index);
       } catch (phErr) {
@@ -52,74 +55,68 @@ function setupSkillDragDropControls(sheet, html, sheetDocument) {
     }
   });
 
-  html.on("dragend", ".skills-list .skill-item", (ev) => {
+  delegate(root, "dragend", ".skills-list .skill-item", (ev, item) => {
     try {
-      $(ev.currentTarget).removeClass("dragging");
+      item.classList.remove("dragging");
       if (sheet._skillDragState && sheet._skillDragState.placeholder) {
         sheet._skillDragState.placeholder.remove();
         sheet._skillDragState = null;
       }
-      try { $(ev.currentTarget).css("opacity", ""); } catch (e) {}
+      item.style.opacity = "";
     } catch (e) {}
   });
 
-  html.on("dragleave", ".skills-list", () => {
-    try { getSheetJQ(sheet).find(".skills-list .skill-item").removeClass("drag-over-top drag-over-bottom"); } catch (e) {}
+  delegate(root, "dragleave", ".skills-list", () => {
+    try { clearDragMarkers(root, ".skills-list .skill-item"); } catch (e) {}
   });
 
-  html.on("dragover", ".skills-list, .skills-list .skill-item", (ev) => {
+  delegate(root, "dragover", ".skills-list, .skills-list .skill-item", (ev) => {
     try {
       ev.preventDefault();
-      const dt = ev.originalEvent.dataTransfer;
+      const dt = ev.dataTransfer;
       if (dt) dt.dropEffect = "move";
 
       try {
-        const x = ev.originalEvent.clientX;
-        const y = ev.originalEvent.clientY;
+        const x = ev.clientX;
+        const y = ev.clientY;
         const el = sheetDocument.elementFromPoint(x, y);
         if (!el) return;
-        const $closest = $(el).closest(".skills-list .skill-item");
-        const items = getSheetJQ(sheet).find(".skills-list .skill-item");
+        const closest = el.closest?.(".skills-list .skill-item");
+        const items = getSkillItems(root);
         if (!sheet._skillDragState) return;
         let toIndex;
-        if ($closest.length) {
-          toIndex = parseInt($closest.attr("data-skill-index"));
-          if (Number.isNaN(toIndex)) toIndex = $closest.index();
+        if (closest) {
+          toIndex = resolveElementIndex(closest, "data-skill-index");
         } else {
           toIndex = items.length;
         }
         if (Number.isNaN(toIndex)) return;
-        items.removeClass("drag-over-top drag-over-bottom");
-        const fromIndex = Number.isFinite(parseInt(sheet._skillDragState.fromIndex)) ? parseInt(sheet._skillDragState.fromIndex) : null;
+        clearDragMarkers(root, ".skills-list .skill-item");
+        const fromIndex = Number.isFinite(Number.parseInt(sheet._skillDragState.fromIndex, 10)) ? Number.parseInt(sheet._skillDragState.fromIndex, 10) : null;
         if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) {
           return;
         }
-        if (toIndex >= items.length) {
-          if (items.length) items.last().addClass("drag-over-bottom");
-        } else {
-          items.eq(toIndex).addClass("drag-over-top");
-        }
+        markDropTarget(items, toIndex);
       } catch (mErr) {
         /* ignore */
       }
     } catch (e) {}
   });
 
-  html.on("drop", ".skills-list, .skills-list .skill-item", async (ev) => {
+  delegate(root, "drop", ".skills-list, .skills-list .skill-item", async (ev) => {
     try {
       ev.preventDefault();
       ev.stopPropagation();
-      const data = ev.originalEvent.dataTransfer.getData("text/plain");
-      const fromIndex = Number.isFinite(parseInt(data)) ? parseInt(data) : null;
+      const data = ev.dataTransfer?.getData("text/plain") ?? "";
+      const fromIndex = Number.isFinite(Number.parseInt(data, 10)) ? Number.parseInt(data, 10) : null;
       if (fromIndex === null) return;
 
-      const dropTarget = $(ev.target).closest(".skill-item");
+      const dropTarget = ev.target?.closest?.(".skill-item");
       let toIndex = null;
-      if (dropTarget.length) {
-        toIndex = parseInt(dropTarget.attr("data-skill-index"));
-        if (Number.isNaN(toIndex)) toIndex = dropTarget.index();
+      if (dropTarget) {
+        toIndex = resolveElementIndex(dropTarget, "data-skill-index");
       } else {
-        toIndex = html.find(".skills-list .skill-item").length - 1 + 1;
+        toIndex = getSkillItems(root).length;
       }
       if (Number.isNaN(toIndex)) return;
 
@@ -146,53 +143,50 @@ function setupAdvantageDragDropControls(sheet, html, {
 } = {}) {
   const enqueue = enqueueSheetUpdate ?? (async (_queueKey, _label, task) => task());
 
-  html.on("dragstart", ".advantages-list .advantage-item", (ev) => {
+  delegate(html, "dragstart", ".advantages-list .advantage-item", (ev, item) => {
     try {
       if (!sheet.isEditMode) return;
-      const el = $(ev.currentTarget);
-      let index = parseInt(el.attr("data-advantage-index"));
-      if (Number.isNaN(index)) index = el.index();
+      let index = resolveElementIndex(item, "data-advantage-index");
       if (Number.isNaN(index)) return;
-      const dt = ev.originalEvent.dataTransfer;
+      const dt = ev.dataTransfer;
       if (dt) {
         dt.effectAllowed = "move";
         dt.setData("text/plain", `adv:${index}`);
       }
-      el.addClass("dragging");
+      item.classList.add("dragging");
       sheet._advDragState = { fromIndex: index };
     } catch (e) {
       pcLog.debug("advantage dragstart failed", e);
     }
   });
 
-  html.on("dragend", ".advantages-list .advantage-item", (ev) => {
+  delegate(html, "dragend", ".advantages-list .advantage-item", (ev, item) => {
     try {
-      $(ev.currentTarget).removeClass("dragging");
+      item.classList.remove("dragging");
       sheet._advDragState = null;
-      getSheetJQ(sheet).find(".advantages-list .advantage-item").removeClass("drag-over-top drag-over-bottom");
+      clearDragMarkers(html, ".advantages-list .advantage-item");
     } catch (e) {}
   });
 
-  html.on("dragover", ".advantages-list, .advantages-list .advantage-item", (ev) => {
+  delegate(html, "dragover", ".advantages-list, .advantages-list .advantage-item", (ev) => {
     try {
       if (!sheet.isEditMode) return;
       ev.preventDefault();
-      const dt = ev.originalEvent.dataTransfer;
+      const dt = ev.dataTransfer;
       if (dt) dt.dropEffect = "move";
 
-      const x = ev.originalEvent.clientX;
-      const y = ev.originalEvent.clientY;
+      const x = ev.clientX;
+      const y = ev.clientY;
       const el = sheetDocument.elementFromPoint(x, y);
       if (!el) return;
-      const $closest = $(el).closest(".advantages-list .advantage-item");
-      const items = getSheetJQ(sheet).find(".advantages-list .advantage-item");
-      items.removeClass("drag-over-top drag-over-bottom");
+      const closest = el.closest?.(".advantages-list .advantage-item");
+      const items = getAdvantageItems(html);
+      clearDragMarkers(html, ".advantages-list .advantage-item");
 
       if (!sheet._advDragState) return;
       let toIndex;
-      if ($closest.length) {
-        toIndex = parseInt($closest.attr("data-advantage-index"));
-        if (Number.isNaN(toIndex)) toIndex = $closest.index();
+      if (closest) {
+        toIndex = resolveElementIndex(closest, "data-advantage-index");
       } else {
         toIndex = items.length;
       }
@@ -201,35 +195,30 @@ function setupAdvantageDragDropControls(sheet, html, {
       const fromIndex = sheet._advDragState.fromIndex;
       if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) return;
 
-      if (toIndex >= items.length) {
-        if (items.length) items.last().addClass("drag-over-bottom");
-      } else {
-        items.eq(toIndex).addClass("drag-over-top");
-      }
+      markDropTarget(items, toIndex);
     } catch (e) {}
   });
 
-  html.on("dragleave", ".advantages-list", () => {
-    try { getSheetJQ(sheet).find(".advantages-list .advantage-item").removeClass("drag-over-top drag-over-bottom"); } catch (e) {}
+  delegate(html, "dragleave", ".advantages-list", () => {
+    try { clearDragMarkers(html, ".advantages-list .advantage-item"); } catch (e) {}
   });
 
-  html.on("drop", ".advantages-list, .advantages-list .advantage-item", async (ev) => {
+  delegate(html, "drop", ".advantages-list, .advantages-list .advantage-item", async (ev) => {
     try {
       if (!sheet.isEditMode) return;
       ev.preventDefault();
       ev.stopPropagation();
-      const data = ev.originalEvent.dataTransfer.getData("text/plain");
+      const data = ev.dataTransfer?.getData("text/plain") ?? "";
       if (!data.startsWith("adv:")) return;
-      const fromIndex = parseInt(data.replace("adv:", ""));
+      const fromIndex = Number.parseInt(data.replace("adv:", ""), 10);
       if (Number.isNaN(fromIndex)) return;
 
-      const dropTarget = $(ev.target).closest(".advantage-item");
+      const dropTarget = ev.target?.closest?.(".advantage-item");
       let toIndex = null;
-      if (dropTarget.length) {
-        toIndex = parseInt(dropTarget.attr("data-advantage-index"));
-        if (Number.isNaN(toIndex)) toIndex = dropTarget.index();
+      if (dropTarget) {
+        toIndex = resolveElementIndex(dropTarget, "data-advantage-index");
       } else {
-        toIndex = html.find(".advantages-list .advantage-item").length;
+        toIndex = getAdvantageItems(html).length;
       }
       if (Number.isNaN(toIndex)) return;
 
@@ -264,18 +253,16 @@ function setupAdvantagePointerDragControls(sheet, html, {
   try {
     let advPointerDragState = null;
 
-    html.on("pointerdown", ".advantage-drag-handle", (ev) => {
+    delegate(html, "pointerdown", ".advantage-drag-handle", (ev, handle) => {
       try {
         if (!sheet?.isEditMode) return;
         ev.preventDefault();
         ev.stopPropagation();
-        const handle = $(ev.currentTarget);
         const row = handle.closest(".advantage-item");
-        let fromIndex = parseInt(row.attr("data-advantage-index"));
-        if (Number.isNaN(fromIndex)) fromIndex = row.index();
+        let fromIndex = resolveElementIndex(row, "data-advantage-index");
         if (Number.isNaN(fromIndex)) return;
 
-        row.addClass("dragging");
+        row.classList.add("dragging");
 
         const previousUserSelect = sheetBody.style.userSelect;
         sheetBody.style.userSelect = "none";
@@ -288,15 +275,14 @@ function setupAdvantagePointerDragControls(sheet, html, {
             const y = moveEv.clientY;
             const el = sheetDocument.elementFromPoint(x, y);
             if (!el) return;
-            const $closest = $(el).closest(".advantages-list .advantage-item");
-            const items = getSheetJQ(sheet).find(".advantages-list .advantage-item");
+            const closest = el.closest?.(".advantages-list .advantage-item");
+            const items = getAdvantageItems(html);
 
-            items.removeClass("drag-over-top drag-over-bottom");
+            clearDragMarkers(html, ".advantages-list .advantage-item");
 
             let toIndex = null;
-            if ($closest.length) {
-              toIndex = parseInt($closest.attr("data-advantage-index"));
-              if (Number.isNaN(toIndex)) toIndex = $closest.index();
+            if (closest) {
+              toIndex = resolveElementIndex(closest, "data-advantage-index");
             } else {
               toIndex = items.length;
             }
@@ -310,11 +296,7 @@ function setupAdvantagePointerDragControls(sheet, html, {
               return;
             }
 
-            if (toIndex >= items.length) {
-              if (items.length) items.last().addClass("drag-over-bottom");
-            } else {
-              items.eq(toIndex).addClass("drag-over-top");
-            }
+            markDropTarget(items, toIndex);
             advPointerDragState.targetIndex = toIndex;
           } catch (e) {
             /* ignore */
@@ -327,8 +309,8 @@ function setupAdvantagePointerDragControls(sheet, html, {
             sheetDocument.removeEventListener("mouseup", onUp);
             if (!advPointerDragState) return;
             const { fromIndex: f, targetIndex: t, draggedEl: dr, previousUserSelect: prev } = advPointerDragState;
-            dr.removeClass("dragging");
-            getSheetJQ(sheet).find(".advantages-list .advantage-item").removeClass("drag-over-top drag-over-bottom");
+            dr.classList.remove("dragging");
+            clearDragMarkers(html, ".advantages-list .advantage-item");
             advPointerDragState = null;
             sheetBody.style.userSelect = prev || "";
 
@@ -358,12 +340,27 @@ function setupAdvantagePointerDragControls(sheet, html, {
   }
 }
 
-function getSheetJQ(sheet) {
-  try {
-    const jq = sheet?._getSheetJQ?.();
-    if (jq?.length) return jq;
-  } catch (e) {
-    /* ignore */
-  }
-  return sheet?.element ?? $();
+function getSkillItems(root) {
+  return qsa(root, ".skills-list .skill-item");
+}
+
+function getAdvantageItems(root) {
+  return qsa(root, ".advantages-list .advantage-item");
+}
+
+function clearDragMarkers(root, selector) {
+  for (const item of qsa(root, selector)) item.classList.remove("drag-over-top", "drag-over-bottom");
+}
+
+function markDropTarget(items, toIndex) {
+  if (!items.length) return;
+  if (toIndex >= items.length) items[items.length - 1].classList.add("drag-over-bottom");
+  else items[toIndex]?.classList.add("drag-over-top");
+}
+
+function resolveElementIndex(element, attr) {
+  const el = toElement(element);
+  let index = Number.parseInt(el?.getAttribute(attr), 10);
+  if (Number.isNaN(index) && el?.parentElement) index = Array.from(el.parentElement.children).indexOf(el);
+  return index;
 }

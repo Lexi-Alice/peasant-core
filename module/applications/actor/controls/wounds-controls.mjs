@@ -1,56 +1,20 @@
+import { escapeHtml } from "../../../utils/chat.mjs";
+import { delegate, qs, qsa, toElement } from "../../dom.mjs";
+import { renderSheetResourceDialog } from "./resource-dialogs.mjs";
+
 export function setupWoundsControls(sheet, html) {
-  if (sheet._woundsMenuOpen) {
-    html.find(".wounds-menu").removeClass("hidden");
-  }
-
-  html.find(".toggle-wounds-menu").click((ev) => {
+  delegate(html, "click", ".toggle-wounds-menu", (ev, target) => {
     ev.preventDefault();
     ev.stopPropagation();
-    const menu = html.find(".wounds-menu");
-    menu.toggleClass("hidden");
-    sheet._woundsMenuOpen = !menu.hasClass("hidden");
-  });
-
-  html.find(".close-wounds").click((ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    html.find(".wounds-menu").addClass("hidden");
-    sheet._woundsMenuOpen = false;
-  });
-
-  html.find(".wounds-menu .wound-tag").each((_, tagEl) => {
-    bindWoundTagHover(tagEl);
-  });
-
-  html.find(".remove-condition").click(async (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-
-    const key = $(ev.currentTarget).data("condition");
-
-    try {
-      await sheet.actor.clearPeasantCondition?.(key);
-    } catch (err) {
-      console.warn("Failed to remove condition:", err);
-      return;
-    }
-
-    const hasRemaining = sheet.actor.hasPeasantConditions?.() ?? false;
-    sheet._woundsMenuOpen = hasRemaining;
-    html.find(".wounds-menu").toggleClass("hidden", !hasRemaining);
-
-    sheet.render(false);
-  });
-
-  html.find(".add-wound-btn").click((ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    openAddWoundDialog(sheet);
+    openWoundsDialog(sheet, target);
   });
 }
 
 function bindWoundTagHover(tagEl) {
-  const removeBtn = tagEl.querySelector(".remove-condition");
+  if (!tagEl || tagEl.dataset.pcWoundHoverBound === "true") return;
+  tagEl.dataset.pcWoundHoverBound = "true";
+
+  const removeBtn = tagEl.querySelector(".pc-remove-condition, .remove-condition");
   const setTagHoverState = (active) => {
     tagEl.classList.toggle("tag-hover-active", !!active);
     if (!active) {
@@ -62,7 +26,7 @@ function bindWoundTagHover(tagEl) {
     }
 
     const hoverSource = removeBtn || tagEl;
-    const hoverStyles = getComputedStyle(hoverSource);
+    const hoverStyles = (hoverSource.ownerDocument?.defaultView ?? window).getComputedStyle(hoverSource);
     const hoverBg = hoverStyles.getPropertyValue("--button-hover-background-color").trim() || "rgba(206, 122, 28, 0.85)";
     const hoverBorder = hoverStyles.getPropertyValue("--button-hover-border-color").trim() || "#e0b15b";
     const hoverText = hoverStyles.getPropertyValue("--button-hover-text-color").trim() || "#fff4db";
@@ -102,12 +66,82 @@ function bindWoundTagHover(tagEl) {
   });
 }
 
-function openAddWoundDialog(sheet) {
+function getDialogWindowPosition(html, width) {
+  const el = toElement(html);
+  if (!el?.isConnected || typeof el.getBoundingClientRect !== "function") return null;
+
+  const rect = el.getBoundingClientRect();
+  if (!rect || (rect.width <= 0 && rect.height <= 0)) return null;
+
+  return {
+    width,
+    left: Math.round(rect.left),
+    top: Math.round(rect.top)
+  };
+}
+
+function openWoundsDialog(sheet, trigger = null, position = null) {
+  return renderSheetResourceDialog(sheet, "wounds", {
+    title: "Active Wounds",
+    ...(position ? { position } : {}),
+    content: `
+      <div class="pc-resource-form pc-wounds-form">
+        <div class="pc-wounds-list">
+          ${renderActiveWounds(sheet.actor)}
+        </div>
+      </div>
+    `,
+    buttons: {
+      add: {
+        icon: "fa-solid fa-plus",
+        label: "Add Wound",
+        callback: (html) => {
+          openAddWoundDialog(sheet, trigger, getDialogWindowPosition(html, 320));
+        }
+      }
+    },
+    render: (html) => {
+      for (const tagEl of qsa(html, ".pc-wound-tag")) {
+        bindWoundTagHover(tagEl);
+      }
+
+      for (const button of qsa(html, ".pc-remove-condition")) {
+        button.addEventListener("click", async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+
+          const key = button.dataset.condition;
+
+          try {
+            await sheet.actor.clearPeasantCondition?.(key);
+          } catch (err) {
+            console.warn("Failed to remove condition:", err);
+            return;
+          }
+
+          button.closest(".pc-wound-tag")?.remove();
+          const list = qs(html, ".pc-wounds-list");
+          if (list && !qs(list, ".pc-wound-tag")) {
+            list.innerHTML = `<div class="pc-resource-empty">No active wounds</div>`;
+          }
+
+          sheet.render(false);
+        });
+      }
+    }
+  }, trigger, {
+    width: 300,
+    height: 260,
+    classes: ["pc-wounds-dialog"]
+  });
+}
+
+function openAddWoundDialog(sheet, trigger = null, position = null) {
   const dialogContent = `
-    <form>
-      <div class="form-group" style="margin-bottom: 10px;">
-        <label style="display: block; margin-bottom: 5px; color: #b0b0b0;">Select Wound Type:</label>
-        <select name="woundType" style="width: 100%; padding: 8px 10px; min-height: 38px; font-size: 14px;">
+    <div class="pc-resource-form pc-add-wound-form">
+      <label class="pc-resource-single-field">
+        <span>Select Wound Type</span>
+        <select name="woundType" class="pc-select">
           <option value="wounded">Wounded</option>
           <optgroup label="--- Disabled ---">
             <option value="disabled:head">Disabled Head</option>
@@ -126,29 +160,75 @@ function openAddWoundDialog(sheet) {
             <option value="crippled:torso">Crippled Torso</option>
           </optgroup>
         </select>
-      </div>
-    </form>
+      </label>
+    </div>
   `;
 
-  sheet._renderDialog({
+  return renderSheetResourceDialog(sheet, "add-wound", {
     title: "Add Wound",
+    ...(position ? { position } : {}),
     content: dialogContent,
     buttons: {
       add: {
-        icon: '<i class="fas fa-plus"></i>',
+        icon: "fa-solid fa-plus",
         label: "Add",
+        default: true,
         callback: async (html) => {
-          const woundType = html.find('[name="woundType"]').val();
+          const woundType = qs(html, '[name="woundType"]')?.value;
+          const position = getDialogWindowPosition(html, 300);
           await sheet.actor.addPeasantWound?.(woundType);
-          sheet._woundsMenuOpen = true;
+          openWoundsDialog(sheet, trigger, position);
           sheet.render(false);
+          return true;
         }
       },
       cancel: {
-        icon: '<i class="fas fa-times"></i>',
+        icon: "fa-solid fa-xmark",
         label: "Cancel"
       }
     },
     default: "add"
+  }, trigger, {
+    width: 320,
+    height: 260,
+    classes: ["pc-add-wound-dialog"]
   });
+}
+
+function renderActiveWounds(actor) {
+  const conditions = actor?.system?.conditions || {};
+  const entries = [];
+
+  if (conditions.wounded) {
+    entries.push({ key: "wounded", label: "WOUNDED" });
+  }
+
+  const locMappings = [
+    { key: "head", label: "Head" },
+    { key: "rightArm", label: "Right Arm" },
+    { key: "leftArm", label: "Left Arm" },
+    { key: "rightLeg", label: "Right Leg" },
+    { key: "leftLeg", label: "Left Leg" },
+    { key: "torso", label: "Torso" },
+    { key: "arms", label: "Arms" },
+    { key: "legs", label: "Legs" }
+  ];
+
+  for (const loc of locMappings) {
+    const status = String(conditions[loc.key] || "");
+    if (!status) continue;
+    entries.push({
+      key: loc.key,
+      label: `${status.charAt(0).toUpperCase()}${status.slice(1)} ${loc.label}`
+    });
+  }
+
+  if (!entries.length) return `<div class="pc-resource-empty">No active wounds</div>`;
+
+  return entries.map((entry) => `
+    <div class="pc-wound-tag">
+      <span>${escapeHtml(entry.label)}</span>
+      <button type="button" class="pc-remove-condition" data-condition="${escapeHtml(entry.key)}" title="Remove ${escapeHtml(entry.label)}" aria-label="Remove ${escapeHtml(entry.label)}">&times;</button>
+    </div>
+  `).join("");
 }

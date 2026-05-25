@@ -1,5 +1,6 @@
-﻿import { renderDialogCompat } from "../dialogs.mjs";
-import { escapeHtml, getCurrentRollMode } from "../../utils/chat.mjs";
+﻿import { renderDialogV2 } from "../dialogs.mjs";
+import { qs, qsa, toElement } from "../dom.mjs";
+import { escapeHtml, getCurrentMessageMode } from "../../utils/chat.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import {
   getTargetedDamageConditionKey,
@@ -52,16 +53,24 @@ const LOCATION_RESULT_TEXT_ALIASES = Object.freeze({
   "armor pen head": ["armor pen head", "head pen"]
 });
 
-export function getLocationBySkillOptions(maxMoS) {
+function normalizeMagnetismGrade(rawGrade) {
+  const grade = Number.parseInt(rawGrade, 10);
+  return Number.isFinite(grade) ? Math.max(0, grade) : 0;
+}
+
+export function getLocationBySkillOptions(maxMoS, { magnetismGrade = 0 } = {}) {
   const mos = Number(maxMoS) || 0;
-  if (mos < 1) return [LOCATION_BY_SKILL_OPTION_MAP.table];
+  const grade = normalizeMagnetismGrade(magnetismGrade);
+  const thresholdBump = Math.max(0, grade - 1);
+  if (mos < 1) return grade > 0 ? [] : [LOCATION_BY_SKILL_OPTION_MAP.table];
 
   const orderedKeys = [];
-  if (mos >= 5) orderedKeys.push("headPen");
-  if (mos >= 4) orderedKeys.push("head");
-  if (mos >= 3) orderedKeys.push("apTorso", "apRightArm", "apLeftArm", "apRightLeg", "apLeftLeg");
-  if (mos >= 2) orderedKeys.push("rightArm", "leftArm", "rightLeg", "leftLeg");
-  orderedKeys.push("torso", "table");
+  if (mos >= 5 + thresholdBump) orderedKeys.push("headPen");
+  if (mos >= 4 + thresholdBump) orderedKeys.push("head");
+  if (mos >= 3 + thresholdBump) orderedKeys.push("apTorso", "apRightArm", "apLeftArm", "apRightLeg", "apLeftLeg");
+  if (mos >= 2 + thresholdBump) orderedKeys.push("rightArm", "leftArm", "rightLeg", "leftLeg");
+  if (mos >= 1 + thresholdBump) orderedKeys.push("torso");
+  if (grade <= 0) orderedKeys.push("table");
 
   return orderedKeys
     .map((key) => LOCATION_BY_SKILL_OPTION_MAP[key])
@@ -82,10 +91,11 @@ export function createLocationRollFromSkillOption(option) {
 export async function showLocationBySkillPrompt({
   maxMoS = 0,
   attackerName = "Attacker",
-  targetLabel = ""
+  targetLabel = "",
+  magnetismGrade = 0
 } = {}) {
-  const options = getLocationBySkillOptions(maxMoS);
-  if (!options.length) return { option: null, selection: "table" };
+  const options = getLocationBySkillOptions(maxMoS, { magnetismGrade });
+  if (!options.length) return { option: null, selection: "magnetism" };
 
   const tableOption = options.find((option) => option.mode === "table") || null;
   const optionsHtml = options.map((option) => (
@@ -97,7 +107,7 @@ export async function showLocationBySkillPrompt({
       ${targetNote}
       <div class="form-group" style="margin-bottom: 10px;">
         <label style="display:block; margin-bottom:5px; color:#b0b0b0;">Select Location:</label>
-        <select class="pc-defense-prompt-select" name="locationBySkillChoice" style="width:100%; padding:8px 10px; min-height:38px; font-size:14px;">
+        <select class="pc-defense-prompt-select pc-select pc-dialog-field-full" name="locationBySkillChoice">
           ${optionsHtml}
         </select>
       </div>
@@ -109,7 +119,8 @@ export async function showLocationBySkillPrompt({
     let renderedWindow = null;
     let closeWatcher = null;
 
-    const finalize = (result = { option: tableOption, selection: "table", cancelled: true, chainCancelled: false }) => {
+    const fallbackSelection = tableOption ? "table" : "magnetism";
+    const finalize = (result = { option: tableOption, selection: fallbackSelection, cancelled: true, chainCancelled: false }) => {
       if (settled) return result;
       settled = true;
       if (closeWatcher) {
@@ -120,14 +131,14 @@ export async function showLocationBySkillPrompt({
       return result;
     };
 
-    renderDialogCompat({
+    renderDialogV2({
       title: "Location by Skill",
       content,
       buttons: {
         select: {
           label: "Select",
           callback: async (html) => {
-            const selectedKey = String(html.find('[name="locationBySkillChoice"]').val() || "").trim();
+            const selectedKey = String(qs(html, '[name="locationBySkillChoice"]')?.value || "").trim();
             const option = options.find((entry) => entry.key === selectedKey) || tableOption;
             finalize({
               option,
@@ -140,27 +151,30 @@ export async function showLocationBySkillPrompt({
         cancel: {
           label: "Cancel",
           callback: async () => {
-            finalize({ option: tableOption, selection: "table", cancelled: true });
+            finalize({ option: tableOption, selection: fallbackSelection, cancelled: true });
             return true;
           }
         }
       },
       default: "select",
       render: (html) => {
+        const dialogElement = toElement(html);
+        if (!dialogElement) return;
         const viewportWidth = Number(window?.innerWidth) || 480;
         const stableDialogWidth = Math.max(340, Math.min(400, viewportWidth - 32));
-        html.css({
-          width: `${stableDialogWidth}px`,
-          minWidth: `${stableDialogWidth}px`,
-          maxWidth: `${Math.max(320, viewportWidth - 32)}px`
-        });
-        html.find('.window-content, .dialog-content').css({ overflowX: 'hidden' });
+        dialogElement.style.width = `${stableDialogWidth}px`;
+        dialogElement.style.minWidth = `${stableDialogWidth}px`;
+        dialogElement.style.maxWidth = `${Math.max(320, viewportWidth - 32)}px`;
+        for (const contentEl of qsa(dialogElement, ".window-content, .dialog-content")) {
+          contentEl.style.overflowX = "hidden";
+        }
 
-        renderedWindow = html.closest('.window-app, .application')[0] || html[0];
-        $(renderedWindow)
-          .find('.header-control, [data-action="close"], [data-button="close"]')
-          .off('.pcLocationBySkillClose')
-          .on('click.pcLocationBySkillClose', () => finalize({ option: tableOption, selection: "close", cancelled: true, chainCancelled: true }));
+        renderedWindow = dialogElement.closest(".application, dialog") || dialogElement;
+        for (const closeButton of qsa(renderedWindow, '.header-control, [data-action="close"], [data-button="close"]')) {
+          closeButton.addEventListener("click", () => {
+            finalize({ option: tableOption, selection: "close", cancelled: true, chainCancelled: true });
+          });
+        }
 
         if (!closeWatcher) {
           closeWatcher = window.setInterval(() => {
@@ -182,6 +196,10 @@ export function getLocationRollTable() {
     if (table) return table;
   }
   return null;
+}
+
+function getTableResultLabel(result) {
+  return String(result?.name || result?.description || result?._source?.name || result?._source?.description || result?._source?.text || "").trim();
 }
 
 export function normalizeLocationResultText(rawText) {
@@ -229,7 +247,7 @@ export async function createChosenLocationTableMessage(locationRoll) {
   const normalizedTarget = String(locationRoll.rawText || "").trim().toLowerCase();
   const candidateTargets = LOCATION_RESULT_TEXT_ALIASES[normalizedTarget] || [normalizedTarget];
   const result = Array.from(table.results || []).find((entry) => {
-    const candidate = String(entry?.text || entry?.name || "").trim().toLowerCase();
+    const candidate = getTableResultLabel(entry).toLowerCase();
     return candidateTargets.includes(candidate);
   });
   if (!result) return null;
@@ -242,7 +260,7 @@ export async function createChosenLocationTableMessage(locationRoll) {
         speaker: ChatMessage.getSpeaker()
       },
       messageOptions: {
-        rollMode: getCurrentRollMode()
+        messageMode: getCurrentMessageMode()
       }
     });
   } catch (e) {
@@ -273,7 +291,7 @@ export function highlightArmorPenLocationResultInChatMessage(message) {
   return true;
 }
 
-export async function drawLocationTableLikeMacro({ rollMode = null } = {}) {
+export async function drawLocationTableLikeMacro({ messageMode = null, rollMode = null } = {}) {
   const table = getLocationRollTable();
   if (!table) {
     ui.notifications?.warn?.("Location table not found. Expected a rollable table named 'Location' or 'Location Table'.");
@@ -283,13 +301,19 @@ export async function drawLocationTableLikeMacro({ rollMode = null } = {}) {
   let hookId = registerLocationArmorPenChatHook();
 
   try {
-    const draw = await table.draw({ rollMode: rollMode || getCurrentRollMode() });
+    const draw = await table.draw({ displayChat: false });
     const firstResult = Array.isArray(draw?.results) ? draw.results[0] : null;
-    const rawText = String(firstResult?.text || firstResult?.name || "").trim();
+    const rawText = getTableResultLabel(firstResult);
     if (!rawText) {
       ui.notifications?.warn?.("Could not resolve a hit location from the location table.");
       return null;
     }
+    await table.toMessage(draw.results, {
+      roll: draw.roll,
+      messageOptions: {
+        messageMode: messageMode || rollMode || getCurrentMessageMode()
+      }
+    });
     return {
       ...normalizeLocationResultText(rawText),
       roll: draw?.roll || null,
@@ -306,5 +330,5 @@ export async function drawLocationTableLikeMacro({ rollMode = null } = {}) {
 }
 
 export async function rollAutomatedAttackLocation({ actor, attackerToken = null, combatName = "", targetLabel = "" } = {}) {
-  return await drawLocationTableLikeMacro({ rollMode: getCurrentRollMode() });
+  return await drawLocationTableLikeMacro({ messageMode: getCurrentMessageMode() });
 }

@@ -1,8 +1,13 @@
-export function setupNotableCombatTagSelectionControls($container, { tagEditor, buildTagInputs, openDescriptionEditor } = {}) {
+import { delegate, qs, qsa, toElement } from "../../dom.mjs";
+
+export function setupNotableCombatTagSelectionControls(container, { tagEditor, buildTagInputs, openDescriptionEditor } = {}) {
+  const root = toElement(container);
+  if (!root) return;
+
   const tagEditorState = tagEditor.state;
 
-  $container.on("change", ".tag-type-select", (ev) => {
-    const tagType = $(ev.currentTarget).val();
+  delegate(root, "change", ".tag-type-select", (ev, select) => {
+    const tagType = select.value;
     if (!tagType) {
       tagEditor.reset();
       buildTagInputs(tagType);
@@ -15,32 +20,38 @@ export function setupNotableCombatTagSelectionControls($container, { tagEditor, 
     buildTagInputs(tagType);
   });
 
-  $container.on("contextmenu", ".current-tag-item", (ev) => {
-    if ($(ev.target).closest(".remove-tag-btn").length) return;
+  delegate(root, "contextmenu", ".current-tag-item", (ev, item) => {
+    if (ev.target?.closest?.(".remove-tag-btn")) return;
     ev.preventDefault();
     ev.stopPropagation();
 
-    const $item = $(ev.currentTarget);
-    const tagType = String($item.data("tag-type") || "").trim();
+    const tagType = String(item.dataset.tagType || "").trim();
     if (!tagType) return;
     if (tagType === "description") {
       openDescriptionEditor?.();
       return;
     }
-    const rawCustomIndex = $item.data("custom-index");
-    const customIndex = Number.isInteger(rawCustomIndex) ? rawCustomIndex : parseInt(rawCustomIndex, 10);
+    const rawCustomIndex = item.dataset.customIndex;
+    const customIndex = Number.isInteger(rawCustomIndex) ? rawCustomIndex : Number.parseInt(rawCustomIndex, 10);
 
     tagEditor.beginEdit(tagType, customIndex);
-    $container.find(".tag-type-select").val(tagType);
+    const tagTypeSelect = qs(root, ".tag-type-select");
+    if (tagTypeSelect) tagTypeSelect.value = tagType;
     buildTagInputs(tagType);
 
-    const $focusTarget = $container.find(".tag-input-area").find("input, select, textarea").filter(":visible").first();
-    if ($focusTarget.length) $focusTarget.trigger("focus");
+    const focusTarget = qsa(qs(root, ".tag-input-area"), "input, select, textarea").find(isVisible);
+    focusTarget?.focus?.();
   });
 
-  $container.on("click", ".edit-description-tag", (ev) => {
+  delegate(root, "click", ".edit-description-tag", (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     openDescriptionEditor?.();
   });
+}
+
+function isVisible(element) {
+  if (!element) return false;
+  const style = element.ownerDocument?.defaultView?.getComputedStyle?.(element);
+  return style?.display !== "none" && style?.visibility !== "hidden";
 }

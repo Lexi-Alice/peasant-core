@@ -4,6 +4,8 @@ export const COMBAT_VIEW_TAG_TYPES = Object.freeze([
   "range",
   "rangeRate",
   "damage",
+  "overkill",
+  "magnetism",
   "heal",
   "manifest",
   "tagUses",
@@ -25,6 +27,8 @@ export const COMBAT_EDITOR_TAG_TYPES = Object.freeze([
   "range",
   "rangeRate",
   "damage",
+  "overkill",
+  "magnetism",
   "heal",
   "manifest",
   "tagUses",
@@ -48,6 +52,8 @@ export const COMBAT_FULL_TAG_ORDER = Object.freeze([
   "range",
   "rangeRate",
   "damage",
+  "overkill",
+  "magnetism",
   "heal",
   "manifest",
   "tagUses",
@@ -61,6 +67,16 @@ export const COMBAT_FULL_TAG_ORDER = Object.freeze([
   "custom",
   "self"
 ]);
+
+export function normalizeCombatMagnetism(rawMagnetism) {
+  const source = (rawMagnetism && typeof rawMagnetism === "object") ? rawMagnetism.grade : rawMagnetism;
+  const grade = Number.parseInt(source, 10);
+  return { grade: Number.isFinite(grade) ? Math.max(0, grade) : 0 };
+}
+
+export function getCombatMagnetismGrade(combatData) {
+  return normalizeCombatMagnetism(combatData?.magnetism).grade;
+}
 
 export function normalizeCustomTagEntry(entry) {
   const name = String(entry?.name ?? "").trim();

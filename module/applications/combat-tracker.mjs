@@ -1,10 +1,10 @@
 import { requestSeizeTurnFromGM } from "../socket/remote-prompts.mjs";
+import { qsa, qs, toElement } from "./dom.mjs";
 
 const SEIZE_WIDTH_PX = "64px";
 const SEIZE_HEIGHT_PX = "32px";
 
-function lockSeizeContainerSize($el) {
-  const el = $el?.[0];
+function lockSeizeContainerSize(el) {
   if (!el) return;
   el.style.setProperty("display", "grid", "important");
   el.style.setProperty("grid-template-columns", "1fr", "important");
@@ -17,8 +17,7 @@ function lockSeizeContainerSize($el) {
   el.style.setProperty("align-self", "center", "important");
 }
 
-function lockSeizeButtonSize($el) {
-  const el = $el?.[0];
+function lockSeizeButtonSize(el) {
   if (!el) return;
   el.style.setProperty("width", SEIZE_WIDTH_PX, "important");
   el.style.setProperty("min-width", SEIZE_WIDTH_PX, "important");
@@ -60,17 +59,17 @@ export function configureCombatTracker() {
 
     const currentIdx = combat.turn;
     const currentPhase = combat.getFlag("peasant-core", "combatPhase") || 0;
-    const $html = html instanceof jQuery ? html : $(html);
+    const root = toElement(html);
+    if (!root) return;
 
-    $html.find(".combatant").each(function() {
-      const $row = $(this);
-      const id = $row.data("combatant-id");
+    for (const row of qsa(root, ".combatant")) {
+      const id = row.dataset.combatantId;
       const combatant = combat.combatants.get(id);
 
-      if (!combatant || combatant.id === currentCombatant.id) return;
+      if (!combatant || combatant.id === currentCombatant.id) continue;
 
       const myIdx = combat.turns.findIndex(c => c.id === id);
-      if (myIdx <= currentIdx) return;
+      if (myIdx <= currentIdx) continue;
 
       const seizedMove = (combat.getFlag("peasant-core", "seizedMovement") || []).includes(id);
       const seizedStd = (combat.getFlag("peasant-core", "seizedStandard") || []).includes(id);
@@ -84,28 +83,37 @@ export function configureCombatTracker() {
         stdPassed = true;
       }
 
-      const btnContainer = $('<div class="seize-buttons"></div>');
+      const btnContainer = document.createElement("div");
+      btnContainer.className = "seize-buttons";
       lockSeizeContainerSize(btnContainer);
 
       if (!seizedMove && !movePassed) {
-        const moveBtn = $('<button type="button" class="seize-btn seize-move" title="Seize Movement Phase">Seize Move</button>');
+        const moveBtn = document.createElement("button");
+        moveBtn.type = "button";
+        moveBtn.className = "seize-btn seize-move";
+        moveBtn.title = "Seize Movement Phase";
+        moveBtn.textContent = "Seize Move";
         lockSeizeButtonSize(moveBtn);
-        moveBtn.on("click", (event) => handleSeizeClick(event, combat, id, 0));
+        moveBtn.addEventListener("click", (event) => handleSeizeClick(event, combat, id, 0));
         btnContainer.append(moveBtn);
       }
 
       if (!seizedStd && !stdPassed) {
-        const stdBtn = $('<button type="button" class="seize-btn seize-std" title="Seize Standard Phase">Seize Standard</button>');
+        const stdBtn = document.createElement("button");
+        stdBtn.type = "button";
+        stdBtn.className = "seize-btn seize-std";
+        stdBtn.title = "Seize Standard Phase";
+        stdBtn.textContent = "Seize Standard";
         lockSeizeButtonSize(stdBtn);
-        stdBtn.on("click", (event) => handleSeizeClick(event, combat, id, 1));
+        stdBtn.addEventListener("click", (event) => handleSeizeClick(event, combat, id, 1));
         btnContainer.append(stdBtn);
       }
 
-      if (btnContainer.children().length > 0) {
-        const initBox = $row.find(".token-initiative");
-        if (initBox.length) initBox.before(btnContainer);
-        else $row.find(".token-name").after(btnContainer);
+      if (btnContainer.children.length > 0) {
+        const initBox = qs(row, ".token-initiative");
+        if (initBox) initBox.before(btnContainer);
+        else qs(row, ".token-name")?.after(btnContainer);
       }
-    });
+    }
   });
 }

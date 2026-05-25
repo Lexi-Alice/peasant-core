@@ -1,14 +1,15 @@
 import { renderDefenseTagInputs } from "./notable-combat-defense-tag-inputs.mjs";
+import {
+  PC_TAG_INPUT_CLASS,
+  PC_TAG_INTEGER_ATTRS
+} from "./notable-combat-tag-form-controls.mjs";
 import { renderStandardNotableCombatTagInputs } from "./notable-combat-standard-tag-inputs.mjs";
 
 export function renderNotableCombatTagInputs($container, tagType, combatData, { tagEditorState } = {}) {
   const $area = $container.find(".tag-input-area");
   $area.empty();
 
-  const inputStyle = "width:60px;padding:4px;background:#2a2a2a;border:1px solid #555;border-radius:3px;color:#e0e0e0;text-align:center;";
-  const labelStyle = "color:#aaa;font-size:12px;margin-right:8px;";
-  const selectStyle = "padding:4px;background:#2a2a2a;border:1px solid #555;border-radius:3px;color:#e0e0e0;";
-  if (renderStandardNotableCombatTagInputs($area, tagType, combatData, { inputStyle, labelStyle, selectStyle, tagEditorState })) return;
+  if (renderStandardNotableCombatTagInputs($area, tagType, combatData, { tagEditorState })) return;
 
   switch (tagType) {
     case "description":
@@ -21,27 +22,27 @@ export function renderNotableCombatTagInputs($container, tagType, combatData, { 
       break;
     case "staminaCost":
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="${labelStyle}">Stamina Cost:</label>
-          <input type="number" class="tag-stamina-cost" value="${combatData.staminaCost || ""}" style="${inputStyle}" min="0" placeholder="#">
-          <span style="color:#888;font-size:11px;">(Legacy - use Resource Costs)</span>
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Stamina Cost:</label>
+          <input type="number" class="tag-stamina-cost ${PC_TAG_INPUT_CLASS}" value="${combatData.staminaCost || ""}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
+          <span class="pc-tag-muted-note">(Legacy - use Resource Costs)</span>
         </div>
       `);
       break;
     case "attunementCost":
       $area.html(`
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="${labelStyle}">Attunement Cost:</label>
-          <input type="number" class="tag-attunement-cost" value="${combatData.attunementCost || ""}" style="${inputStyle}" min="0" placeholder="#">
-          <span style="color:#888;font-size:11px;">(Legacy - use Resource Costs)</span>
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Attunement Cost:</label>
+          <input type="number" class="tag-attunement-cost ${PC_TAG_INPUT_CLASS}" value="${combatData.attunementCost || ""}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
+          <span class="pc-tag-muted-note">(Legacy - use Resource Costs)</span>
         </div>
       `);
       break;
     case "defense":
-      renderDefenseTagInputs($area, combatData, { inputStyle, selectStyle });
+      renderDefenseTagInputs($area, combatData);
       break;
     default:
-      $area.html(`<p style="color:#666;font-style:italic;font-size:12px;">Select a tag type above.</p>`);
+      $area.html(`<p class="pc-tag-muted-note" style="font-style:italic;">Select a tag type above.</p>`);
   }
 }
 

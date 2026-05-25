@@ -291,13 +291,19 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         range: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         rangeRate: new fields.StringField({ initial: "" }), // "x/x/x/x" format
         damage: new fields.SchemaField({
+          enabled: new fields.BooleanField({ initial: false }),
           diceCount: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           diceValue: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           diceBonus: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           flat: new fields.NumberField({ integer: true, initial: 0 }),
           type: new fields.StringField({ initial: "" }) // Blunt, Lethal, Hybrid, Crit
         }),
+        overkill: new fields.BooleanField({ initial: false }),
+        magnetism: new fields.SchemaField({
+          grade: new fields.NumberField({ integer: true, min: 0, initial: 0 })
+        }),
         heal: new fields.SchemaField({
+          enabled: new fields.BooleanField({ initial: false }),
           diceCount: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           diceValue: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           diceBonus: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
@@ -305,6 +311,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
           type: new fields.StringField({ initial: "" }) // Temporary, Greater
         }),
         manifest: new fields.SchemaField({
+          enabled: new fields.BooleanField({ initial: false }),
           diceCount: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           diceValue: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           diceBonus: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
@@ -359,8 +366,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
           // Legacy field retained temporarily so older worlds can migrate cleanly to `block`.
           contactless: new fields.BooleanField({ initial: false }),
           blockType: new fields.StringField({ initial: "Shield" }),
+          shieldArm: new fields.StringField({ initial: "LeftArm" }),
           hardness: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
           hp: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
+          masteryBonus: new fields.BooleanField({ initial: false }),
           // Legacy field retained temporarily while older worlds migrate away from this option.
           alwaysBraced: new fields.BooleanField({ initial: false }),
           appliesDebuff: new fields.BooleanField({ initial: false }),

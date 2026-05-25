@@ -2,10 +2,27 @@ import { doesPromptResultCountAsActiveDefense } from "../../data/actor/defense-r
 import {
   createChosenLocationTableMessage,
   createLocationRollFromSkillOption,
+  getTargetedDamageLocationDisplay,
   rollAutomatedAttackLocation,
   showLocationBySkillPrompt
 } from "../actor/location-table.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
+
+function normalizeMagnetismGrade(rawGrade) {
+  const grade = Number.parseInt(rawGrade, 10);
+  return Number.isFinite(grade) ? Math.max(0, grade) : 0;
+}
+
+function createMagnetismTorsoLocationRoll(magnetismGrade) {
+  return {
+    rawText: "Torso",
+    location: "Torso",
+    locationDisplay: getTargetedDamageLocationDisplay("Torso"),
+    isAP: false,
+    byMagnetism: true,
+    magnetismGrade
+  };
+}
 
 export async function resolveAttackLocationForTarget({
   actor = null,
@@ -13,17 +30,24 @@ export async function resolveAttackLocationForTarget({
   combat = null,
   target = null,
   attackRoll = null,
-  defensePromptResult = null
+  defensePromptResult = null,
+  magnetismGrade = 0,
+  locationMoS = null
 } = {}) {
   const targetLabel = target?.targetName || target?.actor?.name || "";
   const defendedByReflex = doesPromptResultCountAsActiveDefense(defensePromptResult);
-  const selectableMoS = Number(attackRoll?.rollResult?.totalMoS) || 0;
+  const selectableMoSOverride = Number(locationMoS);
+  const selectableMoS = Number.isFinite(selectableMoSOverride)
+    ? selectableMoSOverride
+    : (Number(attackRoll?.rollResult?.totalMoS) || 0);
+  const resolvedMagnetismGrade = normalizeMagnetismGrade(magnetismGrade);
 
   if (selectableMoS >= 1) {
     const promptResult = await showLocationBySkillPrompt({
       maxMoS: selectableMoS,
       attackerName: actor?.name || attackerToken?.name || "Attacker",
-      targetLabel
+      targetLabel,
+      magnetismGrade: resolvedMagnetismGrade
     });
     if (isChainCancelledResult(promptResult)) {
       return { chainCancelled: true };
@@ -35,6 +59,12 @@ export async function resolveAttackLocationForTarget({
 
       return selectedLocation;
     }
+  }
+
+  if (resolvedMagnetismGrade > 0) {
+    const forcedLocation = createMagnetismTorsoLocationRoll(resolvedMagnetismGrade);
+    await createChosenLocationTableMessage(forcedLocation);
+    return forcedLocation;
   }
 
   let locationRoll = await rollAutomatedAttackLocation({

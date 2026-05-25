@@ -29,11 +29,14 @@ export async function executeResolvedNotableCombatRoll({
   defenseAccuracyPenalty = 0,
   defenseToHitPenalty = 0,
   defenseFailureLabel = "Failure due to Defense",
-  targetLabel = ""
+  targetLabel = "",
+  cardClass = ""
 } = {}) {
   const combatMods = actor.system?.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0, costMod: 0 };
   const toHitMod = Number.parseInt(combatMods.toHit, 10) || 0;
   const accuracyMod = Number.parseInt(combatMods.accuracy, 10) || 0;
+  const resolvedDefenseAccuracyPenalty = Math.abs(Number(defenseAccuracyPenalty) || 0);
+  const resolvedDefenseToHitPenalty = Number(defenseToHitPenalty) || 0;
 
   const baseToHit = Number.isFinite(Number.parseInt(combat.tohit, 10))
     ? Number.parseInt(combat.tohit, 10)
@@ -53,20 +56,20 @@ export async function executeResolvedNotableCombatRoll({
 
   const hasRollOverrides = !!rollOverrides && Number.isFinite(Number.parseInt(rollOverrides.toHit, 10));
   if (hasRollOverrides) {
-    finalToHit = Number.parseInt(rollOverrides.toHit, 10) + toHitAdj + defenseToHitPenalty;
+    finalToHit = Number.parseInt(rollOverrides.toHit, 10) + toHitAdj + resolvedDefenseToHitPenalty;
 
     const overrideAccuracyRaw = rollOverrides.accuracy;
     if (overrideAccuracyRaw === undefined || overrideAccuracyRaw === null || overrideAccuracyRaw === "") {
-      finalAccuracy = 0 + accuracyAdj - defenseAccuracyPenalty;
+      finalAccuracy = 0 + accuracyAdj - resolvedDefenseAccuracyPenalty;
       accuracyValue = finalAccuracy === 0 ? undefined : finalAccuracy;
     } else {
-      finalAccuracy = (Number.parseInt(overrideAccuracyRaw, 10) || 0) + accuracyAdj - defenseAccuracyPenalty;
+      finalAccuracy = (Number.parseInt(overrideAccuracyRaw, 10) || 0) + accuracyAdj - resolvedDefenseAccuracyPenalty;
       accuracyValue = finalAccuracy;
     }
     untrainedAccuracyValue = finalAccuracy;
   } else {
-    const totalToHitMod = toHitMod + toHitAdj + defenseToHitPenalty;
-    const totalAccuracyMod = accuracyMod + accuracyAdj - defenseAccuracyPenalty;
+    const totalToHitMod = toHitMod + toHitAdj + resolvedDefenseToHitPenalty;
+    const totalAccuracyMod = accuracyMod + accuracyAdj - resolvedDefenseAccuracyPenalty;
     const rollCalc = applyToHitAccuracy(baseToHit, baseAccuracy, totalToHitMod, totalAccuracyMod, 2);
     finalToHit = rollCalc.toHit;
     finalAccuracy = rollCalc.accuracy;
@@ -86,10 +89,11 @@ export async function executeResolvedNotableCombatRoll({
       toHit: finalToHit,
       accuracy: untrainedAccuracyValue,
       skillName: untrainedName,
-      speaker
+      speaker,
+      cardClass
     });
   } else {
-    rollResult = await performSkillRoll({ toHit: finalToHit, accuracy: accuracyValue, skillName: combatName, speaker });
+    rollResult = await performSkillRoll({ toHit: finalToHit, accuracy: accuracyValue, skillName: combatName, speaker, cardClass });
   }
 
   const forcePassResult = await maybeForcePassFailedNotableRoll({
@@ -106,8 +110,8 @@ export async function executeResolvedNotableCombatRoll({
       rollLabel: combatName,
       toHit: finalToHit,
       accuracy: accuracyValue,
-      defenseAccuracyPenalty,
-      defenseToHitPenalty,
+      defenseAccuracyPenalty: resolvedDefenseAccuracyPenalty,
+      defenseToHitPenalty: resolvedDefenseToHitPenalty,
       forcePassResult,
       targetLabel,
       rollResult,
@@ -140,8 +144,8 @@ export async function executeResolvedNotableCombatRoll({
     rollLabel: combatName,
     toHit: finalToHit,
     accuracy: accuracyValue,
-    defenseAccuracyPenalty,
-    defenseToHitPenalty,
+    defenseAccuracyPenalty: resolvedDefenseAccuracyPenalty,
+    defenseToHitPenalty: resolvedDefenseToHitPenalty,
     forcePassResult,
     targetLabel,
     rollResult

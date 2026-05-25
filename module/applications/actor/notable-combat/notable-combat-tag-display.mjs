@@ -1,6 +1,6 @@
 import { getCombatDefenseSummary } from "../../../data/actor/combat-defense.mjs";
 import { COMBAT_EDITOR_TAG_TYPES, getCombatCustomTags } from "../../../data/actor/combat-tags.mjs";
-import { formatCombatDiceValue, hasCombatDice } from "../../../dice/combat-dice.mjs";
+import { formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 
 export function getActiveNotableCombatEditorTags(combatData) {
   const rawTagOrder = Array.isArray(combatData?.tagOrder) ? combatData.tagOrder : [];
@@ -63,24 +63,21 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
       return (combatData.rangeRate && combatData.rangeRate !== "///") ? `Range-Rate: ${combatData.rangeRate}` : null;
     case "damage":
       if (hasCombatDice(combatData.damage)) {
-        let str = `Damage: ${combatData.damage.diceCount}d${formatCombatDiceValue(combatData.damage.diceValue, combatData.damage.diceBonus)}`;
-        if (combatData.damage.flat) str += combatData.damage.flat > 0 ? `+${combatData.damage.flat}` : `${combatData.damage.flat}`;
+        let str = `Damage: ${formatCombatDiceDisplay(combatData.damage.diceCount, combatData.damage.diceValue, combatData.damage.flat, combatData.damage.diceBonus)}`;
         if (combatData.damage.type) str += ` ${combatData.damage.type}`;
         return str;
       }
       return null;
     case "heal":
       if (hasCombatDice(combatData.heal)) {
-        let str = `Heal: ${combatData.heal.diceCount}d${formatCombatDiceValue(combatData.heal.diceValue, combatData.heal.diceBonus)}`;
-        if (combatData.heal.flat) str += combatData.heal.flat > 0 ? `+${combatData.heal.flat}` : `${combatData.heal.flat}`;
+        let str = `Heal: ${formatCombatDiceDisplay(combatData.heal.diceCount, combatData.heal.diceValue, combatData.heal.flat, combatData.heal.diceBonus)}`;
         if (combatData.heal.type) str += ` ${combatData.heal.type}`;
         return str;
       }
       return null;
     case "manifest":
       if (hasCombatDice(combatData.manifest)) {
-        let str = `Manifest: ${combatData.manifest.diceCount}d${formatCombatDiceValue(combatData.manifest.diceValue, combatData.manifest.diceBonus)}`;
-        if (combatData.manifest.flat) str += combatData.manifest.flat > 0 ? `+${combatData.manifest.flat}` : `${combatData.manifest.flat}`;
+        const str = `Manifest: ${formatCombatDiceDisplay(combatData.manifest.diceCount, combatData.manifest.diceValue, combatData.manifest.flat, combatData.manifest.diceBonus)}`;
         return str;
       }
       return null;
@@ -111,6 +108,12 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
       return combatData.reach > 0 ? `Reach: ${combatData.reach}` : null;
     case "stability":
       return combatData.stability ? "Stability" : null;
+    case "overkill":
+      return combatData.overkill ? "Overkill" : null;
+    case "magnetism": {
+      const grade = Number.parseInt(combatData.magnetism?.grade, 10) || 0;
+      return grade > 0 ? `Magnetism: Grade ${grade}` : null;
+    }
     case "strengthen":
       return combatData.strengthen ? "Strengthen" : null;
     case "custom":

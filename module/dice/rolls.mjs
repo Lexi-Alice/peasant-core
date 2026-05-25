@@ -2,8 +2,14 @@
 // No UI dialogs here; these return by posting chat messages directly.
 
 import { registerPeasantCoreApi } from "../utils/api.mjs";
-import { applyRollMode, escapeHtml } from "../utils/chat.mjs";
+import { rollPeasantCriticalExplosion } from "./exploding.mjs";
+import { applyMessageMode, escapeHtml } from "../utils/chat.mjs";
 import { pcLog } from "../utils/logging.mjs";
+
+function getRollCardClassAttribute(extraClass = "") {
+  const safeClass = String(extraClass || "").replace(/[^a-zA-Z0-9_-]/g, "");
+  return safeClass ? ` ${safeClass}` : "";
+}
 
 export async function performConsciousnessCheck({
   tn = 7,
@@ -46,13 +52,13 @@ export async function performConsciousnessCheck({
   const outcomeBackground = isSuccess ? 'rgba(34, 197, 94, 0.2)' : 'rgba(220, 38, 38, 0.2)';
   const outcomeBorder = isSuccess ? '1px solid #22c55e' : '1px solid #dc2626';
 
-  const content = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  const content = `<div class="skill-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
       ${escapeHtml(skillName)}
     </div>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;"></div>
-      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
         <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
         ${detailLines}
       </div>
@@ -61,43 +67,20 @@ export async function performConsciousnessCheck({
       </div>
     </div>
   </div>`;
-  await ChatMessage.create(applyRollMode({ user: game.user.id, speaker, content, style }));
+  await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content, style }));
 }
 
-export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER } = {}) {
+export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "" } = {}) {
   pcLog.debug('Peasant Core: performSkillRoll called', { toHit, accuracy, skillName });
   const roll = await new Roll('2d6').evaluate();
   const initialDice = roll.dice[0].results.map(r => r.result);
   const diceValues = initialDice.join(', ');
 
-  let isCritical = false;
-  let criticalType = null;
-  let additionalDice = [];
-  let criticalMoS = 0;
-
-  if (initialDice[0] === 6 && initialDice[1] === 6) {
-    isCritical = true;
-    criticalType = 'Critical Success';
-    let keepRolling = true;
-    while (keepRolling) {
-      const extraRoll = await new Roll('1d6').evaluate();
-      const extraValue = extraRoll.dice[0].results[0].result;
-      additionalDice.push(extraValue);
-      criticalMoS += extraValue * 0.25;
-      if (extraValue !== 6) keepRolling = false;
-    }
-  } else if (initialDice[0] === 1 && initialDice[1] === 1) {
-    isCritical = true;
-    criticalType = 'Critical Failure';
-    let keepRolling = true;
-    while (keepRolling) {
-      const extraRoll = await new Roll('1d6').evaluate();
-      const extraValue = extraRoll.dice[0].results[0].result;
-      additionalDice.push(extraValue);
-      criticalMoS -= extraValue * 0.25;
-      if (extraValue !== 6) keepRolling = false;
-    }
-  }
+  const critical = await rollPeasantCriticalExplosion(initialDice);
+  const isCritical = critical.isCritical;
+  const criticalType = critical.label;
+  const additionalDice = critical.dice;
+  const criticalMoS = critical.mos;
 
   let diceResult = initialDice[0] + initialDice[1];
   if (isCritical && additionalDice.length > 0) diceResult = initialDice[0] + initialDice[1] + additionalDice.reduce((s, v) => s + v, 0);
@@ -128,24 +111,24 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
 
   const rollId = `skill-roll-${Date.now()}`;
 
-  const chatContent = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  const chatContent = `<div class="skill-roll-card${getRollCardClassAttribute(cardClass)}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
       ${escapeHtml(skillName)}
     </div>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">To-Hit:</span>
           <span style="color: #e0e0e0; font-size: 13px; font-weight: bold;">${toHit}+</span>
         </div>
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">MoS:</span>
           <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: ${mosColor}; border: ${mosBorder};">
             ${mosDisplay}
           </button>
         </div>
       </div>
-      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
         <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
         <div>Dice: [${diceValues}] = ${initialTotal}</div>${isCritical ? `
         <div>Critical Dice: [${additionalDice.join(', ')}] = ${additionalDice.reduce((sum, val) => sum + val, 0)}</div>` : ''}
@@ -158,7 +141,7 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
     </div>
   </div>`;
 
-  const chatMessage = await ChatMessage.create(applyRollMode({ user: game.user.id, speaker, content: chatContent, style }));
+  const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
   return {
     chatMessage,
     toHit,
@@ -177,7 +160,7 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
   };
 }
 
-export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Untrained Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER } = {}) {
+export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Untrained Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "" } = {}) {
   pcLog.debug('Peasant Core: performUntrainedSkillRoll called', { toHit, accuracy, skillName });
   const roll = await new Roll('3d6').evaluate();
   const allDice = roll.dice[0].results.map(r => r.result);
@@ -187,31 +170,11 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
   const diceResult = keptDice[0] + keptDice[1];
   const allDiceDisplay = allDice.map((die, index) => index === maxIndex ? `<span style="color: #888;">${die}</span>` : die).join(', ');
 
-  let isCritical = false;
-  let criticalType = null;
-  let additionalDice = [];
-  let criticalMoS = 0;
-  if (keptDice[0] === 6 && keptDice[1] === 6) {
-    isCritical = true; criticalType = 'Critical Success';
-    let keepRolling = true;
-    while (keepRolling) {
-      const extraRoll = await new Roll('1d6').evaluate();
-      const extraValue = extraRoll.dice[0].results[0].result;
-      additionalDice.push(extraValue);
-      criticalMoS += extraValue * 0.25;
-      if (extraValue !== 6) keepRolling = false;
-    }
-  } else if (keptDice[0] === 1 && keptDice[1] === 1) {
-    isCritical = true; criticalType = 'Critical Failure';
-    let keepRolling = true;
-    while (keepRolling) {
-      const extraRoll = await new Roll('1d6').evaluate();
-      const extraValue = extraRoll.dice[0].results[0].result;
-      additionalDice.push(extraValue);
-      criticalMoS -= extraValue * 0.25;
-      if (extraValue !== 6) keepRolling = false;
-    }
-  }
+  const critical = await rollPeasantCriticalExplosion(keptDice);
+  const isCritical = critical.isCritical;
+  const criticalType = critical.label;
+  const additionalDice = critical.dice;
+  const criticalMoS = critical.mos;
 
   const initialTotal = keptDice[0] + keptDice[1];
   const difference = initialTotal - toHit;
@@ -235,24 +198,24 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
   const outcomeBorder = isSuccess ? '1px solid #22c55e' : '1px solid #dc2626';
 
   const rollId = `untrained-roll-${Date.now()}`;
-  const chatContent = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  const chatContent = `<div class="skill-roll-card${getRollCardClassAttribute(cardClass)}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
       ${escapeHtml(skillName)}
     </div>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">To-Hit:</span>
           <span style="color: #e0e0e0; font-size: 13px; font-weight: bold;">${toHit}+</span>
         </div>
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">MoS:</span>
           <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: ${mosColor}; border: ${mosBorder};">
             ${mosDisplay}
           </button>
         </div>
       </div>
-      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
         <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
         <div>Dice: [${allDiceDisplay}] = ${diceResult}</div>${isCritical ? `
         <div>Critical Dice: [${additionalDice.join(', ')}] = ${additionalDice.reduce((sum, val) => sum + val, 0)}</div>` : ''}
@@ -265,7 +228,7 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
     </div>
   </div>`;
 
-  const chatMessage = await ChatMessage.create(applyRollMode({ user: game.user.id, speaker, content: chatContent, style }));
+  const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
   return {
     chatMessage,
     toHit,
@@ -307,24 +270,24 @@ export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', 
   const rollId = `saving-roll-${Date.now()}`;
   const allDiceDisplay = allDice.map((die, index) => index === minIndex ? `<span style="color: #888;">${die}</span>` : die).join(', ');
 
-  const chatContent = `<div class="skill-roll-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  const chatContent = `<div class="skill-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
       ${escapeHtml(skillName)}
     </div>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">To-Hit:</span>
           <span style="color: #e0e0e0; font-size: 13px; font-weight: bold;">${toHit}+</span>
         </div>
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #252525; border-radius: 3px; border-left: 3px solid #555;">
+        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">MoS:</span>
           <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: ${mosColor}; border: ${mosBorder};">
             ${mosDisplay}
           </button>
         </div>
       </div>
-      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
+      <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
         <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
         <div>Dice: [${allDiceDisplay}] = ${diceResult}</div>
         <div>MoS: ${totalMoS >= 0 ? '+' : ''}${totalMoS.toFixed(2)}</div>
@@ -335,7 +298,7 @@ export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', 
     </div>
   </div>`;
 
-  const chatMessage = await ChatMessage.create(applyRollMode({ user: game.user.id, speaker, content: chatContent, style }));
+  const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
   return {
     chatMessage,
     toHit,

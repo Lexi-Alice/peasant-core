@@ -6,7 +6,7 @@ export function applyDefensePenaltiesToRollResult(sourceRollResult, {
 } = {}) {
   if (!sourceRollResult || typeof sourceRollResult !== "object") return null;
 
-  const defensePenaltyValue = Number(defenseAccuracyPenalty) || 0;
+  const defensePenaltyValue = Math.abs(Number(defenseAccuracyPenalty) || 0);
   const defenseToHitPenaltyValue = Number(defenseToHitPenalty) || 0;
   const totalDefensePenaltyValue = defensePenaltyValue + defenseToHitPenaltyValue;
 
@@ -18,6 +18,7 @@ export function applyDefensePenaltiesToRollResult(sourceRollResult, {
   const sourceTotalMoS = Number(sourceRollResult.totalMoS);
   const resolvedSourceTotalMoS = Number.isFinite(sourceTotalMoS) ? sourceTotalMoS : 0;
   const preDefenseTotalMoS = rollResult.forcedPass ? 0 : resolvedSourceTotalMoS;
+  rollResult.preDefenseTotalMoS = preDefenseTotalMoS;
 
   if (Number.isFinite(Number(sourceRollResult.baseMoS))) {
     rollResult.baseMoS = Number(sourceRollResult.baseMoS) - (defenseToHitPenaltyValue * 0.25);

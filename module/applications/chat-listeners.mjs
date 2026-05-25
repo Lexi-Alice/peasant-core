@@ -1,19 +1,23 @@
+import { qsa, qs, toElement } from "./dom.mjs";
+
 export function configureChatListeners() {
   Hooks.on("renderChatMessageHTML", (message, html) => {
-    const $html = $(html);
-    const mosButtons = $html.find(".mos-toggle");
+    const root = toElement(html);
+    if (!root) return;
 
-    mosButtons.on("click", function(event) {
-      event.preventDefault();
-      event.stopPropagation();
+    for (const button of qsa(root, ".mos-toggle")) {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-      const rollId = $(this).attr("data-roll-id");
-      const messageContainer = $(this).closest(".skill-roll-card");
-      const details = messageContainer.find(`.roll-details[data-roll-id="${rollId}"]`);
+        const rollId = button.dataset.rollId;
+        const messageContainer = button.closest(".skill-roll-card");
+        const details = qs(messageContainer, `.roll-details[data-roll-id="${rollId}"]`);
 
-      if (details.length > 0) {
-        details.css("display", details.css("display") === "none" ? "block" : "none");
-      }
-    });
+        if (details) {
+          details.style.display = details.style.display === "none" ? "block" : "none";
+        }
+      });
+    }
   });
 }

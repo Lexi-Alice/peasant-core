@@ -13,8 +13,12 @@ import {
 } from "../../../data/actor/combat-modifiers.mjs";
 import { computeBaseSaves } from "../../../data/actor/attributes.mjs";
 import { applyToHitFloor } from "../../../dice/roll-targets.mjs";
+import { delegate, qs, qsa, readStringInput, toElement } from "../../dom.mjs";
 
 export function setupCombatModifierControls(sheet, html, { blurActiveEditableInSheet, enqueueSheetUpdate, runQueuedInputUpdate } = {}) {
+  const root = toElement(html);
+  if (!root) return;
+
   const getCombatHaltBuffsForUpdate = () => sheet.actor.getPeasantCombatHaltBuffsForUpdate?.() ?? sanitizeCombatHaltBuffs(sheet.actor?.system?.combatMods?.haltBuffs);
   const hasCombatHaltBuffType = (buffs, type) => buffs.some(buff => sanitizeCombatHaltBuffType(buff?.type) === type);
   const hasCombatCostBuffResource = (buffs, resourceType) => {
@@ -24,29 +28,27 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
       sanitizeCombatCostResourceType(buff?.resourceType) === safeType
     );
   };
-  setupHaltInputSanitizer(html);
-  setupHaltHardLocationToggle(sheet, html);
+  setupHaltInputSanitizer(root);
+  setupHaltHardLocationToggle(sheet, root);
   const refreshCombatModifierHighlights = () => {
-    html.find(".combat-modifiers .combat-mod-input").each((_, inputEl) => {
-      const $input = $(inputEl);
+    for (const inputEl of qsa(root, ".combat-modifiers .combat-mod-input")) {
       let hasMod = false;
 
-      if ($input.hasClass("combat-halt-buff-input")) {
-        hasMod = normalizeHaltSlashValue($input.val()) !== "0/0/0/0";
+      if (inputEl.classList.contains("combat-halt-buff-input")) {
+        hasMod = normalizeHaltSlashValue(inputEl.value) !== "0/0/0/0";
       } else if (inputEl.type === "number") {
-        hasMod = (Number.parseInt($input.val(), 10) || 0) !== 0;
+        hasMod = (Number.parseInt(inputEl.value, 10) || 0) !== 0;
       }
 
-      $input.toggleClass("has-mod", hasMod);
-    });
+      inputEl.classList.toggle("has-mod", hasMod);
+    }
   };
   refreshCombatModifierHighlights();
 
-  html.on("input change", ".combat-modifiers .combat-mod-input", () => {
-    refreshCombatModifierHighlights();
-  });
+  delegate(root, "input", ".combat-modifiers .combat-mod-input", refreshCombatModifierHighlights);
+  delegate(root, "change", ".combat-modifiers .combat-mod-input", refreshCombatModifierHighlights);
 
-  html.on("click", ".add-combat-halt-buff", async (ev) => {
+  delegate(root, "click", ".add-combat-halt-buff", async (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     if (!sheet.isEditable) return;
@@ -76,21 +78,21 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
         <form>
           <div class="form-group" style="margin-bottom: 10px;">
             <label style="display: block; margin-bottom: 5px;">Buff Type</label>
-            <select name="combatBuffType" class="pc-macro-input" style="width: 100%;">
+            <select name="combatBuffType" class="pc-macro-input pc-select pc-dialog-field-full">
               ${optionsHtml}
             </select>
           </div>
           <div class="form-group combat-cost-type-group" style="margin-bottom: 10px; display: none;">
             <label style="display: block; margin-bottom: 5px;">Resource Type</label>
-            <select name="combatCostResourceType" class="pc-macro-input" style="width: 100%;">
+            <select name="combatCostResourceType" class="pc-macro-input pc-select pc-dialog-field-full">
               ${resourceOptionsHtml}
             </select>
           </div>
           <div class="form-group combat-custom-group" style="margin-bottom: 10px; display: none;">
             <label style="display: block; margin-bottom: 5px;">Custom Name</label>
-            <input type="text" name="combatCustomBuffName" class="pc-macro-input" style="width: 100%;" placeholder="Custom Buff">
+            <input type="text" name="combatCustomBuffName" class="pc-macro-input pc-input pc-dialog-field-full" placeholder="Custom Buff">
             <label style="display: block; margin-bottom: 5px; margin-top: 8px;">Value</label>
-            <input type="number" name="combatCustomBuffValue" class="pc-macro-input" style="width: 100%;" value="0">
+            <input type="number" name="combatCustomBuffValue" class="pc-macro-input pc-input pc-dialog-field-full" value="0" data-dtype="Number" inputmode="numeric" pattern="[+=\\-]?\\d*">
           </div>
         </form>
       `,
@@ -99,10 +101,11 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
           icon: '<i class="fas fa-plus"></i>',
           label: "Add",
           callback: async (dlgHtml) => {
-            const selectedType = sanitizeCombatHaltBuffType(dlgHtml.find('[name="combatBuffType"]').val());
-            const selectedResourceType = sanitizeCombatCostResourceType(dlgHtml.find('[name="combatCostResourceType"]').val());
-            const customName = String(dlgHtml.find('[name="combatCustomBuffName"]').val() ?? "").trim() || "Custom";
-            const customValue = Number.parseInt(dlgHtml.find('[name="combatCustomBuffValue"]').val(), 10) || 0;
+            const dialogRoot = toElement(dlgHtml);
+            const selectedType = sanitizeCombatHaltBuffType(readStringInput(dialogRoot, '[name="combatBuffType"]'));
+            const selectedResourceType = sanitizeCombatCostResourceType(readStringInput(dialogRoot, '[name="combatCostResourceType"]'));
+            const customName = readStringInput(dialogRoot, '[name="combatCustomBuffName"]').trim() || "Custom";
+            const customValue = Number.parseInt(readStringInput(dialogRoot, '[name="combatCustomBuffValue"]'), 10) || 0;
             const result = await sheet.actor.addPeasantCombatHaltBuff?.(selectedType, {
               resourceType: selectedResourceType,
               customName,
@@ -121,25 +124,26 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
       },
       default: "add",
       render: (dlgHtml) => {
-        const typeSelect = dlgHtml.find('[name="combatBuffType"]');
-        const resourceGroup = dlgHtml.find(".combat-cost-type-group");
-        const customGroup = dlgHtml.find(".combat-custom-group");
+        const dialogRoot = toElement(dlgHtml);
+        const typeSelect = qs(dialogRoot, '[name="combatBuffType"]');
+        const resourceGroup = qs(dialogRoot, ".combat-cost-type-group");
+        const customGroup = qs(dialogRoot, ".combat-custom-group");
         const refreshVisibility = () => {
-          const selectedType = sanitizeCombatHaltBuffType(typeSelect.val());
-          resourceGroup.css("display", selectedType === COMBAT_HALT_BUFF_TYPE_COST ? "" : "none");
-          customGroup.css("display", selectedType === COMBAT_HALT_BUFF_TYPE_CUSTOM ? "" : "none");
+          const selectedType = sanitizeCombatHaltBuffType(typeSelect?.value);
+          if (resourceGroup) resourceGroup.style.display = selectedType === COMBAT_HALT_BUFF_TYPE_COST ? "" : "none";
+          if (customGroup) customGroup.style.display = selectedType === COMBAT_HALT_BUFF_TYPE_CUSTOM ? "" : "none";
         };
-        typeSelect.on("change", refreshVisibility);
+        typeSelect?.addEventListener("change", refreshVisibility);
         refreshVisibility();
       }
     }, { classes: ["peasant-macro-dialog"] });
   });
 
-  html.on("click", ".remove-combat-halt-buff", async (ev) => {
+  delegate(root, "click", ".remove-combat-halt-buff", async (ev, target) => {
     ev.preventDefault();
     ev.stopPropagation();
     if (!sheet.isEditable) return;
-    const index = Number.parseInt($(ev.currentTarget).data("buffIndex"), 10);
+    const index = Number.parseInt(target.dataset.buffIndex, 10);
     if (!Number.isFinite(index) || index < 0) return;
 
     await enqueueSheetUpdate?.("_combatSaveQueue", "Remove combat HALT buff", async () => {
@@ -148,7 +152,7 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     sheet.render(false);
   });
 
-  html.on("input", ".combat-halt-buff-input", (ev) => {
+  delegate(root, "input", ".combat-halt-buff-input", (ev) => {
     if (!sheet.isEditable) return;
     const inputEl = ev.currentTarget;
     const before = String(inputEl.value ?? "");
@@ -162,28 +166,28 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     }
   });
 
-  html.on("change blur", ".combat-halt-buff-input", async (ev) => {
+  const handleCombatHaltBuffCommit = async (ev, input) => {
     if (!sheet.isEditable) return;
-    const input = $(ev.currentTarget);
-    const index = Number.parseInt(input.data("buffIndex"), 10);
+    const index = Number.parseInt(input.dataset.buffIndex, 10);
     if (!Number.isFinite(index) || index < 0) return;
-    const normalized = normalizeHaltSlashValue(input.val());
-    if (normalized !== input.val()) input.val(normalized);
+    const normalized = normalizeHaltSlashValue(input.value);
+    if (normalized !== input.value) input.value = normalized;
 
     await runQueuedInputUpdate?.(input, "_combatSaveQueue", "Combat HALT buff values change", async () => {
-      await sheet.actor.setPeasantCombatHaltBuffValues?.(index, input.val(), { render: false });
+      await sheet.actor.setPeasantCombatHaltBuffValues?.(index, input.value, { render: false });
     });
     refreshCombatModifierHighlights();
     sheet.render(false);
-  });
+  };
+  delegate(root, "change", ".combat-halt-buff-input", handleCombatHaltBuffCommit);
+  delegate(root, "blur", ".combat-halt-buff-input", handleCombatHaltBuffCommit, true);
 
-  html.on("change", ".combat-flat-buff-input, .combat-cost-buff-value, .combat-custom-buff-value", async (ev) => {
+  delegate(root, "change", ".combat-flat-buff-input, .combat-cost-buff-value, .combat-custom-buff-value", async (ev, input) => {
     if (!sheet.isEditable) return;
-    const input = $(ev.currentTarget);
-    const index = Number.parseInt(input.data("buffIndex"), 10);
+    const index = Number.parseInt(input.dataset.buffIndex, 10);
     if (!Number.isFinite(index) || index < 0) return;
-    const normalizedValue = Number.parseInt(input.val(), 10) || 0;
-    if (String(normalizedValue) !== String(input.val())) input.val(normalizedValue);
+    const normalizedValue = Number.parseInt(input.value, 10) || 0;
+    if (String(normalizedValue) !== String(input.value)) input.value = String(normalizedValue);
 
     await runQueuedInputUpdate?.(input, "_combatSaveQueue", "Combat numeric buff value change", async () => {
       await sheet.actor.setPeasantCombatHaltBuffValue?.(index, normalizedValue, { render: false });
@@ -192,26 +196,26 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     sheet.render(false);
   });
 
-  html.on("change blur", ".combat-custom-buff-name", async (ev) => {
+  const handleCustomBuffNameCommit = async (ev, input) => {
     if (!sheet.isEditable) return;
-    const input = $(ev.currentTarget);
-    const index = Number.parseInt(input.data("buffIndex"), 10);
+    const index = Number.parseInt(input.dataset.buffIndex, 10);
     if (!Number.isFinite(index) || index < 0) return;
-    const normalizedName = String(input.val() ?? "").trim() || "Custom";
-    if (normalizedName !== input.val()) input.val(normalizedName);
+    const normalizedName = String(input.value ?? "").trim() || "Custom";
+    if (normalizedName !== input.value) input.value = normalizedName;
 
     await runQueuedInputUpdate?.(input, "_combatSaveQueue", "Combat custom buff name change", async () => {
       await sheet.actor.setPeasantCombatCustomBuffName?.(index, normalizedName, { render: false });
     });
     sheet.render(false);
-  });
+  };
+  delegate(root, "change", ".combat-custom-buff-name", handleCustomBuffNameCommit);
+  delegate(root, "blur", ".combat-custom-buff-name", handleCustomBuffNameCommit, true);
 
-  html.on("change", ".combat-cost-buff-resource", async (ev) => {
+  delegate(root, "change", ".combat-cost-buff-resource", async (ev, select) => {
     if (!sheet.isEditable) return;
-    const select = $(ev.currentTarget);
-    const index = Number.parseInt(select.data("buffIndex"), 10);
+    const index = Number.parseInt(select.dataset.buffIndex, 10);
     if (!Number.isFinite(index) || index < 0) return;
-    const selectedResourceType = sanitizeCombatCostResourceType(select.val());
+    const selectedResourceType = sanitizeCombatCostResourceType(select.value);
 
     await runQueuedInputUpdate?.(select, "_combatSaveQueue", "Combat cost buff resource type change", async () => {
       const result = await sheet.actor.setPeasantCombatCostBuffResource?.(index, selectedResourceType, { render: false });
@@ -220,60 +224,63 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     sheet.render(false);
   });
 
-  setupReflexAoeSaveControls(sheet, html);
+  setupReflexAoeSaveControls(sheet, root);
 }
 
 function setupHaltInputSanitizer(html) {
   const normalizeHaltValue = (raw) => normalizeHaltSlashValueEditable(raw);
   const finalizeHaltValue = (raw) => normalizeHaltSlashValue(raw);
 
-  const haltInputs = html.find('input[name="system.haltValues"], input[name="system.naturalHaltValues"]');
-  haltInputs.each((_, el) => {
+  const haltInputs = qsa(html, 'input[name="system.haltValues"], input[name="system.naturalHaltValues"]');
+  for (const el of haltInputs) {
     const normalized = normalizeHaltValue(el.value);
     if (normalized !== el.value) el.value = normalized;
-  });
+  }
 
-  haltInputs.on("keydown", (ev) => {
-    if (ev.key !== "Backspace" && ev.key !== "Delete") return;
-    const input = ev.currentTarget;
-    const value = input.value || "";
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? start;
-    if (start !== end) return;
-    if (ev.key === "Backspace" && start > 0 && value[start - 1] === "/") {
-      ev.preventDefault();
-    }
-    if (ev.key === "Delete" && value[start] === "/") {
-      ev.preventDefault();
-    }
-  });
+  for (const inputElement of haltInputs) {
+    inputElement.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Backspace" && ev.key !== "Delete") return;
+      const input = ev.currentTarget;
+      const value = input.value || "";
+      const start = input.selectionStart ?? 0;
+      const end = input.selectionEnd ?? start;
+      if (start !== end) return;
+      if (ev.key === "Backspace" && start > 0 && value[start - 1] === "/") {
+        ev.preventDefault();
+      }
+      if (ev.key === "Delete" && value[start] === "/") {
+        ev.preventDefault();
+      }
+    });
 
-  haltInputs.on("input", (ev) => {
-    const input = ev.currentTarget;
-    const before = input.value || "";
-    const pos = input.selectionStart ?? before.length;
-    const normalized = normalizeHaltValue(before);
-    if (normalized !== before) {
-      const delta = normalized.length - before.length;
-      const nextPos = Math.max(0, Math.min(normalized.length, pos + delta));
-      input.value = normalized;
-      try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
-    }
-  });
+    inputElement.addEventListener("input", (ev) => {
+      const input = ev.currentTarget;
+      const before = input.value || "";
+      const pos = input.selectionStart ?? before.length;
+      const normalized = normalizeHaltValue(before);
+      if (normalized !== before) {
+        const delta = normalized.length - before.length;
+        const nextPos = Math.max(0, Math.min(normalized.length, pos + delta));
+        input.value = normalized;
+        try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
+      }
+    });
 
-  haltInputs.on("change blur", (ev) => {
-    const input = ev.currentTarget;
-    const finalized = finalizeHaltValue(input.value || "");
-    if (finalized !== input.value) input.value = finalized;
-  });
+    const finalizeInput = (ev) => {
+      const input = ev.currentTarget;
+      const finalized = finalizeHaltValue(input.value || "");
+      if (finalized !== input.value) input.value = finalized;
+    };
+    inputElement.addEventListener("change", finalizeInput);
+    inputElement.addEventListener("blur", finalizeInput);
+  }
 }
 
 function setupHaltHardLocationToggle(sheet, html) {
-  html.find(".halt-letter").click(async (ev) => {
+  delegate(html, "click", ".halt-letter", async (ev, target) => {
     if (!sheet.isEditMode) return;
-    const el = $(ev.currentTarget);
-    const loc = el.data("loc");
-    const type = el.data("type");
+    const loc = target.dataset.loc;
+    const type = target.dataset.type;
 
     await sheet.actor.togglePeasantHardLocation?.(loc, type);
   });
@@ -288,32 +295,32 @@ function setupReflexAoeSaveControls(sheet, html) {
     return applyToHitFloor(reflexBase, toHitMod, 2).toHit;
   };
 
-  html.on("click", ".reflex-aoe-add", async (ev) => {
+  delegate(html, "click", ".reflex-aoe-add", async (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     if (!sheet.isEditMode) return;
     const defaultTarget = getDefaultReflexAoeSaveTarget();
     await sheet.actor.setPeasantReflexAoeSave?.(true, String(defaultTarget));
     setTimeout(() => {
-      const input = sheet._getSheetJQ().find(".reflex-aoe-save-input").first();
-      if (!input.length) return;
+      const input = qs(toElement(sheet.element), ".reflex-aoe-save-input");
+      if (!input) return;
       try {
-        input.trigger("focus");
-        input[0]?.select?.();
+        input.focus();
+        input.select?.();
       } catch (e) {
         /* ignore */
       }
     }, 40);
   });
 
-  html.on("click", ".reflex-aoe-remove", async (ev) => {
+  delegate(html, "click", ".reflex-aoe-remove", async (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     if (!sheet.isEditMode) return;
     await sheet.actor.setPeasantReflexAoeSave?.(false);
   });
 
-  html.on("input", ".reflex-aoe-save-input", (ev) => {
+  delegate(html, "input", ".reflex-aoe-save-input", (ev) => {
     if (!sheet.isEditMode) return;
     const inputEl = ev.currentTarget;
     const before = String(inputEl.value ?? "");
@@ -328,16 +335,17 @@ function setupReflexAoeSaveControls(sheet, html) {
     sheet._scheduleEditAutosaveChange(inputEl, 260);
   });
 
-  html.on("change blur", ".reflex-aoe-save-input", (ev) => {
+  const normalizeReflexAoeInput = (ev, input) => {
     if (!sheet.isEditMode) return;
-    const input = $(ev.currentTarget);
-    const raw = String(input.val() ?? "").trim();
+    const raw = String(input.value ?? "").trim();
     if (!raw) {
-      input.val("");
+      input.value = "";
       return;
     }
     const parsed = Number.parseInt(raw, 10);
     const normalized = Number.isFinite(parsed) ? String(Math.max(2, parsed)) : "";
-    if (normalized !== raw) input.val(normalized);
-  });
+    if (normalized !== raw) input.value = normalized;
+  };
+  delegate(html, "change", ".reflex-aoe-save-input", normalizeReflexAoeInput);
+  delegate(html, "blur", ".reflex-aoe-save-input", normalizeReflexAoeInput, true);
 }

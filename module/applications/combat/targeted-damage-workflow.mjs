@@ -15,11 +15,11 @@ function buildDamageTakenChatCard({
   const haltLine = haltUsed > 0 ? `-${haltUsed}` : "0";
   const hpGridText = `${damageToGrid} (${normalizedType}${isHybrid ? " - Hybrid" : ""})`;
 
-  return `<div class="skill-roll-card pc-damage-taken-card" style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  return `<div class="skill-roll-card pc-damage-taken-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
       ${escapeHtml(headline)}
     </div>
-    <div class="roll-details" style="display: block; background-color: #1a1a1a; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 12px; line-height: 1.55;">
+    <div class="roll-details" style="display: block; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 12px; line-height: 1.55;">
       <div>Damage: ${damageAmount}</div>
       <div>Location: ${escapeHtml(locationDisplay)}</div>
       <div>HALT Reduction: ${haltLine}</div>

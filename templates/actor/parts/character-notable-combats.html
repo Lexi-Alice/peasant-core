@@ -26,11 +26,11 @@
               <div style="flex: 0 0 24px; text-align: center; display: flex; align-items: center; justify-content: center;">
                 <input type="checkbox" class="combat-sig-checkbox" {{#if combat.sig}}checked{{/if}} data-field="sig" title="Sig?">
               </div>
-              <input type="number" value="{{combat.class}}" class="combat-input combat-class" min="1" max="10" placeholder="C" data-field="class" style="flex: 0 0 30px;">
-              <input type="text" value="{{combat.rank}}" class="combat-input combat-rank" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" title="Enter 0-4 or 'U' for untrained">
+              <input type="number" value="{{combat.class}}" class="combat-input combat-class pc-input" min="1" max="10" placeholder="C" data-field="class" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px;">
+              <input type="text" value="{{combat.rank}}" class="combat-input combat-rank pc-input" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" title="Enter 0-4 or 'U' for untrained">
               <button type="button" class="combat-toggle-type" title="Switch to Special Type" style="flex: 0 0 12px; width: 12px; height: 12px; padding: 0; font-size: 10px; border: none; background: transparent; color: #666; cursor: pointer; align-self: center; margin: 0 2px 0 0; line-height: 1;">&times;</button>
             {{else}}
-              <select class="combat-select" data-field="type" style="flex: 0 0 75px; height: 24px; font-size: 11px;">
+              <select class="combat-select pc-select" data-field="type" style="flex: 0 0 75px; height: 24px; font-size: 11px;">
                 <option value="standard">Standard</option>
                 <option value="Stance" {{#if (eq combat.type "Stance")}}selected{{/if}}>Stance</option>
                 <option value="Perk" {{#if (eq combat.type "Perk")}}selected{{/if}}>Perk</option>
@@ -43,24 +43,24 @@
                 <option value="Other" {{#if (eq combat.type "Other")}}selected{{/if}}>Other</option>
               </select>
               {{#if (eq combat.type "TM")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade" min="0" placeholder="Grade" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="Grade" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{else if (eq combat.type "Perk")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade" min="0" placeholder="Grade" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="Grade" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{else if (eq combat.type "Spellcraft")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade" min="0" placeholder="C#" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="C#" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{else if (eq combat.type "Gate")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade" min="0" placeholder="C#" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="C#" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{/if}}
             {{/if}}
 
-            <input type="text" value="{{combat.name}}" class="combat-input combat-name" placeholder="Combat name" data-field="name" style="flex: 1; margin-left: 2px;">
+            <input type="text" value="{{combat.name}}" class="combat-input combat-name pc-input" placeholder="Combat name" data-field="name" style="flex: 1; margin-left: 2px;">
             <button type="button" class="combat-desc-btn" title="Edit Description" style="margin-left:6px; background:#666; color:#fff; border:none; border-radius:3px; width:20px; height:20px; line-height:16px; padding:0; cursor:pointer;">+</button>
             {{#if combat.allowToHitAcc}}
-              <input type="text" value="{{combat.tohit}}" class="combat-input combat-tohit" placeholder="TH" data-field="tohit" style="flex: 0 0 30px; margin-left: 2px;">
-              <input type="text" value="{{combat.accuracy}}" class="combat-input combat-accuracy" placeholder="Acc" data-field="accuracy" style="flex: 0 0 30px; margin-left: 2px;">
+              <input type="text" value="{{combat.tohit}}" class="combat-input combat-tohit pc-input" placeholder="TH" data-field="tohit" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
+              <input type="text" value="{{combat.accuracy}}" class="combat-input combat-accuracy pc-input" placeholder="Acc" data-field="accuracy" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
             {{/if}}
             {{#if combat.sig}}
-              <input type="number" value="{{combat.usesMax}}" class="combat-input combat-uses-max" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
+              <input type="number" value="{{combat.usesMax}}" class="combat-input combat-uses-max pc-input" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
             {{/if}}
             <div class="combat-actions" style="display: flex; gap: 2px; flex: 0 0 auto;">
               <button type="button" class="combat-indent" title="Indent" style="padding: 0 4px; font-size: 10px;">&rarr;</button>
@@ -104,7 +104,7 @@
                     <span class="combat-uses-display">
                       <span class="uses-label">Uses</span>
                       <div class="combat-uses-box">
-                        <input type="number" class="combat-uses-current" data-index="{{index}}" value="{{combat.usesCurrent}}">
+                        <input type="number" class="combat-uses-current pc-input-plain" data-index="{{index}}" value="{{combat.usesCurrent}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
                         <span class="uses-separator">/ {{combat.usesMax}}</span>
                       </div>
                     </span>
@@ -117,20 +117,20 @@
                           <span class="combat-uses-display combat-tag-uses-display combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">
                             <span class="uses-label">{{tag.label}}</span>
                             <span class="combat-uses-box">
-                              <input type="number" class="combat-uses-current combat-tag-uses-current" data-index="{{../index}}" value="{{tag.current}}">
+                              <input type="number" class="combat-uses-current combat-tag-uses-current pc-input-plain" data-index="{{../index}}" value="{{tag.current}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
                               <span class="uses-separator">/ {{tag.max}}</span>
                             </span>
                           </span>
                         {{else if tag.isSections}}
                           <span class="combat-tag combat-tag-compact combat-tag-sections combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">
                             {{tag.label}}:
-                            <input type="number" class="combat-tag-sections-current" data-index="{{../index}}" value="{{tag.current}}">
+                            <input type="number" class="combat-tag-sections-current pc-input-plain" data-index="{{../index}}" value="{{tag.current}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
                             <span>/{{tag.max}}</span>
                           </span>
                         {{else if tag.isSplitSecond}}
                           <span class="combat-tag combat-tag-compact combat-tag-speed combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">
                             {{tag.value}}:
-                            <input type="number" class="combat-tag-splitsecond-current" data-index="{{../index}}" value="{{tag.splitSecondCurrent}}">
+                            <input type="number" class="combat-tag-splitsecond-current pc-input-plain" data-index="{{../index}}" value="{{tag.splitSecondCurrent}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
                             <span>/{{tag.splitSecondMax}}</span>
                           </span>
                         {{else if tag.rollable}}

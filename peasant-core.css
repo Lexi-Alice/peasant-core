@@ -5,24 +5,29 @@
     box-shadow: 0 0 20px black;
 }
 
-.window-app.peasant-actor-sheet:not(.minimized, .minimizing, .maximizing),
-.application.peasant-actor-sheet:not(.minimized, .minimizing, .maximizing) {
+.peasant-core.sheet.actor.character.peasant-actor-sheet:not(.minimized, .minimizing, .maximizing) {
     min-width: 800px;
     min-height: 700px;
     overflow: visible !important;
 }
 
-/* Shared section-border accents (keep available across V1/V2 roots) */
+/* Shared section-border accents */
 .peasant-core,
 .peasant-core .actor-sheet,
-.actor-sheet.peasant-core {
+.actor-sheet.peasant-core,
+#chat-log .message,
+.chat-message {
     --pc-accent-border: var(--color-light-5, #9f8475);
     --pc-accent-border-muted: rgba(159, 132, 117, 0.65);
+    --pc-sheet-surface: var(--background, var(--color-cool-5-90, rgba(11, 10, 19, 0.9)));
 }
 
-/* Shared surface token aligned with Foundry's dark application/sidebar background. */
+/* Shared surface token aligned with Foundry's application background. */
 :root {
-    --pc-sheet-surface: var(--color-cool-5-90, rgba(11, 10, 19, 0.9));
+    --pc-sheet-surface: var(--background, var(--color-cool-5-90, rgba(11, 10, 19, 0.9)));
+    --pc-foundry-input-focus-outline: var(--input-focus-outline-color, var(--color-cool-3, #584a75));
+    --pc-foundry-input-focus-border: var(--input-border-color, transparent);
+    --pc-foundry-input-focus-shadow: transparent;
 }
 
 /* Typography alignment:
@@ -40,13 +45,9 @@
 .window-app.peasant-core .actor-sheet span,
 .window-app.peasant-core .actor-sheet td,
 .window-app.peasant-core .actor-sheet th,
-.wounds-menu,
-.blessing-menu,
-.damage-controls,
-.heal-controls,
-.stress-damage-controls,
-.stress-heal-controls,
-.peasant-skill-floating,
+.pc-resource-dialog,
+.pc-description-editor,
+.pc-notable-combat-tag-editor,
 .peasant-tag-editor,
 #chat-log .message,
 .chat-message,
@@ -57,10 +58,10 @@
 #chat-log .message .skill-roll-card,
 .chat-message .skill-roll-card,
 .window-app.peasant-macro-dialog,
-.app.dialog.peasant-macro-dialog,
+.peasant-macro-dialog,
 .peasant-macro-dialog,
 .window-app.peasant-macro-dialog-force,
-.app.dialog.peasant-macro-dialog-force,
+.peasant-macro-dialog-force,
 .window-app.macro-sheet,
 #macro-config {
     font-family: var(--font-body);
@@ -137,10 +138,6 @@
     flex: 0 0 auto !important;
   }
 
-  .hp-grid-container {
-    /* Allow HP grid to take remaining space */
-    flex: 1 1 auto !important;
-  }
 }
 
 .window-app.peasant-core .window-content,
@@ -375,7 +372,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 18px;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     border-radius: 4px;
-    background: var(--background);
+    background: transparent;
     color: #e0e0e0;
 }
 
@@ -418,10 +415,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 18px 16px 14px;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     border-radius: 6px;
-    background: rgba(0, 0, 0, 0.14);
-    box-shadow:
-        inset 0 0 18px rgba(0, 0, 0, 0.18),
-        0 0 0 1px rgba(255, 255, 255, 0.02);
+    background: transparent;
+    box-shadow: none;
 }
 
 .pc-settings-group legend {
@@ -487,6 +482,81 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     border: 1px solid var(--input-border-color, rgba(203, 191, 154, 0.72));
     border-radius: 4px;
     font-weight: 700;
+}
+
+.pc-setting-number-suffix-control {
+    display: inline-flex;
+    align-items: center;
+    width: 82px;
+    height: 30px;
+    box-sizing: border-box;
+    color: #f4ead7;
+    background: rgba(9, 8, 14, 0.62);
+    border: 1px solid var(--input-border-color, rgba(85, 76, 96, 0.56));
+    border-radius: 4px;
+    font-weight: 700;
+    box-shadow: none;
+    outline: 1px solid transparent;
+    outline-offset: -2px;
+    transition: outline-color 0.5s;
+}
+
+.pc-setting-number-suffix-control:hover:not(:focus-within) {
+    background: rgba(9, 8, 14, 0.62);
+    border-color: var(--input-border-color, #555);
+    box-shadow: none;
+    outline-color: transparent;
+}
+
+.pc-setting-number-suffix-control:focus-within {
+    background: rgba(9, 8, 14, 0.62);
+    border-color: var(--input-border-color, transparent);
+    box-shadow: var(--input-box-shadow, none);
+    outline: 2px solid var(--pc-foundry-input-focus-outline);
+    outline-offset: -2px;
+}
+
+.pc-setting-control .pc-setting-number-suffix-control input[type="number"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    height: 100%;
+    padding: 0 2px 0 6px;
+    text-align: right;
+    color: inherit;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0;
+    box-shadow: none !important;
+    outline: 0 !important;
+    outline-offset: 0 !important;
+}
+
+.pc-setting-number-suffix {
+    flex: 0 0 auto;
+    padding: 0 8px 0 2px;
+    color: rgba(244, 234, 215, 0.58);
+    pointer-events: none;
+    user-select: none;
+}
+
+.pc-setting-control .pc-setting-number-suffix-control input[type="number"]:hover,
+.pc-setting-control .pc-setting-number-suffix-control input[type="number"]:is(:focus, :focus-visible),
+.pc-setting-control .pc-setting-number-suffix-control input[type="number"]:invalid {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+}
+
+.pc-setting-control .pc-setting-number-suffix-control input[type="number"]:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+.pc-setting-number-suffix-control:has(input:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .pc-setting-control input[type="checkbox"] {
@@ -570,7 +640,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     align-items: center !important;
     justify-content: center !important;
     gap: 0.35rem;
-    background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+    background: transparent !important;
     border: 1px solid var(--button-border-color, #9a8462) !important;
     color: var(--button-text-color, #e5cfaa) !important;
     border-radius: 4px !important;
@@ -715,11 +785,9 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 18px 16px 14px;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     border-radius: 6px;
-    background: rgba(0, 0, 0, 0.14);
+    background: transparent;
     color: #e0e0e0;
-    box-shadow:
-        inset 0 0 18px rgba(0, 0, 0, 0.18),
-        0 0 0 1px rgba(255, 255, 255, 0.02);
+    box-shadow: none;
 }
 
 .pc-foundry-section legend {
@@ -744,6 +812,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     display: grid;
     gap: 22px;
     color: #e0e0e0;
+    container-type: inline-size;
 }
 
 .pc-biography-detail-strip {
@@ -817,10 +886,10 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .pc-bio-field input:focus,
 .pc-bio-note textarea:focus {
-    border-color: var(--button-hover-background-color, #c07a32);
+    border-color: var(--pc-foundry-input-focus-border);
     box-shadow:
         inset 0 0 8px rgba(0, 0, 0, 0.3),
-        0 0 0 1px rgba(192, 122, 50, 0.28);
+        0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .pc-bio-value,
@@ -879,7 +948,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     background: transparent !important;
 }
 
-@media (max-width: 860px) {
+@container (max-width: 360px) {
     .pc-biography-detail-strip,
     .pc-biography-identity-grid,
     .pc-biography-notes-grid {
@@ -979,14 +1048,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .actor-sheet:focus {
     outline: none;
 }
-/* Blessing menu checkbox label spacing */
-.window-app.peasant-core .blessing-menu label,
-.blessing-menu label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 /* Restore Foundry default hover colors for box-style form fields */
 .window-app.peasant-core .actor-sheet input[type="text"]:not(.character-name),
 .window-app.peasant-core .actor-sheet input[type="number"],
@@ -1004,6 +1065,232 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .window-app.peasant-core .actor-sheet textarea:hover {
     background: var(--input-background-color, #2a2a2a);
     border-color: var(--input-border-color, #555);
+}
+
+/* Shared Peasant Core form controls, modeled after Foundry/dnd5e plain utility classes. */
+.peasant-core .pc-input,
+.application.peasant-core .pc-input,
+.window-app.peasant-core .pc-input,
+.peasant-core .pc-select,
+.application.peasant-core .pc-select,
+.window-app.peasant-core .pc-select,
+.peasant-core .pc-textarea,
+.application.peasant-core .pc-textarea,
+.window-app.peasant-core .pc-textarea,
+.peasant-macro-dialog .pc-input,
+.window-app.peasant-macro-dialog .pc-input,
+.peasant-macro-dialog .pc-select,
+.window-app.peasant-macro-dialog .pc-select,
+.peasant-macro-dialog .pc-textarea,
+.window-app.peasant-macro-dialog .pc-textarea,
+.peasant-macro-dialog-force .pc-input,
+.window-app.peasant-macro-dialog-force .pc-input,
+.peasant-macro-dialog-force .pc-select,
+.window-app.peasant-macro-dialog-force .pc-select,
+.peasant-macro-dialog-force .pc-textarea,
+.window-app.peasant-macro-dialog-force .pc-textarea {
+    background: var(--input-background-color, #2a2a2a);
+    color: var(--input-text-color, #e0e0e0);
+    border: 1px solid var(--input-border-color, #555);
+    border-radius: 3px;
+    box-shadow: none;
+    outline: none;
+}
+
+.pc-input,
+.pc-select,
+.pc-textarea {
+    min-height: 24px;
+    padding: 4px 8px;
+}
+
+.pc-select {
+    color-scheme: dark;
+}
+
+.peasant-core .pc-input:hover,
+.application.peasant-core .pc-input:hover,
+.window-app.peasant-core .pc-input:hover,
+.peasant-core .pc-input:focus,
+.application.peasant-core .pc-input:focus,
+.window-app.peasant-core .pc-input:focus,
+.peasant-core .pc-input:focus-visible,
+.application.peasant-core .pc-input:focus-visible,
+.window-app.peasant-core .pc-input:focus-visible,
+.peasant-core .pc-select:hover,
+.application.peasant-core .pc-select:hover,
+.window-app.peasant-core .pc-select:hover,
+.peasant-core .pc-select:focus,
+.application.peasant-core .pc-select:focus,
+.window-app.peasant-core .pc-select:focus,
+.peasant-core .pc-select:focus-visible,
+.application.peasant-core .pc-select:focus-visible,
+.window-app.peasant-core .pc-select:focus-visible,
+.peasant-core .pc-textarea:hover,
+.application.peasant-core .pc-textarea:hover,
+.window-app.peasant-core .pc-textarea:hover,
+.peasant-core .pc-textarea:focus,
+.application.peasant-core .pc-textarea:focus,
+.window-app.peasant-core .pc-textarea:focus,
+.peasant-core .pc-textarea:focus-visible,
+.application.peasant-core .pc-textarea:focus-visible,
+.window-app.peasant-core .pc-textarea:focus-visible,
+.peasant-macro-dialog .pc-input:hover,
+.window-app.peasant-macro-dialog .pc-input:hover,
+.peasant-macro-dialog .pc-input:focus,
+.window-app.peasant-macro-dialog .pc-input:focus,
+.peasant-macro-dialog .pc-input:focus-visible,
+.window-app.peasant-macro-dialog .pc-input:focus-visible,
+.peasant-macro-dialog .pc-select:hover,
+.window-app.peasant-macro-dialog .pc-select:hover,
+.peasant-macro-dialog .pc-select:focus,
+.window-app.peasant-macro-dialog .pc-select:focus,
+.peasant-macro-dialog .pc-select:focus-visible,
+.window-app.peasant-macro-dialog .pc-select:focus-visible,
+.peasant-macro-dialog-force .pc-input:hover,
+.window-app.peasant-macro-dialog-force .pc-input:hover,
+.peasant-macro-dialog-force .pc-input:focus,
+.window-app.peasant-macro-dialog-force .pc-input:focus,
+.peasant-macro-dialog-force .pc-input:focus-visible,
+.window-app.peasant-macro-dialog-force .pc-input:focus-visible,
+.peasant-macro-dialog-force .pc-select:hover,
+.window-app.peasant-macro-dialog-force .pc-select:hover,
+.peasant-macro-dialog-force .pc-select:focus,
+.window-app.peasant-macro-dialog-force .pc-select:focus,
+.peasant-macro-dialog-force .pc-select:focus-visible,
+.window-app.peasant-macro-dialog-force .pc-select:focus-visible {
+    background: var(--input-focus-background-color, #333);
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
+    outline: none;
+}
+
+.pc-input-plain,
+.pc-select-plain,
+.pc-textarea-plain {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    box-shadow: none;
+    outline: none;
+}
+
+.pc-input[readonly],
+.pc-select[disabled],
+.pc-textarea[readonly],
+.pc-input-plain[readonly],
+.pc-select-plain[disabled],
+.pc-textarea-plain[readonly] {
+    opacity: 0.72;
+    cursor: default;
+}
+
+.pc-input::placeholder,
+.pc-textarea::placeholder,
+.pc-input-plain::placeholder,
+.pc-textarea-plain::placeholder {
+    color: var(--color-light-5, #9f8475);
+}
+
+.pc-input[type="number"],
+.pc-input-plain[type="number"] {
+    appearance: textfield;
+}
+
+.pc-input[type="number"]::-webkit-outer-spin-button,
+.pc-input[type="number"]::-webkit-inner-spin-button,
+.pc-input-plain[type="number"]::-webkit-outer-spin-button,
+.pc-input-plain[type="number"]::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+.pc-dialog-field-full {
+    width: 100%;
+}
+
+.pc-dialog-field-md {
+    width: 180px;
+}
+
+.pc-defense-prompt-select {
+    min-height: 38px !important;
+    padding: 8px 10px !important;
+    font-size: 14px !important;
+}
+
+.pc-tag-field-row,
+.pc-tag-field-stack {
+    display: flex;
+    gap: 8px;
+}
+
+.pc-tag-field-row {
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.pc-tag-field-stack {
+    flex-direction: column;
+}
+
+.pc-tag-field-label {
+    color: #aaa;
+    font-size: 12px;
+    margin-right: 8px;
+}
+
+.pc-tag-muted-note {
+    color: #888;
+    font-size: 11px;
+}
+
+.pc-tag-separator {
+    color: #666;
+}
+
+.pc-tag-message {
+    color: #e0e0e0;
+    padding: 8px;
+    text-align: center;
+    background: transparent;
+    border-radius: 4px;
+}
+
+.pc-tag-input {
+    width: 60px;
+    padding: 4px 8px;
+    text-align: center;
+}
+
+.pc-tag-input-xs {
+    width: 45px;
+}
+
+.pc-tag-input-sm {
+    width: 50px;
+}
+
+.pc-tag-input-md {
+    width: 58px;
+}
+
+.pc-tag-input-lg {
+    width: 72px;
+}
+
+.pc-tag-input-xl {
+    width: 88px;
+}
+
+.pc-tag-input-xxl {
+    width: 110px;
+}
+
+.pc-tag-input-fill {
+    flex: 1;
+    min-width: 120px;
+    text-align: left;
 }
 
 .peasant-core.peasant-actor-sheet .window-header {
@@ -1186,7 +1473,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .actor-sheet > .character-header .character-field-popover-input,
 .window-app.peasant-core .actor-sheet .pc-character-banner .character-field:not(select),
 .window-app.peasant-core .actor-sheet .pc-character-banner .character-field-popover-input {
-    background: rgba(11, 10, 19, 0.72) !important;
+    background: var(--pc-sheet-surface) !important;
     border-color: rgba(218, 190, 130, 0.42) !important;
     color: #f3e8d2 !important;
     box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32);
@@ -1194,7 +1481,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .actor-sheet > .character-header select.character-field,
 .window-app.peasant-core .actor-sheet .pc-character-banner select.character-field {
-    background: rgba(11, 10, 19, 0.82) !important;
+    background: var(--pc-sheet-surface) !important;
     border-color: rgba(218, 190, 130, 0.42) !important;
     color: #f3e8d2 !important;
     box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32);
@@ -1213,7 +1500,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .window-app.peasant-core .actor-sheet .pc-character-banner .character-field-popover-input:hover,
 .window-app.peasant-core .actor-sheet .pc-character-banner .character-field-popover-input:focus {
     background: rgba(18, 14, 12, 0.9) !important;
-    border-color: rgba(238, 214, 157, 0.7) !important;
+    border-color: var(--pc-foundry-input-focus-border) !important;
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 @media (max-width: 760px) {
@@ -1273,7 +1561,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .actor-sheet .character-field:not(select):focus {
     background: #333;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .actor-sheet select.character-field {
@@ -1298,7 +1587,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .actor-sheet select.character-field:hover,
 .actor-sheet select.character-field:focus {
     background: #333 !important;
-    border-color: #777 !important;
+    border-color: var(--pc-foundry-input-focus-border) !important;
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .actor-sheet select.character-field option {
@@ -1335,7 +1625,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .actor-sheet .character-field-popover-input:hover,
 .actor-sheet .character-field-popover-input:focus {
     background: #333;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
     outline: none;
 }
 
@@ -1390,11 +1681,10 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .actor-sheet > .character-header .pc-banner-identity input.character-name.pc-banner-name-input:focus,
 .window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-identity input.character-name.pc-banner-name-input:hover,
 .window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-identity input.character-name.pc-banner-name-input:focus {
-    border-color: rgba(222, 123, 42, 0.78) !important;
+    border-color: var(--pc-foundry-input-focus-border) !important;
     box-shadow:
         inset 0 0 18px rgba(0, 0, 0, 0.62),
-        0 0 0 1px rgba(255, 244, 207, 0.07),
-        0 0 9px rgba(222, 123, 42, 0.34) !important;
+        0 0 4px var(--pc-foundry-input-focus-shadow) !important;
     outline: none;
 }
 
@@ -1539,7 +1829,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .actor-sheet > .character-header .pc-banner-ap-input:focus,
 .window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-ap-input:focus {
-    border-color: var(--button-hover-border-color, #c9b183);
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
     outline: none;
 }
 
@@ -1605,7 +1896,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .actor-sheet .character-name:focus {
-    border-bottom-color: #777;
+    border-bottom-color: var(--pc-foundry-input-focus-border);
 }
 
 .actor-sheet p {
@@ -1943,7 +2234,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     overflow: hidden;
     border: 1px solid rgba(203, 191, 154, 0.78);
     border-radius: 4px;
-    background: rgba(11, 10, 19, 0.93);
+    background: var(--pc-sheet-surface);
     clip-path: none;
     box-shadow:
         inset 0 0 12px rgba(0, 0, 0, 0.62),
@@ -1979,7 +2270,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     border: 0 !important;
     border-radius: 0 !important;
     outline: 0;
-    background: rgba(11, 10, 19, 0.93) !important;
+    background: var(--pc-sheet-surface) !important;
     box-shadow: none !important;
     clip-path: none;
     color: #ffffff !important;
@@ -1998,11 +2289,11 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-portrait-lozenge-input:focus,
 .pc-portrait-lozenge-input:hover {
     background:
-        linear-gradient(180deg, rgba(255, 244, 207, 0.08), rgba(222, 123, 42, 0.1)),
-        rgba(11, 10, 19, 0.93) !important;
+        linear-gradient(180deg, rgba(255, 244, 207, 0.08), rgba(0, 0, 0, 0.08)),
+        var(--pc-sheet-surface) !important;
     box-shadow:
         inset 0 0 10px rgba(255, 244, 207, 0.18),
-        0 0 7px rgba(222, 123, 42, 0.34) !important;
+        0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .pc-portrait-lozenge-input::-webkit-outer-spin-button,
@@ -2218,11 +2509,11 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-portrait-hp-input:focus {
     color: #ffffff;
     background: transparent !important;
-    box-shadow: 0 0 8px var(--pc-dnd-gold) !important;
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .pc-portrait-hp-input:hover {
-    box-shadow: 0 0 8px var(--pc-dnd-gold) !important;
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .pc-portrait-hp-input::-webkit-outer-spin-button,
@@ -2348,8 +2639,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .pc-portrait-stress-count-input:focus,
 .pc-portrait-stress-count-input:hover {
-    border-color: var(--button-hover-border-color, #c9b183) !important;
-    box-shadow: 0 0 6px rgba(222, 123, 42, 0.38) !important;
+    border-color: var(--pc-foundry-input-focus-border) !important;
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .pc-portrait-stress-count-input::-webkit-outer-spin-button,
@@ -2446,7 +2737,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-portrait-resource-max-input:hover,
 .pc-portrait-resource-value-input:focus,
 .pc-portrait-resource-value-input:hover {
-    box-shadow: 0 0 8px var(--pc-dnd-gold, #9f9275) !important;
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .pc-portrait-resource-max-input::-webkit-outer-spin-button,
@@ -2530,9 +2821,9 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     min-width: 0;
     margin-top: 4px;
     padding: 8px 10px;
-    background: rgba(4, 4, 7, 0.58);
+    background: transparent;
     border-color: rgba(159, 146, 117, 0.55);
-    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.18);
+    box-shadow: none;
 }
 
 .halt-section.pc-portrait-halt-list.simplified-halt-section {
@@ -2559,7 +2850,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     align-items: center;
     margin-bottom: 10px;
     padding: 8px;
-    background: rgba(0, 0, 0, 0.28);
+    background: transparent;
     border: 1px solid rgba(159, 146, 117, 0.42);
     border-radius: 4px;
 }
@@ -2611,13 +2902,13 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .window-app.pc-hp-grid-dialog .dialog-buttons,
-.app.dialog.pc-hp-grid-dialog .dialog-buttons,
+.pc-hp-grid-dialog .dialog-buttons,
 .pc-hp-grid-dialog .dialog-buttons,
 .window-app.pc-hp-grid-dialog .form-footer,
-.app.dialog.pc-hp-grid-dialog .form-footer,
+.pc-hp-grid-dialog .form-footer,
 .pc-hp-grid-dialog .form-footer,
 .window-app.pc-hp-grid-dialog footer,
-.app.dialog.pc-hp-grid-dialog footer,
+.pc-hp-grid-dialog footer,
 .pc-hp-grid-dialog footer {
     display: none !important;
 }
@@ -2697,32 +2988,15 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .window-app.pc-stress-grid-dialog .dialog-buttons,
-.app.dialog.pc-stress-grid-dialog .dialog-buttons,
+.pc-stress-grid-dialog .dialog-buttons,
 .pc-stress-grid-dialog .dialog-buttons,
 .window-app.pc-stress-grid-dialog .form-footer,
-.app.dialog.pc-stress-grid-dialog .form-footer,
+.pc-stress-grid-dialog .form-footer,
 .pc-stress-grid-dialog .form-footer,
 .window-app.pc-stress-grid-dialog footer,
-.app.dialog.pc-stress-grid-dialog footer,
+.pc-stress-grid-dialog footer,
 .pc-stress-grid-dialog footer {
     display: none !important;
-}
-
-.hp-grid-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    overflow: visible;
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.hp-section > .hp-grid-container {
-    order: 99;
-    flex: 0 0 0 !important;
-    width: 0;
-    min-width: 0;
-    height: 0;
 }
 
 .hp-grid-with-labels {
@@ -2868,157 +3142,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     outline: none !important;
 }
 
-/* Wounds Menu Styling */
-.wounds-menu {
-    background: #2a1e1e;
-    padding: 12px;
-    padding-top: 30px;
-    border-radius: 4px;
-    margin-top: 0;
-    border: 1px solid #4a2a2a;
-    overflow: visible;
-    z-index: 1000;
-    position: absolute;
-    width: fit-content;
-    min-width: 160px;
-    max-width: 250px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    cursor: move;
-    /* Default position if not overridden */
-    top: 30px;
-    left: 0;
-}
-
-.wounds-menu.hidden {
-    display: none;
-}
-
-.wounds-menu-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 25px;
-    cursor: move;
-    background: linear-gradient(to bottom, #3a2a2a, #2a1e1e);
-    border-radius: 4px 4px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding-left: 8px;
-}
-
-.wounds-menu-handle::before {
-    content: '??';
-    color: #6a4a4a;
-    font-size: 14px;
-    letter-spacing: 2px;
-}
-
-.close-wounds {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: transparent !important;
-    border: none !important;
-    color: #8a6a6a;
-    font-size: 16px;
-    line-height: 1;
-    padding: 2px 6px !important;
-    margin: 0 !important;
-    cursor: pointer;
-    --button-size: 20px;
-    transition: color 0.2s;
-    width: auto;
-    min-width: 0;
-}
-
-.close-wounds:hover {
-    color: #fff !important;
-    background: transparent !important;
-}
-
-.close-wounds:active {
-    color: #ddaaaa !important;
-    background: transparent !important;
-}
-
-.wound-tag {
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    background: #5a1a1a; 
-    padding: 4px 8px; 
-    border-radius: 3px !important;
-    border: 1px solid #8b0000;
-}
-
-.wound-tag span {
-    color: #fff; 
-    font-weight: bold; 
-    font-size: 11px;
-}
-
-/* Blessing menu styling tweaks */
-.blessing-menu .close-blessing {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    background: transparent !important;
-    border: none !important;
-    color: #8a6a6a;
-    font-size: 12px;
-    line-height: 1;
-    padding: 2px 4px !important;
-    cursor: pointer;
-    --button-size: 20px;
-}
-
-.blessing-menu .close-blessing:hover { color: #fff !important; }
-
-.blessing-menu .close-blessing:active { color: #ddaaaa !important; }
-
-/* Ensure the attributes table is a positioning context for the blessing popup */
-.attributes-table {
-    position: relative !important;
-}
-
-/* Base blessing menu defaults when anchored inside attributes table */
-.blessing-menu {
-    position: absolute;
-    z-index: 1300;
-    display: none; /* shown via JS by removing .hidden and setting inline styles */
-}
-
-.blessing-menu .apply-blessing {
-    background: #16a34a; /* green */
-    color: #ffffff;
-    border: 1px solid #15803d;
-    padding: 6px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-}
-.blessing-menu .apply-blessing:hover { background: #15803d; }
-
-.blessing-menu .clear-blessing {
-    background: #dc2626; /* red */
-    color: #ffffff;
-    border: 1px solid #a00;
-    padding: 6px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-}
-.blessing-menu .clear-blessing:hover { background: #a00; }
-
 /* Style for selected characteristic (use same blessed color) */
 .characteristic-label.blessed { color: #8fd1ff; font-weight: 700; text-shadow: 0 0 6px rgba(143,209,255,0.12); }
-
-/* Reduce clickable area so it doesn't overlap checkboxes */
-.blessing-menu button.close-blessing { width: auto; min-width: 0; }
 
 .stress-row {
     display: flex;
@@ -3226,7 +3351,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     flex-direction: column;
     gap: 4px; /* Tighter gap */
     padding: 10px;
-    background: rgba(0, 0, 0, 0.2);
+    background: transparent;
     border-radius: 4px;
     border: 1px solid #444;
     min-width: 180px;
@@ -3282,13 +3407,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     font-weight: bold;
 }
 
-/* Add wound button styling */
-.add-wound-btn:hover {
-    background: #3a2a2a !important;
-    border-color: #888 !important;
-    color: #ccc !important;
-}
-
 .halt-input {
     background: var(--input-background-color, #2a2a2a);
     color: #e0e0e0;
@@ -3318,7 +3436,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .bolstered-hp-input:focus {
     outline: none;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 /* Temporary HP row styling */
@@ -3339,7 +3458,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .temporary-hp-input:focus {
     outline: none;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .hard-val {
@@ -3410,293 +3530,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 0;
     font-size: var(--font-size-12);
 }
-.damage-controls {
-    background: #2a1e1e;
-    padding: 12px;
-    padding-top: 30px;
-    border-radius: 4px;
-    margin-top: 0;
-    border: 1px solid #4a2a2a;
-    overflow: visible;
-    z-index: 10;
-    position: absolute;
-    width: fit-content;
-    min-width: 250px; /* Reduced from default/implicit to ensure compactness */
-    max-width: 300px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    cursor: move;
-}
-
-.damage-controls-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 25px;
-    cursor: move;
-    background: linear-gradient(to bottom, #3a2a2a, #2a1e1e);
-    border-radius: 4px 4px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding-left: 8px;
-}
-
-.damage-controls-handle::before {
-    content: '??';
-    color: #6a4a4a;
-    font-size: 14px;
-    letter-spacing: 2px;
-}
-
-.damage-controls.hidden {
-    display: none;
-}
-
-.damage-controls select {
-    background: #3a2a2a;
-    color: #e0e0e0;
-    border: 1px solid #5a3a3a;
-    padding: 6px 10px;
-    border-radius: 4px;
-    margin: 0 !important;
-    min-height: 32px;
-    line-height: 1.5;
-    flex: 0 1 auto;
-}
-
-.damage-controls input[type="number"] {
-    background: #3a2a2a;
-    color: #e0e0e0;
-    border: 1px solid #5a3a3a;
-    padding: 6px 10px;
-    border-radius: 4px;
-    margin: 0 !important;
-    min-height: 32px;
-    line-height: 1.5;
-    width: 60px;
-    flex: 0 0 auto;
-}
-
-.damage-controls select {
-    cursor: pointer;
-    --button-size: 20px;
-}
-
-.damage-controls select option {
-    background: #2a2a2a;
-    color: #e0e0e0;
-    padding: 8px;
-}
-
-.damage-controls select:focus {
-    outline: none;
-    border-color: var(--input-border-color, #555);
-    background: var(--input-background-color, #2a2a2a);
-}
-
-.damage-controls input[type="number"]:focus {
-    outline: none;
-    border-color: var(--input-border-color, #555);
-    background: var(--input-background-color, #2a2a2a);
-}
-
-.damage-controls select:hover {
-    background: var(--input-background-color, #2a2a2a);
-    border-color: var(--input-border-color, #555);
-}
-
-.damage-controls label {
-    color: #d0b0b0;
-    margin: 0 !important;
-    display: inline-flex;
-    align-items: center;
-    font-size: 13px;
-}
-
-.damage-controls input[type="checkbox"] {
-    margin-right: 5px;
-}
-
-.damage-controls button:not(.close-damage) {
-    background: #5a2a2a;
-    color: #ffffff;
-    border: 1px solid #6a3a3a;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-    font-weight: bold;
-    margin: 0 !important;
-    transition: background 0.3s;
-    font-size: 12px;
-}
-
-.damage-controls button:not(.close-damage):hover {
-    background: #7a3a3a;
-}
-
-.damage-controls button:not(.close-damage):active {
-    background: #4a1a1a;
-}
-
-/* Healing Controls Styling */
-.heal-controls {
-    background: #1e2a1e;
-    padding: 12px;
-    padding-top: 30px;
-    border-radius: 4px;
-    margin-top: 0;
-    border: 1px solid #2a4a2a;
-    overflow: visible;
-    z-index: 10;
-    position: absolute;
-    width: fit-content;
-    max-width: 400px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    cursor: move;
-}
-
-.heal-controls.hidden {
-    display: none;
-}
-
-.heal-controls-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 25px;
-    cursor: move;
-    background: linear-gradient(to bottom, #2a3a2a, #1e2a1e);
-    border-radius: 4px 4px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding-left: 8px;
-}
-
-.heal-controls-handle::before {
-    content: '??';
-    color: #4a6a4a;
-    font-size: 14px;
-    letter-spacing: 2px;
-}
-
-.heal-controls input[type="number"] {
-    background: #2a3a2a;
-    color: #e0e0e0;
-    border: 1px solid #3a5a3a;
-    padding: 6px 10px;
-    border-radius: 4px;
-    margin: 0 !important;
-    min-height: 32px;
-    line-height: 1.5;
-    width: 60px;
-    flex: 0 0 auto;
-}
-
-.heal-controls input[type="number"]:focus {
-    outline: none;
-    border-color: #4a7a4a;
-    background: #2f3f2f;
-}
-
-.heal-controls label {
-    color: #b0d0b0;
-    margin: 0 !important;
-    display: inline-flex;
-    align-items: center;
-    font-size: 13px;
-}
-
-.heal-controls input[type="checkbox"] {
-    margin-right: 5px;
-}
-
-.heal-controls button:not(.close-heal) {
-    background: #2a5a2a;
-    color: #ffffff;
-    border: 1px solid #3a6a3a;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-    font-weight: bold;
-    margin: 0 !important;
-    transition: background 0.3s;
-    font-size: 12px;
-}
-
-.heal-controls button:not(.close-heal):hover {
-    background: #3a7a3a;
-}
-
-.heal-controls button:not(.close-heal):active {
-    background: #1a4a1a;
-}
-
-.close-heal {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: transparent !important;
-    border: none !important;
-    color: #6a8a6a;
-    font-size: 16px;
-    line-height: 1;
-    padding: 2px 6px !important;
-    margin: 0 !important;
-    cursor: pointer;
-    --button-size: 20px;
-    transition: color 0.2s;
-    width: auto;
-    min-width: 0;
-}
-
-.close-heal:hover {
-    color: #fff !important;
-    background: transparent !important;
-}
-
-.close-heal:active {
-    color: #aaddaa !important;
-    background: transparent !important;
-}
-
-.close-damage {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: transparent !important;
-    border: none !important;
-    color: #8a6a6a;
-    font-size: 16px;
-    line-height: 1;
-    padding: 2px 6px !important;
-    margin: 0 !important;
-    cursor: pointer;
-    --button-size: 20px;
-    transition: color 0.2s;
-    width: auto;
-    min-width: 0;
-}
-
-.close-damage:hover {
-    color: #fff !important;
-    background: transparent !important;
-}
-
-.close-damage:active {
-    color: #ddaaaa !important;
-    background: transparent !important;
-}
 
 /* Section Divider */
 .section-divider {
@@ -3710,7 +3543,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     display: grid;
     /* Slightly narrower attributes table so resource column can have more space */
     grid-template-columns: minmax(80px, 1fr) repeat(4, minmax(40px, 84px));
-    background: var(--background);
+    background: transparent;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     border-radius: 4px;
     overflow: hidden;
@@ -3749,7 +3582,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .attr-label {
-    background: var(--background);
+    background: transparent;
     color: #b0b0b0;
     padding: 10px;
     border-right: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
@@ -3759,7 +3592,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .attr-input {
-    background: var(--background);
+    background: transparent;
     color: #e0e0e0;
     border: none;
     border-right: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
@@ -3773,10 +3606,12 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .attr-input:focus {
     background: #333;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .attr-input-text {
-    background: var(--background);
+    background: transparent;
     color: #e0e0e0;
     border: none;
     border-bottom: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
@@ -3789,6 +3624,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .attr-input-text:focus {
     background: #333;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 /* Edit-mode attribute score/max-edge inputs should use the shared textbox style */
@@ -3800,7 +3637,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .attr-calculated {
-    background: var(--background);
+    background: transparent;
     color: #888;
     padding: 10px;
     text-align: center;
@@ -4091,11 +3928,12 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-hex-attributes .pc-attr-hex-score-input:focus,
 .pc-hex-attributes .pc-attr-hex-score-input:hover {
     background:
-        linear-gradient(180deg, rgba(255, 244, 207, 0.08), rgba(222, 123, 42, 0.08)),
+        linear-gradient(180deg, rgba(255, 244, 207, 0.08), rgba(0, 0, 0, 0.08)),
         var(--pc-hex-face) !important;
     box-shadow:
         inset 0 0 14px rgba(0, 0, 0, 0.48),
-        inset 0 0 9px rgba(222, 123, 42, 0.22) !important;
+        inset 0 0 9px var(--pc-foundry-input-focus-shadow),
+        0 0 4px var(--pc-foundry-input-focus-shadow) !important;
     outline: none;
 }
 
@@ -4117,7 +3955,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 2px 7px;
     border: 1px solid rgba(203, 191, 154, 0.68);
     border-radius: 999px;
-    background: rgba(11, 10, 19, 0.96);
+    background: var(--pc-sheet-surface);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.68);
     color: #efe7d2;
     cursor: pointer;
@@ -4316,7 +4154,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 0 2px !important;
     border: 0 !important;
     border-radius: 3px !important;
-    background: rgba(11, 10, 19, 0.88) !important;
+    background: var(--pc-sheet-surface) !important;
     color: #ffffff !important;
     font-size: 12px;
     font-weight: 900;
@@ -4344,7 +4182,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 4px 5px;
     border: 1px solid rgba(203, 191, 154, 0.32);
     border-radius: 4px;
-    background: rgba(11, 10, 19, 0.44);
+    background: var(--pc-sheet-surface);
     color: #cbbf9a;
     font-size: 10px;
     font-weight: 800;
@@ -4466,7 +4304,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     gap: 0;
     border-bottom: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
     border-right: none;
-    background: var(--background);
+    background: transparent;
     min-height: 0;
     overflow: hidden;
 }
@@ -4685,7 +4523,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .resource-input:focus {
     background: rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 /* SIR Section */
@@ -4728,7 +4567,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     gap: 6px;
     flex: 0 1 auto;
     max-width: 100%;
-    background: var(--background);
+    background: transparent;
     padding: 4px 8px;
     border-radius: 3px !important;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
@@ -4789,7 +4628,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .sir-input:focus {
     background: var(--input-background-color, #2a2a2a);
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 /* Skills Section */
@@ -4801,7 +4641,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .skills-container {
-    background: var(--background);
+    background: transparent;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     border-radius: 4px;
     padding: 15px;
@@ -4842,7 +4682,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     grid-template-columns: 30px minmax(50px, 70px) minmax(50px, 70px) 1fr minmax(60px, 80px) minmax(100px, 120px);
     gap: 10px;
     align-items: center;
-    background: var(--background);
+    background: transparent;
     padding: 8px;
     border-radius: 4px;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
@@ -4852,7 +4692,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .skill-item:hover {
-    background: #2a2a2a;
+    background: transparent;
+    border-color: var(--button-hover-border-color, var(--pc-accent-border, #9f8475));
 }
 
 .skill-drag-handle {
@@ -4871,7 +4712,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .skill-item.dragging {
     opacity: 0.4;
-    background: #1a1a1a;
+    background: transparent;
 }
 
 .skill-item.drag-over-top {
@@ -4928,7 +4769,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .skill-input:focus {
     background: #333;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .skill-class,
@@ -5010,7 +4852,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .advantages-container {
-    background: var(--background);
+    background: transparent;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     border-radius: 4px;
     padding: 15px;
@@ -5028,7 +4870,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     gap: 10px;
     padding: 8px;
     margin-bottom: 8px;
-    background: var(--background);
+    background: transparent;
     border-radius: 4px;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     transition: all 0.15s ease;
@@ -5037,7 +4879,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .advantage-item.dragging {
     opacity: 0.4;
-    background: var(--background);
+    background: transparent;
 }
 
 .advantage-item.drag-over-top {
@@ -5128,7 +4970,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .advantage-input:focus {
     background: #333;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .advantage-delete {
@@ -5192,7 +5035,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .inventory-container {
-    background: var(--background);
+    background: transparent;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
     border-radius: 4px;
     padding: 15px;
@@ -5213,7 +5056,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .inventory-container .editor-content:focus {
     outline: none;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
     background: transparent;
 }
 
@@ -5230,7 +5074,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .inventory-container .tox .tox-edit-area__iframe {
-    background: #252525 !important;
+    background: transparent !important;
 }
 
 /* Dark mode for editor toolbar and dropdowns */
@@ -5346,7 +5190,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .peasant-tag-editor select:hover,
 .peasant-tag-editor select:focus {
     background: #333;
-    border-color: #777;
+    border-color: var(--pc-foundry-input-focus-border);
+    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .window-app.peasant-core .actor-sheet select:not(.pm-dropdown) option,
@@ -5376,49 +5221,87 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   z-index: 4100 !important;
 }
 
-/* ProseMirror editor styling for skill description floating editor */
-.peasant-skill-floating {
-  z-index: 4000 !important;
-  position: fixed !important;
-  background: var(--background) !important;
-  border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
-  box-shadow: 0 0 20px black !important;
-}
-
-
 /* Keep inventory view area transparent */
 .inventory-container .inventory-view {
     background: transparent;
     border-radius: 3px;
 }
 
-/* Let floating window content show the parent surface instead of stacking opacity. */
-.peasant-skill-floating .window-content {
+.pc-description-editor .window-content {
   background: transparent !important;
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--spacer-16, 16px) !important;
+  min-height: 0 !important;
   padding: 12px !important;
-  display: block !important;
   overflow: visible !important;
 }
 
-.peasant-skill-floating .window-footer {
-  background: var(--background) !important;
-  border-top: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
-  border-radius: 0 0 8px 8px !important;
+.pc-description-editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.pc-notable-combat-tag-editor .window-content {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--spacer-16, 16px) !important;
+  min-height: 0 !important;
+  padding: 12px !important;
+  overflow: hidden !important;
+}
+
+.pc-notable-combat-tag-editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.pc-notable-combat-tag-editor-body .current-tags-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pc-notable-combat-tag-editor-body hr {
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
+}
+
+.pc-tag-section-label {
+  color: var(--color-light-3, #aaa);
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pc-notable-combat-tag-editor-body .add-tag-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* Form group styling */
-.peasant-skill-floating .form-group {
+.pc-description-editor .form-group {
   margin: 0 !important;
-  background: var(--background) !important;
+  background: transparent !important;
   border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
   border-radius: 4px !important;
   padding: 12px !important;
 }
 
 /* ProseMirror custom-element styling for skill/combat popup editors */
-.peasant-skill-floating prose-mirror.peasant-desc-editor {
+.pc-description-editor prose-mirror.peasant-desc-editor {
   --min-height: 280px;
   --button-text-color: var(--color-light-3);
   min-height: 280px !important;
@@ -5428,13 +5311,13 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   border-radius: 0 !important;
 }
 
-.peasant-skill-floating prose-mirror.peasant-desc-editor .editor-container {
+.pc-description-editor prose-mirror.peasant-desc-editor .editor-container {
   background: transparent !important;
   border: none !important;
 }
 
-.peasant-skill-floating prose-mirror.peasant-desc-editor .editor-content,
-.peasant-skill-floating prose-mirror.peasant-desc-editor .ProseMirror {
+.pc-description-editor prose-mirror.peasant-desc-editor .editor-content,
+.pc-description-editor prose-mirror.peasant-desc-editor .ProseMirror {
   background: transparent !important;
   color: #e0e0e0 !important;
   min-height: 220px !important;
@@ -5442,26 +5325,26 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   padding: 10px !important;
 }
 
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu {
+.pc-description-editor prose-mirror.peasant-desc-editor menu {
   background: var(--color-cool-4, #302831) !important;
   border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
   border-radius: 4px !important;
   padding: 4px 6px !important;
 }
 
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu button,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown > span {
+.pc-description-editor prose-mirror.peasant-desc-editor menu button,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown > span {
   background: transparent !important;
   border: 1px solid transparent !important;
   border-radius: 4px !important;
 }
 
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu button:hover,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu button:focus-visible,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown:hover,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown:focus-within,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown > span:hover {
+.pc-description-editor prose-mirror.peasant-desc-editor menu button:hover,
+.pc-description-editor prose-mirror.peasant-desc-editor menu button:focus-visible,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown:hover,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown:focus-within,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown > span:hover {
   background: var(--button-hover-background-color) !important;
   border-color: var(--button-hover-border-color) !important;
   color: var(--button-hover-text-color) !important;
@@ -5470,127 +5353,26 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   box-shadow: none !important;
 }
 
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu button,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown > span,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu button i,
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu .pm-dropdown i {
+.pc-description-editor prose-mirror.peasant-desc-editor menu,
+.pc-description-editor prose-mirror.peasant-desc-editor menu button,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown > span,
+.pc-description-editor prose-mirror.peasant-desc-editor menu button i,
+.pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown i {
   color: var(--button-text-color) !important;
   fill: var(--button-text-color) !important;
 }
 
-.peasant-skill-floating prose-mirror.peasant-desc-editor menu [data-action="save"] {
+.pc-description-editor prose-mirror.peasant-desc-editor menu [data-action="save"] {
   display: none !important;
-}
-
-/* Ensure Foundry dialog containers allow editor chrome to overflow and remain visible */
-.app.dialog, .app.dialog .window-content, .app.dialog .dialog-content {
-  overflow: visible !important;
-}
-
-/* Dark mode for dialogs (excluding Create Document / Create Actor dialog) */
-.app.dialog .window-content,
-.app.dialog .dialog-content {
-    background: transparent;
-    color: #e0e0e0;
-}
-
-.app.dialog label {
-    color: #b0b0b0;
-    font-weight: bold;
-}
-
-.app.dialog input[type="number"],
-.app.dialog input[type="text"] {
-    background: #2a2a2a;
-    color: #e0e0e0;
-    border: 1px solid #555;
-}
-
-.app.dialog input[type="number"]:focus,
-.app.dialog input[type="text"]:focus {
-    background: #333;
-    border-color: #777;
-    outline: none;
-}
-
-.app.dialog .dialog-buttons {
-    background: #1a1a1a;
-    border-top: 1px solid #444;
-}
-
-.app.dialog .dialog-buttons button {
-    background: var(--button-background-color);
-    color: var(--color-light-3);
-    border: 1px solid var(--button-border-color);
-}
-
-.app.dialog .dialog-buttons button i {
-    color: inherit;
-}
-
-.app.dialog .dialog-buttons button:hover {
-    background: var(--button-hover-background-color);
-    color: var(--color-light-1);
-    border-color: var(--button-hover-border-color);
-}
-
-/* Dialog select dropdown styling */
-.app.dialog select {
-    background: var(--input-background-color, #2a2a2a) !important;
-    color: var(--input-text-color, #e0e0e0) !important;
-    border: 1px solid var(--input-border-color, #555) !important;
-    border-radius: 3px !important;
-    padding: 8px 10px !important;
-    min-height: 36px !important;
-    box-shadow: none !important;
-    outline: none !important;
-    appearance: auto;
-    color-scheme: dark;
-}
-
-.app.dialog select:focus {
-    background: #333 !important;
-    border-color: var(--button-hover-border-color, #c9b183) !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-.app.dialog select:hover,
-.app.dialog select:focus-visible,
-.app.dialog select:active,
-.app.dialog select:open {
-    background: #333 !important;
-    border-color: var(--button-hover-border-color, #c9b183) !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-.app.dialog select option {
-    background: var(--input-background-color, #2a2a2a) !important;
-    color: var(--input-text-color, #e0e0e0) !important;
-}
-
-/* Optgroup headers in dark mode */
-.app.dialog select optgroup {
-    background: var(--background, #1a1a1a) !important;
-    color: #b0b0b0 !important;
-    font-weight: bold !important;
-    font-style: normal !important;
-}
-
-.app.dialog select option {
-    background: #2a2a2a;
-    color: #e0e0e0;
-    padding: 6px 10px;
 }
 
 /* Chat messages: use the same base surface as the sheet window */
 #chat-log .message,
 .chat-message {
     background: var(--pc-sheet-surface) !important;
-    border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
+    border: 1px solid var(--color-border, var(--color-cool-4, #302831)) !important;
+    border-radius: 6px !important;
     color: var(--color-light-1, #e0e0e0) !important;
     backdrop-filter: blur(6px) saturate(1.15) !important;
     -webkit-backdrop-filter: blur(6px) saturate(1.15) !important;
@@ -5640,30 +5422,134 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 /* Roll cards are rendered with inline dark backgrounds; override to match sheet/chat surface */
 #chat-log .message .skill-roll-card,
 .chat-message .skill-roll-card {
-    background: rgba(11, 10, 19, 0.78) !important;
+    position: relative !important;
+    background: transparent !important;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
+    border-radius: 4px !important;
     color: var(--button-text-color, #e0e0e0) !important;
+    margin-top: 10px !important;
+    padding: 16px 10px 10px !important;
+    overflow: visible !important;
 }
 
 #chat-log .message .skill-roll-card > div:first-child,
 .chat-message .skill-roll-card > div:first-child {
-    border-bottom-color: var(--button-border-color, #9f8475) !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 10px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    max-width: calc(100% - 20px) !important;
+    min-height: 1.2em !important;
+    margin: 0 !important;
+    padding: 0 6px !important;
+    border: 0 !important;
+    background: var(--color-cool-5, #0b0a13) !important;
     color: var(--button-text-color, #e0e0e0) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+    overflow-wrap: anywhere !important;
+    transform: translateY(-50%) !important;
 }
 
-/* Gold box style for To-Hit/MoS/Damage row containers (keep success/failure + value chips untouched) */
+/* Gold fieldset-style row containers (keep success/failure + value chips untouched) */
 #chat-log .message .skill-roll-card div[style*="justify-content"][style*="space-between"],
 .chat-message .skill-roll-card div[style*="justify-content"][style*="space-between"] {
-    background: rgba(11, 10, 19, 0.78) !important;
+    background: transparent !important;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
     border-left: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
     color: var(--color-light-1, #e0e0e0) !important;
 }
 
+#chat-log .message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"],
+#chat-log .message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"],
+#chat-log .message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"],
+.chat-message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"],
+.chat-message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"],
+.chat-message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] {
+    border: 0 !important;
+    border-left: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+}
+
+#chat-log .message .skill-roll-card.pc-damage-roll-card,
+#chat-log .message .skill-roll-card.pc-heal-roll-card,
+#chat-log .message .skill-roll-card.pc-manifest-roll-card,
+#chat-log .message .skill-roll-card.pc-initiative-roll-card,
+.chat-message .skill-roll-card.pc-damage-roll-card,
+.chat-message .skill-roll-card.pc-heal-roll-card,
+.chat-message .skill-roll-card.pc-manifest-roll-card,
+.chat-message .skill-roll-card.pc-initiative-roll-card {
+    padding: 12px 10px 5px !important;
+}
+
+#chat-log .message .skill-roll-card.pc-damage-roll-card > div:nth-child(2),
+#chat-log .message .skill-roll-card.pc-heal-roll-card > div:nth-child(2),
+#chat-log .message .skill-roll-card.pc-manifest-roll-card > div:nth-child(2),
+#chat-log .message .skill-roll-card.pc-initiative-roll-card > div:nth-child(2),
+.chat-message .skill-roll-card.pc-damage-roll-card > div:nth-child(2),
+.chat-message .skill-roll-card.pc-heal-roll-card > div:nth-child(2),
+.chat-message .skill-roll-card.pc-manifest-roll-card > div:nth-child(2),
+.chat-message .skill-roll-card.pc-initiative-roll-card > div:nth-child(2) {
+    gap: 1px !important;
+}
+
+#chat-log .message .skill-roll-card.pc-initiative-roll-card .pc-initiative-result-row,
+.chat-message .skill-roll-card.pc-initiative-roll-card .pc-initiative-result-row {
+    min-height: 0 !important;
+    padding: 0 !important;
+}
+
+#chat-log .message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
+#chat-log .message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
+#chat-log .message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
+.chat-message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
+.chat-message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
+.chat-message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+}
+
+#chat-log .message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > div,
+#chat-log .message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > div,
+#chat-log .message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > div,
+.chat-message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > div,
+.chat-message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > div,
+.chat-message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > div {
+    gap: 4px !important;
+}
+
+#chat-log .message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > div > span,
+#chat-log .message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > div > span,
+#chat-log .message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > div > span,
+.chat-message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > div > span,
+.chat-message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > div > span,
+.chat-message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > div > span {
+    margin-left: 0 !important;
+}
+
 #chat-log .message .skill-roll-card .roll-details,
 .chat-message .skill-roll-card .roll-details {
-    background: rgba(11, 10, 19, 0.92) !important;
-    border-color: var(--button-border-color, #9f8475) !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 2px 0 0 !important;
+    color: var(--color-light-1, #e0e0e0) !important;
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+}
+
+#chat-log .message .skill-roll-card .roll-details > div,
+.chat-message .skill-roll-card .roll-details > div {
+    margin: 0 0 2px !important;
+}
+
+#chat-log .message .skill-roll-card.pc-damage-taken-card .roll-details,
+.chat-message .skill-roll-card.pc-damage-taken-card .roll-details {
+    font-size: 12px !important;
+    line-height: 1.55 !important;
 }
 
 /* Keep MoS/Damage value chips on bright success/failure border/text, but use sheet textbox fill */
@@ -5688,7 +5574,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     min-height: var(--button-size) !important;
     border: 1px solid var(--pc-accent-border, #9f8475) !important;
     border-radius: 4px !important;
-    background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+    background: transparent !important;
     color: #e5cfaa !important;
     padding: 0 0.24rem !important;
     gap: 0.12rem !important;
@@ -5764,7 +5650,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .skill-roll-tooltip .tooltip-text {
     visibility: hidden;
-    background-color: #1a1a1a;
+    background-color: var(--pc-sheet-surface);
     color: #e0e0e0;
     text-align: left;
     border-radius: 4px;
@@ -5783,279 +5669,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .skill-roll-tooltip:hover .tooltip-text {
     visibility: visible;
-}
-
-/* Stress Damage Controls */
-.stress-damage-controls {
-    background: #2a1e1e;
-    padding: 12px;
-    padding-top: 30px;
-    border-radius: 4px;
-    margin-top: 0;
-    border: 1px solid #4a2a2a;
-    overflow: visible;
-    z-index: 10;
-    position: absolute;
-    width: fit-content;
-    max-width: 400px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    cursor: move;
-}
-
-.stress-damage-controls.hidden {
-    display: none;
-}
-
-.stress-damage-controls-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 25px;
-    cursor: move;
-    background: linear-gradient(to bottom, #3a2a2a, #2a1e1e);
-    border-radius: 4px 4px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding-left: 8px;
-}
-
-.stress-damage-controls-handle::before {
-    content: '??';
-    color: #6a4a4a;
-    font-size: 14px;
-    letter-spacing: 2px;
-}
-
-.stress-damage-controls input[type="number"] {
-    background: #3a2a2a;
-    color: #e0e0e0;
-    border: 1px solid #5a3a3a;
-    padding: 6px 10px;
-    border-radius: 4px;
-    margin: 0 !important;
-    min-height: 32px;
-    line-height: 1.5;
-    width: 60px;
-    flex: 0 0 auto;
-}
-
-.stress-damage-controls input[type="number"]:focus {
-    outline: none;
-    border-color: var(--input-border-color, #555);
-    background: var(--input-background-color, #2a2a2a);
-}
-
-.stress-damage-controls button:not(.close-stress-damage) {
-    background: #5a2a2a;
-    color: #ffffff;
-    border: 1px solid #6a3a3a;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-    font-weight: bold;
-    margin: 0 !important;
-    transition: background 0.3s;
-    font-size: 12px;
-}
-
-.stress-damage-controls button:not(.close-stress-damage):hover {
-    background: #7a3a3a;
-}
-
-.stress-damage-controls button:not(.close-stress-damage):active {
-    background: #4a1a1a;
-}
-
-.close-stress-damage {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: transparent !important;
-    border: none !important;
-    color: #8a6a6a;
-    font-size: 16px;
-    line-height: 1;
-    padding: 2px 6px !important;
-    margin: 0 !important;
-    cursor: pointer;
-    --button-size: 20px;
-    transition: color 0.2s;
-    width: auto;
-    min-width: 0;
-}
-
-.close-stress-damage:hover {
-    color: #fff !important;
-    background: transparent !important;
-}
-
-.close-stress-damage:active {
-    color: #ddaaaa !important;
-    background: transparent !important;
-}
-
-/* Stress Healing Controls */
-.stress-heal-controls {
-    background: #1e2a1e;
-    padding: 12px;
-    padding-top: 30px;
-    border-radius: 4px;
-    margin-top: 0;
-    border: 1px solid #2a4a2a;
-    overflow: visible;
-    z-index: 10;
-    position: absolute;
-    width: fit-content;
-    max-width: 400px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    cursor: move;
-}
-
-.stress-heal-controls.hidden {
-    display: none;
-}
-
-.stress-heal-controls-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 25px;
-    cursor: move;
-    background: linear-gradient(to bottom, #2a3a2a, #1e2a1e);
-    border-radius: 4px 4px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding-left: 8px;
-}
-
-.stress-heal-controls-handle::before {
-    content: '??';
-    color: #4a6a4a;
-    font-size: 14px;
-    letter-spacing: 2px;
-}
-
-.stress-heal-controls input[type="number"] {
-    background: #2a3a2a;
-    color: #e0e0e0;
-    border: 1px solid #3a5a3a;
-    padding: 6px 10px;
-    border-radius: 4px;
-    margin: 0 !important;
-    min-height: 32px;
-    line-height: 1.5;
-    width: 60px;
-    flex: 0 0 auto;
-}
-
-.stress-heal-controls input[type="number"]:focus {
-    outline: none;
-    border-color: #4a7a4a;
-    background: #2f3f2f;
-}
-
-.stress-heal-controls button:not(.close-stress-heal) {
-    background: #2a5a2a;
-    color: #ffffff;
-    border: 1px solid #3a6a3a;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-    font-weight: bold;
-    margin: 0 !important;
-    transition: background 0.3s;
-    font-size: 12px;
-}
-
-.stress-heal-controls button:not(.close-stress-heal):hover {
-    background: #3a7a3a;
-}
-
-.stress-heal-controls button:not(.close-stress-heal):active {
-    background: #1a4a1a;
-}
-
-.close-stress-heal {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: transparent !important;
-    border: none !important;
-    color: #6a8a6a;
-    font-size: 16px;
-    line-height: 1;
-    padding: 2px 6px !important;
-    margin: 0 !important;
-    cursor: pointer;
-    --button-size: 20px;
-    transition: color 0.2s;
-    width: auto;
-    min-width: 0;
-}
-
-.close-stress-heal:hover {
-    color: #fff !important;
-    background: transparent !important;
-}
-
-.close-stress-heal:active {
-    color: #aaddaa !important;
-    background: transparent !important;
-}
-
-/* Blessing popup */
-/* Blessing popup styles Ã¯Â¿Â½ match sheet color scheme (black/grey) with green apply, red clear */
-.blessing-menu {
-background: #2a2a2a !important;
-padding: 10px 12px !important;
-border-radius: 6px !important;
-border: 1px solid #444 !important;
-position: absolute !important;
-z-index: 1200 !important;
-width: 260px !important;
-display: flex !important;
-flex-direction: column !important;
-gap: 8px !important;
-    top: 0 !important;
-    left: 0 !important;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.7) !important;
-    color: #e0e0e0 !important;
-}
-
-.blessing-menu.hidden { display: none !important; }
-
-.blessing-menu-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 18px;
-    cursor: move;
-    border-radius: 6px 6px 0 0;
-    background: linear-gradient(to bottom, rgba(255,255,255,0.02), rgba(0,0,0,0.08));
-}
-
-.close-blessing {
-    position: absolute;
-    top: 6px;
-    right: 8px;
-    background: transparent !important;
-    border: none !important;
-    color: #c0c0c0;
-    cursor: pointer;
-    --button-size: 20px;
 }
 
 /* Blessed attribute style (lightish blue) */
@@ -6101,7 +5714,7 @@ gap: 8px !important;
 
 /* Hide the inserted placeholder bar so only the subtle top/bottom
    insertion indicator is shown. The JS still maintains a placeholder
-   element for pointer fallbacks, but we hide its visual appearance. */
+   element for pointer positioning, but we hide its visual appearance. */
 .skills-list .skill-placeholder {
   display: none !important;
 }
@@ -6115,8 +5728,8 @@ gap: 8px !important;
 
 /* Focus styling for arrow key navigation in view mode */
 :root {
-  --pc-keyboard-focus-border: var(--color-warm-1, #de7b2a);
-  --pc-keyboard-focus-bg: rgba(222, 123, 42, 0.2);
+  --pc-keyboard-focus-border: var(--pc-foundry-input-focus-outline);
+  --pc-keyboard-focus-bg: rgba(88, 74, 117, 0.2);
 }
 
 .attr-save-clickable:focus,
@@ -6286,7 +5899,7 @@ gap: 8px !important;
   position: fixed;
   z-index: 100000;
   
-  background: var(--background);
+  background: var(--pc-sheet-surface);
   color: #e0e0e0;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -6340,7 +5953,7 @@ gap: 8px !important;
 }
 
 .notable-combats-container {
-  background: var(--background);
+  background: transparent;
   border: 1px solid #444;
   border-radius: 4px;
   padding: 15px;
@@ -6363,7 +5976,7 @@ gap: 8px !important;
   grid-template-columns: 30px minmax(50px, 70px) minmax(50px, 70px) 1fr minmax(60px, 80px) minmax(100px, 120px);
   gap: 10px;
   align-items: center;
-  background: var(--background);
+  background: transparent;
   padding: 8px;
   border-radius: 4px;
   border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
@@ -6373,7 +5986,8 @@ gap: 8px !important;
 }
 
 .combat-item:hover {
-  background: #2a2a2a;
+  background: transparent;
+  border-color: var(--button-hover-border-color, var(--pc-accent-border, #9f8475));
 }
 
 .combat-drag-handle {
@@ -6391,7 +6005,7 @@ gap: 8px !important;
 
 .combat-item.dragging {
   opacity: 0.4;
-  background: #1a1a1a;
+  background: transparent;
 }
 
 .combat-item.drag-over-top {
@@ -6442,7 +6056,8 @@ gap: 8px !important;
 
 .combat-input:focus {
   background: #333;
-  border-color: #777;
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .combat-class,
@@ -6550,8 +6165,8 @@ gap: 8px !important;
 }
 
 .combat-modifiers .combat-mod-input:focus {
-  border-color: #c084fc;
-  box-shadow: 0 0 4px rgba(192, 132, 252, 0.4);
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
   outline: none;
 }
 
@@ -6573,16 +6188,16 @@ gap: 8px !important;
 }
 
 .combat-cost-buff-inline .combat-cost-buff-resource:focus {
-  border-color: #c084fc;
-  box-shadow: 0 0 4px rgba(192, 132, 252, 0.4);
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
   outline: none;
 }
 
 .pc-effects-modifiers.combat-modifiers .combat-mod-input:focus,
 .pc-effects-modifiers .combat-cost-buff-resource:focus,
 .pc-effects-modifiers .combat-custom-buff-name:focus {
-  border-color: var(--button-hover-border-color, #c9b183);
-  box-shadow: 0 0 6px rgba(222, 123, 42, 0.38);
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
   outline: none;
 }
 
@@ -6595,8 +6210,8 @@ gap: 8px !important;
 }
 
 .combat-custom-buff-inline .combat-custom-buff-name:focus {
-  border-color: #c084fc;
-  box-shadow: 0 0 4px rgba(192, 132, 252, 0.4);
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
   outline: none;
 }
 
@@ -6704,7 +6319,7 @@ gap: 8px !important;
   z-index: 100000;
   
   
-  background: var(--background);
+  background: var(--pc-sheet-surface);
   color: #e0e0e0;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -6801,9 +6416,9 @@ gap: 8px !important;
 .skill-uses-box .skill-uses-current:focus,
 .combat-uses-box .combat-uses-current:focus {
   background: var(--input-background-color, #2a2a2a) !important;
-  border-color: var(--input-border-color, #555) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
   outline: none;
-  box-shadow: none;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
 }
 
 .skill-uses-display .uses-label,
@@ -6833,24 +6448,9 @@ gap: 8px !important;
   align-items: center;
 }
 
-/* Legacy block display - keep for backwards compat */
-.combat-tags-display {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 4px;
-  margin-left: 20px;
-  font-size: 11px;
-  color: #aaa;
-}
-
-.combat-tags-display:empty {
-  display: none;
-}
-
 .combat-tag {
   --button-size: 28px;
-  --pc-combat-tag-bg: var(--button-background-color, rgba(20, 18, 16, 0.65));
+  --pc-combat-tag-bg: transparent;
   --pc-combat-tag-border: var(--button-border-color, #9a8462);
   --pc-combat-tag-text: var(--button-text-color, #e5cfaa);
   display: inline-flex !important;
@@ -6904,6 +6504,8 @@ gap: 8px !important;
 .combat-tag input[type="number"]:focus {
   outline: none !important;
   background: transparent !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 /* Tag with sections - special inline styling */
@@ -6967,10 +6569,18 @@ gap: 8px !important;
   margin-right: 0 !important;
 }
 
-.actor-sheet .combat-tags-inline .combat-tag-uses-display .combat-tag-uses-current,
-.actor-sheet .combat-tags-inline .combat-tag-uses-display .combat-tag-uses-current:hover,
+.actor-sheet .combat-tags-inline .combat-tag-uses-display .combat-tag-uses-current {
+  border-color: var(--input-border-color, #555) !important;
+}
+
+.actor-sheet .combat-tags-inline .combat-tag-uses-display .combat-tag-uses-current:hover:not(:focus):not(:focus-visible) {
+  border-color: var(--input-border-color, #555) !important;
+  box-shadow: none !important;
+}
+
 .actor-sheet .combat-tags-inline .combat-tag-uses-display .combat-tag-uses-current:focus {
-  border-color: #555 !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 /* Editor tag draggable styles */
@@ -7013,15 +6623,6 @@ gap: 8px !important;
 /* ========== COMBAT TAG EDITOR POPUP ========== */
 
 
-.peasant-tag-editor {
-  z-index: 4000 !important;
-  position: fixed !important;
-}
-
-.peasant-tag-editor .peasant-tag-drag-handle {
-  cursor: move !important;
-}
-
 /* Tag type dropdown */
 .peasant-tag-editor .tag-type-select {
   width: 100%;
@@ -7035,7 +6636,8 @@ gap: 8px !important;
 
 .peasant-tag-editor .tag-type-select:focus {
   outline: none;
-  border-color: #777;
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
   background: #333;
 }
 
@@ -7057,7 +6659,8 @@ gap: 8px !important;
 
 .peasant-tag-editor .tag-input-area input:focus {
   outline: none;
-  border-color: #777;
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
   background: #333;
 }
 
@@ -7072,7 +6675,8 @@ gap: 8px !important;
 
 .peasant-tag-editor .tag-input-area select:focus {
   outline: none;
-  border-color: #777;
+  border-color: var(--pc-foundry-input-focus-border);
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
   background: #333;
 }
 
@@ -7083,9 +6687,9 @@ gap: 8px !important;
   gap: 6px;
   min-height: 30px;
   padding: 8px;
-  background: #222;
+  background: transparent;
   border-radius: 4px;
-  border: 1px solid #333;
+  border: 1px solid var(--color-border);
 }
 
 .peasant-tag-editor .current-tag-item {
@@ -7098,7 +6702,7 @@ gap: 8px !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0.25rem;
-  background: var(--button-background-color) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color) !important;
   color: var(--button-text-color) !important;
   border-radius: 4px !important;
@@ -7151,11 +6755,7 @@ gap: 8px !important;
 .peasant-tag-editor .peasant-tag-done,
 .peasant-tag-editor .peasant-tag-apply,
 .peasant-tag-editor .peasant-tag-clear,
-.peasant-tag-editor .peasant-tag-cancel,
-.peasant-skill-floating .peasant-skill-save,
-.peasant-skill-floating .peasant-skill-cancel,
-.peasant-skill-floating .peasant-combat-save,
-.peasant-skill-floating .peasant-combat-cancel {
+.peasant-tag-editor .peasant-tag-cancel {
   --button-size: 28px;
   min-width: max-content;
   padding: 0 0.5rem !important;
@@ -7164,7 +6764,7 @@ gap: 8px !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0.25rem;
-  background: var(--button-background-color) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color) !important;
   color: var(--button-text-color) !important;
   border-radius: 4px !important;
@@ -7176,11 +6776,7 @@ gap: 8px !important;
 .peasant-tag-editor .peasant-tag-done:hover,
 .peasant-tag-editor .peasant-tag-apply:hover,
 .peasant-tag-editor .peasant-tag-clear:hover,
-.peasant-tag-editor .peasant-tag-cancel:hover,
-.peasant-skill-floating .peasant-skill-save:hover,
-.peasant-skill-floating .peasant-skill-cancel:hover,
-.peasant-skill-floating .peasant-combat-save:hover,
-.peasant-skill-floating .peasant-combat-cancel:hover {
+.peasant-tag-editor .peasant-tag-cancel:hover {
   background: var(--button-hover-background-color) !important;
   color: var(--button-hover-text-color) !important;
   border-color: var(--button-hover-border-color) !important;
@@ -7210,11 +6806,6 @@ gap: 8px !important;
 
 
 /* BEGIN unified apply/add buttons */
-/* Match APPLY/ADD controls to TAKE DMG/HEAL Foundry button styling */
-.damage-controls button.apply-damage,
-.heal-controls button.apply-heal,
-.stress-damage-controls button.apply-stress-damage,
-.stress-heal-controls button.apply-stress-heal,
 .add-combat-btn,
 .add-skill-btn,
 .add-advantage-btn {
@@ -7227,7 +6818,7 @@ gap: 8px !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0.25rem;
-  background: var(--button-background-color) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color) !important;
   color: var(--button-text-color) !important;
   border-radius: 4px !important;
@@ -7235,10 +6826,6 @@ gap: 8px !important;
   cursor: var(--cursor-pointer) !important;
 }
 
-.damage-controls button.apply-damage:hover,
-.heal-controls button.apply-heal:hover,
-.stress-damage-controls button.apply-stress-damage:hover,
-.stress-heal-controls button.apply-stress-heal:hover,
 .add-combat-btn:hover,
 .add-skill-btn:hover,
 .add-advantage-btn:hover {
@@ -7247,10 +6834,6 @@ gap: 8px !important;
   border-color: var(--button-hover-border-color) !important;
 }
 
-.damage-controls button.apply-damage:active,
-.heal-controls button.apply-heal:active,
-.stress-damage-controls button.apply-stress-damage:active,
-.stress-heal-controls button.apply-stress-heal:active,
 .add-combat-btn:active,
 .add-skill-btn:active,
 .add-advantage-btn:active {
@@ -7362,7 +6945,7 @@ gap: 8px !important;
 
 /* Macro dialogs/windows: match actor-sheet surface and field styling */
 .window-app.peasant-macro-dialog,
-.app.dialog.peasant-macro-dialog,
+.peasant-macro-dialog,
 .peasant-macro-dialog,
 .window-app.macro-sheet,
 #macro-config {
@@ -7371,19 +6954,10 @@ gap: 8px !important;
   box-shadow: 0 0 20px black !important;
 }
 
-.window-app.peasant-macro-dialog .window-header,
-.app.dialog.peasant-macro-dialog .window-header,
-.peasant-macro-dialog .window-header,
-.window-app.macro-sheet .window-header,
-#macro-config .window-header {
-  background: transparent !important;
-  border-bottom: 1px solid var(--color-border) !important;
-}
-
 .window-app.peasant-macro-dialog .window-content,
 .window-app.peasant-macro-dialog .dialog-content,
-.app.dialog.peasant-macro-dialog .window-content,
-.app.dialog.peasant-macro-dialog .dialog-content,
+.peasant-macro-dialog .window-content,
+.peasant-macro-dialog .dialog-content,
 .peasant-macro-dialog .window-content,
 .peasant-macro-dialog .dialog-content,
 .window-app.macro-sheet .window-content,
@@ -7395,7 +6969,7 @@ gap: 8px !important;
 }
 
 .window-app.peasant-macro-dialog label,
-.app.dialog.peasant-macro-dialog label,
+.peasant-macro-dialog label,
 .peasant-macro-dialog label,
 .window-app.macro-sheet label,
 #macro-config label {
@@ -7406,9 +6980,9 @@ gap: 8px !important;
 .window-app.peasant-macro-dialog input[type="number"],
 .window-app.peasant-macro-dialog input[type="text"],
 .window-app.peasant-macro-dialog select,
-.app.dialog.peasant-macro-dialog input[type="number"],
-.app.dialog.peasant-macro-dialog input[type="text"],
-.app.dialog.peasant-macro-dialog select,
+.peasant-macro-dialog input[type="number"],
+.peasant-macro-dialog input[type="text"],
+.peasant-macro-dialog select,
 .peasant-macro-dialog input[type="number"],
 .peasant-macro-dialog input[type="text"],
 .peasant-macro-dialog select,
@@ -7430,12 +7004,12 @@ gap: 8px !important;
 .window-app.peasant-macro-dialog input[type="text"]:focus,
 .window-app.peasant-macro-dialog select:hover,
 .window-app.peasant-macro-dialog select:focus,
-.app.dialog.peasant-macro-dialog input[type="number"]:hover,
-.app.dialog.peasant-macro-dialog input[type="number"]:focus,
-.app.dialog.peasant-macro-dialog input[type="text"]:hover,
-.app.dialog.peasant-macro-dialog input[type="text"]:focus,
-.app.dialog.peasant-macro-dialog select:hover,
-.app.dialog.peasant-macro-dialog select:focus,
+.peasant-macro-dialog input[type="number"]:hover,
+.peasant-macro-dialog input[type="number"]:focus,
+.peasant-macro-dialog input[type="text"]:hover,
+.peasant-macro-dialog input[type="text"]:focus,
+.peasant-macro-dialog select:hover,
+.peasant-macro-dialog select:focus,
 .peasant-macro-dialog input[type="number"]:hover,
 .peasant-macro-dialog input[type="number"]:focus,
 .peasant-macro-dialog input[type="text"]:hover,
@@ -7455,69 +7029,15 @@ gap: 8px !important;
 #macro-config select:hover,
 #macro-config select:focus {
   background: var(--input-background-color, #2a2a2a) !important;
-  border-color: var(--input-border-color, #555) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
   color: var(--input-text-color, #e0e0e0) !important;
   outline: none !important;
-}
-
-.window-app.peasant-macro-dialog .dialog-buttons,
-.app.dialog.peasant-macro-dialog .dialog-buttons,
-.peasant-macro-dialog .dialog-buttons,
-.window-app.macro-sheet footer,
-#macro-config footer {
-  background: transparent !important;
-  border-top: 1px solid var(--color-border) !important;
-}
-
-.window-app.peasant-macro-dialog .dialog-buttons button,
-.app.dialog.peasant-macro-dialog .dialog-buttons button,
-.peasant-macro-dialog .dialog-buttons button,
-.window-app.macro-sheet footer button,
-#macro-config footer button {
-  --button-size: 28px;
-  min-width: max-content;
-  min-height: var(--button-size) !important;
-  padding: 0 0.5rem !important;
-  margin: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.25rem;
-  background: var(--button-background-color) !important;
-  border: 1px solid var(--button-border-color) !important;
-  color: var(--button-text-color) !important;
-  border-radius: 4px !important;
-  line-height: normal !important;
-  cursor: var(--cursor-pointer) !important;
-}
-
-.window-app.peasant-macro-dialog .dialog-buttons button i,
-.app.dialog.peasant-macro-dialog .dialog-buttons button i,
-.peasant-macro-dialog .dialog-buttons button i,
-.window-app.macro-sheet footer button i,
-#macro-config footer button i {
-  color: inherit !important;
-}
-
-.window-app.peasant-macro-dialog .dialog-buttons button:hover,
-.window-app.peasant-macro-dialog .dialog-buttons button:focus-visible,
-.app.dialog.peasant-macro-dialog .dialog-buttons button:hover,
-.app.dialog.peasant-macro-dialog .dialog-buttons button:focus-visible,
-.peasant-macro-dialog .dialog-buttons button:hover,
-.peasant-macro-dialog .dialog-buttons button:focus-visible,
-.window-app.macro-sheet footer button:hover,
-.window-app.macro-sheet footer button:focus-visible,
-#macro-config footer button:hover,
-#macro-config footer button:focus-visible {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-  outline: none !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 /* Force class from macro render hooks to guarantee exact sheet-like macro styling */
 .window-app.peasant-macro-dialog-force,
-.app.dialog.peasant-macro-dialog-force {
+.peasant-macro-dialog-force {
   background: var(--background) !important;
   border: 2px solid var(--color-border) !important;
   box-shadow: 0 0 20px black !important;
@@ -7525,8 +7045,8 @@ gap: 8px !important;
 
 .window-app.peasant-macro-dialog-force .window-content,
 .window-app.peasant-macro-dialog-force .dialog-content,
-.app.dialog.peasant-macro-dialog-force .window-content,
-.app.dialog.peasant-macro-dialog-force .dialog-content {
+.peasant-macro-dialog-force .window-content,
+.peasant-macro-dialog-force .dialog-content {
   background: transparent !important;
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
@@ -7536,9 +7056,9 @@ gap: 8px !important;
 .window-app.peasant-macro-dialog-force input[type="number"],
 .window-app.peasant-macro-dialog-force input[type="text"],
 .window-app.peasant-macro-dialog-force select,
-.app.dialog.peasant-macro-dialog-force input[type="number"],
-.app.dialog.peasant-macro-dialog-force input[type="text"],
-.app.dialog.peasant-macro-dialog-force select {
+.peasant-macro-dialog-force input[type="number"],
+.peasant-macro-dialog-force input[type="text"],
+.peasant-macro-dialog-force select {
   background: var(--input-background-color, #2a2a2a) !important;
   color: var(--input-text-color, #e0e0e0) !important;
   border: 1px solid var(--input-border-color, #555) !important;
@@ -7555,44 +7075,44 @@ gap: 8px !important;
 .window-app.peasant-macro-dialog-force input[type="number"]:invalid,
 .window-app.peasant-macro-dialog-force input[type="text"]:invalid,
 .window-app.peasant-macro-dialog-force select:invalid,
-.app.dialog.peasant-macro-dialog-force input[type="number"]:hover,
-.app.dialog.peasant-macro-dialog-force input[type="number"]:focus,
-.app.dialog.peasant-macro-dialog-force input[type="text"]:hover,
-.app.dialog.peasant-macro-dialog-force input[type="text"]:focus,
-.app.dialog.peasant-macro-dialog-force select:hover,
-.app.dialog.peasant-macro-dialog-force select:focus,
-.app.dialog.peasant-macro-dialog-force input[type="number"]:invalid,
-.app.dialog.peasant-macro-dialog-force input[type="text"]:invalid,
-.app.dialog.peasant-macro-dialog-force select:invalid {
+.peasant-macro-dialog-force input[type="number"]:hover,
+.peasant-macro-dialog-force input[type="number"]:focus,
+.peasant-macro-dialog-force input[type="text"]:hover,
+.peasant-macro-dialog-force input[type="text"]:focus,
+.peasant-macro-dialog-force select:hover,
+.peasant-macro-dialog-force select:focus,
+.peasant-macro-dialog-force input[type="number"]:invalid,
+.peasant-macro-dialog-force input[type="text"]:invalid,
+.peasant-macro-dialog-force select:invalid {
   background: var(--input-background-color, #2a2a2a) !important;
-  border-color: var(--input-border-color, #555) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
   color: var(--input-text-color, #e0e0e0) !important;
   outline: none !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .window-app.pc-defense-prompt-dialog,
-.app.dialog.pc-defense-prompt-dialog,
+.pc-defense-prompt-dialog,
 .window-app.pc-force-pass-dialog,
-.app.dialog.pc-force-pass-dialog,
+.pc-force-pass-dialog,
 .window-app.pc-waiting-dialog,
-.app.dialog.pc-waiting-dialog,
+.pc-waiting-dialog,
 .window-app.pc-location-by-skill-dialog,
-.app.dialog.pc-location-by-skill-dialog,
+.pc-location-by-skill-dialog,
 .window-app.pc-incoming-hit-dialog,
-.app.dialog.pc-incoming-hit-dialog {
+.pc-incoming-hit-dialog {
   min-width: min(440px, calc(100vw - 32px)) !important;
   max-width: calc(100vw - 32px) !important;
 }
 
 .window-app.pc-defense-prompt-dialog .pc-defense-prompt-select,
-.app.dialog.pc-defense-prompt-dialog .pc-defense-prompt-select,
+.pc-defense-prompt-dialog .pc-defense-prompt-select,
 .window-app.pc-force-pass-dialog .pc-defense-prompt-select,
-.app.dialog.pc-force-pass-dialog .pc-defense-prompt-select,
+.pc-force-pass-dialog .pc-defense-prompt-select,
 .window-app.pc-location-by-skill-dialog .pc-defense-prompt-select,
-.app.dialog.pc-location-by-skill-dialog .pc-defense-prompt-select,
+.pc-location-by-skill-dialog .pc-defense-prompt-select,
 .window-app.pc-incoming-hit-dialog .pc-defense-prompt-select,
-.app.dialog.pc-incoming-hit-dialog .pc-defense-prompt-select {
+.pc-incoming-hit-dialog .pc-defense-prompt-select {
   background: var(--input-background-color, #2a2a2a) !important;
   color: var(--input-text-color, #e0e0e0) !important;
   border: 1px solid var(--input-border-color, #555) !important;
@@ -7604,75 +7124,75 @@ gap: 8px !important;
 .window-app.pc-defense-prompt-dialog .pc-defense-prompt-select:hover,
 .window-app.pc-defense-prompt-dialog .pc-defense-prompt-select:focus,
 .window-app.pc-defense-prompt-dialog .pc-defense-prompt-select:focus-visible,
-.app.dialog.pc-defense-prompt-dialog .pc-defense-prompt-select:hover,
-.app.dialog.pc-defense-prompt-dialog .pc-defense-prompt-select:focus,
-.app.dialog.pc-defense-prompt-dialog .pc-defense-prompt-select:focus-visible,
+.pc-defense-prompt-dialog .pc-defense-prompt-select:hover,
+.pc-defense-prompt-dialog .pc-defense-prompt-select:focus,
+.pc-defense-prompt-dialog .pc-defense-prompt-select:focus-visible,
 .window-app.pc-force-pass-dialog .pc-defense-prompt-select:hover,
 .window-app.pc-force-pass-dialog .pc-defense-prompt-select:focus,
 .window-app.pc-force-pass-dialog .pc-defense-prompt-select:focus-visible,
-.app.dialog.pc-force-pass-dialog .pc-defense-prompt-select:hover,
-.app.dialog.pc-force-pass-dialog .pc-defense-prompt-select:focus,
-.app.dialog.pc-force-pass-dialog .pc-defense-prompt-select:focus-visible,
+.pc-force-pass-dialog .pc-defense-prompt-select:hover,
+.pc-force-pass-dialog .pc-defense-prompt-select:focus,
+.pc-force-pass-dialog .pc-defense-prompt-select:focus-visible,
 .window-app.pc-location-by-skill-dialog .pc-defense-prompt-select:hover,
 .window-app.pc-location-by-skill-dialog .pc-defense-prompt-select:focus,
 .window-app.pc-location-by-skill-dialog .pc-defense-prompt-select:focus-visible,
-.app.dialog.pc-location-by-skill-dialog .pc-defense-prompt-select:hover,
-.app.dialog.pc-location-by-skill-dialog .pc-defense-prompt-select:focus,
-.app.dialog.pc-location-by-skill-dialog .pc-defense-prompt-select:focus-visible,
+.pc-location-by-skill-dialog .pc-defense-prompt-select:hover,
+.pc-location-by-skill-dialog .pc-defense-prompt-select:focus,
+.pc-location-by-skill-dialog .pc-defense-prompt-select:focus-visible,
 .window-app.pc-incoming-hit-dialog .pc-defense-prompt-select:hover,
 .window-app.pc-incoming-hit-dialog .pc-defense-prompt-select:focus,
 .window-app.pc-incoming-hit-dialog .pc-defense-prompt-select:focus-visible,
-.app.dialog.pc-incoming-hit-dialog .pc-defense-prompt-select:hover,
-.app.dialog.pc-incoming-hit-dialog .pc-defense-prompt-select:focus,
-.app.dialog.pc-incoming-hit-dialog .pc-defense-prompt-select:focus-visible {
+.pc-incoming-hit-dialog .pc-defense-prompt-select:hover,
+.pc-incoming-hit-dialog .pc-defense-prompt-select:focus,
+.pc-incoming-hit-dialog .pc-defense-prompt-select:focus-visible {
   background: #333 !important;
-  border-color: var(--button-hover-border-color, #c9b183) !important;
-  box-shadow: none !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
   outline: none !important;
 }
 
 .window-app.pc-defense-prompt-dialog .pc-defense-prompt-select option,
-.app.dialog.pc-defense-prompt-dialog .pc-defense-prompt-select option,
+.pc-defense-prompt-dialog .pc-defense-prompt-select option,
 .window-app.pc-force-pass-dialog .pc-defense-prompt-select option,
-.app.dialog.pc-force-pass-dialog .pc-defense-prompt-select option,
+.pc-force-pass-dialog .pc-defense-prompt-select option,
 .window-app.pc-location-by-skill-dialog .pc-defense-prompt-select option,
-.app.dialog.pc-location-by-skill-dialog .pc-defense-prompt-select option,
+.pc-location-by-skill-dialog .pc-defense-prompt-select option,
 .window-app.pc-incoming-hit-dialog .pc-defense-prompt-select option,
-.app.dialog.pc-incoming-hit-dialog .pc-defense-prompt-select option {
+.pc-incoming-hit-dialog .pc-defense-prompt-select option {
   background: var(--input-background-color, #2a2a2a) !important;
   color: var(--input-text-color, #e0e0e0) !important;
 }
 
 .window-app.pc-waiting-dialog .dialog-buttons,
-.app.dialog.pc-waiting-dialog .dialog-buttons,
+.pc-waiting-dialog .dialog-buttons,
 .window-app.pc-waiting-dialog .form-footer,
-.app.dialog.pc-waiting-dialog .form-footer,
+.pc-waiting-dialog .form-footer,
 .window-app.pc-waiting-dialog footer,
-.app.dialog.pc-waiting-dialog footer {
+.pc-waiting-dialog footer {
   display: none !important;
 }
 
 .window-app.pc-waiting-dialog .window-content,
-.app.dialog.pc-waiting-dialog .window-content,
+.pc-waiting-dialog .window-content,
 .window-app.pc-waiting-dialog .dialog-content,
-.app.dialog.pc-waiting-dialog .dialog-content,
+.pc-waiting-dialog .dialog-content,
 .window-app.pc-waiting-dialog form,
-.app.dialog.pc-waiting-dialog form,
+.pc-waiting-dialog form,
 .window-app.pc-waiting-dialog .standard-form,
-.app.dialog.pc-waiting-dialog .standard-form {
+.pc-waiting-dialog .standard-form {
   overflow: hidden !important;
   scrollbar-width: none !important;
 }
 
 .window-app.pc-waiting-dialog .controls-dropdown,
-.app.dialog.pc-waiting-dialog .controls-dropdown,
+.pc-waiting-dialog .controls-dropdown,
 .window-app.pc-waiting-dialog .window-resize-handle,
-.app.dialog.pc-waiting-dialog .window-resize-handle {
+.pc-waiting-dialog .window-resize-handle {
   display: none !important;
 }
 
 .window-app.pc-waiting-dialog .pc-waiting-dialog-body,
-.app.dialog.pc-waiting-dialog .pc-waiting-dialog-body {
+.pc-waiting-dialog .pc-waiting-dialog-body {
   min-height: 120px !important;
   display: flex !important;
   flex-direction: column !important;
@@ -7683,14 +7203,14 @@ gap: 8px !important;
 }
 
 .window-app.pc-waiting-dialog .pc-waiting-dialog-dots,
-.app.dialog.pc-waiting-dialog .pc-waiting-dialog-dots {
+.pc-waiting-dialog .pc-waiting-dialog-dots {
   display: inline-flex !important;
   align-items: center !important;
   gap: 8px !important;
 }
 
 .window-app.pc-waiting-dialog .pc-waiting-dialog-dots span,
-.app.dialog.pc-waiting-dialog .pc-waiting-dialog-dots span {
+.pc-waiting-dialog .pc-waiting-dialog-dots span {
   display: inline-block !important;
   min-width: 12px !important;
   line-height: 1 !important;
@@ -7704,18 +7224,18 @@ gap: 8px !important;
 }
 
 .window-app.pc-waiting-dialog .pc-waiting-dialog-dots span.is-active,
-.app.dialog.pc-waiting-dialog .pc-waiting-dialog-dots span.is-active {
+.pc-waiting-dialog .pc-waiting-dialog-dots span.is-active {
   transform: translateY(-7px) !important;
   opacity: 1 !important;
 }
 
 .window-app.pc-incoming-hit-dialog .pc-incoming-hit-message,
-.app.dialog.pc-incoming-hit-dialog .pc-incoming-hit-message {
+.pc-incoming-hit-dialog .pc-incoming-hit-message {
   color: #e0e0e0 !important;
 }
 
 .window-app.pc-incoming-hit-dialog .pc-incoming-hit-summary-grid,
-.app.dialog.pc-incoming-hit-dialog .pc-incoming-hit-summary-grid {
+.pc-incoming-hit-dialog .pc-incoming-hit-summary-grid {
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
   gap: 8px !important;
@@ -7723,9 +7243,9 @@ gap: 8px !important;
 }
 
 .window-app.pc-incoming-hit-dialog .pc-incoming-hit-summary-card,
-.app.dialog.pc-incoming-hit-dialog .pc-incoming-hit-summary-card {
+.pc-incoming-hit-dialog .pc-incoming-hit-summary-card {
   padding: 8px !important;
-  background: rgba(39, 31, 22, 0.9) !important;
+  background: transparent !important;
   border: 1px solid var(--button-hover-border-color, #c9b183) !important;
   border-radius: 4px !important;
   color: var(--input-text-color, #e0e0e0) !important;
@@ -7733,7 +7253,7 @@ gap: 8px !important;
 }
 
 .window-app.pc-incoming-hit-dialog .pc-incoming-hit-summary-label,
-.app.dialog.pc-incoming-hit-dialog .pc-incoming-hit-summary-label {
+.pc-incoming-hit-dialog .pc-incoming-hit-summary-label {
   font-size: 11px !important;
   color: var(--button-hover-border-color, #c9b183) !important;
   margin-bottom: 4px !important;
@@ -7742,101 +7262,64 @@ gap: 8px !important;
 }
 
 .window-app.pc-incoming-hit-dialog .pc-incoming-hit-summary-value,
-.app.dialog.pc-incoming-hit-dialog .pc-incoming-hit-summary-value {
+.pc-incoming-hit-dialog .pc-incoming-hit-summary-value {
   font-weight: bold !important;
   color: var(--color-light-1, #f2dfbd) !important;
 }
 
 .window-app.pc-incoming-hit-dialog .pc-incoming-hit-summary-value.is-ap,
-.app.dialog.pc-incoming-hit-dialog .pc-incoming-hit-summary-value.is-ap {
+.pc-incoming-hit-dialog .pc-incoming-hit-summary-value.is-ap {
   color: #f87171 !important;
-}
-
-.window-app.peasant-macro-dialog-force .dialog-buttons,
-.app.dialog.peasant-macro-dialog-force .dialog-buttons {
-  background: transparent !important;
-  border-top: 1px solid var(--color-border) !important;
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  gap: 8px !important;
-  align-items: stretch !important;
-}
-
-.window-app.peasant-macro-dialog-force .dialog-buttons button,
-.app.dialog.peasant-macro-dialog-force .dialog-buttons button {
-  --button-size: 28px;
-  min-width: 0 !important;
-  min-height: var(--button-size) !important;
-  width: auto !important;
-  flex: 1 1 0 !important;
-  padding: 0 0.5rem !important;
-  margin: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.25rem;
-  background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
-  border: 1px solid var(--button-border-color, #9a8462) !important;
-  color: var(--color-light-3, #e7d1b1) !important;
-  border-radius: 4px !important;
-  line-height: normal !important;
-  cursor: var(--cursor-pointer) !important;
-}
-
-.window-app.peasant-macro-dialog-force .dialog-buttons button i,
-.app.dialog.peasant-macro-dialog-force .dialog-buttons button i {
-  color: inherit !important;
-}
-
-.window-app.peasant-macro-dialog-force .dialog-buttons button:hover,
-.window-app.peasant-macro-dialog-force .dialog-buttons button:focus-visible,
-.app.dialog.peasant-macro-dialog-force .dialog-buttons button:hover,
-.app.dialog.peasant-macro-dialog-force .dialog-buttons button:focus-visible {
-  background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
-  border-color: var(--button-hover-border-color, #c9b183) !important;
-  color: var(--color-light-2, #efe6d8) !important;
-  outline: none !important;
 }
 
 /* Skill roll macro fields: force same textbox look as sheet inputs */
 .window-app.peasant-macro-dialog-force .skill-roll-dialog input[type="number"],
-.app.dialog.peasant-macro-dialog-force .skill-roll-dialog input[type="number"],
+.peasant-macro-dialog-force .skill-roll-dialog input[type="number"],
 .window-app.peasant-macro-dialog-force .saving-roll-dialog input[type="number"],
-.app.dialog.peasant-macro-dialog-force .saving-roll-dialog input[type="number"] {
+.peasant-macro-dialog-force .saving-roll-dialog input[type="number"] {
   background: var(--input-background-color, #2a2a2a) !important;
   color: var(--input-text-color, #e0e0e0) !important;
   border: 1px solid var(--input-border-color, #555) !important;
   border-radius: 3px !important;
   box-shadow: none !important;
   outline: none !important;
+}
+
+.window-app.peasant-macro-dialog-force .pc-macro-input[type="number"],
+.peasant-macro-dialog-force .pc-macro-input[type="number"],
+.window-app.peasant-macro-dialog .pc-macro-input[type="number"],
+.peasant-macro-dialog .pc-macro-input[type="number"],
+.window-app.peasant-macro-dialog-force .pc-macro-input[type="text"],
+.peasant-macro-dialog-force .pc-macro-input[type="text"],
+.window-app.peasant-macro-dialog .pc-macro-input[type="text"],
+.peasant-macro-dialog .pc-macro-input[type="text"] {
   appearance: textfield !important;
 }
 
 .window-app.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:hover,
 .window-app.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:focus,
 .window-app.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:invalid,
-.app.dialog.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:hover,
-.app.dialog.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:focus,
-.app.dialog.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:invalid,
+.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:hover,
+.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:focus,
+.peasant-macro-dialog-force .skill-roll-dialog input[type="number"]:invalid,
 .window-app.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:hover,
 .window-app.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:focus,
 .window-app.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:invalid,
-.app.dialog.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:hover,
-.app.dialog.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:focus,
-.app.dialog.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:invalid {
+.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:hover,
+.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:focus,
+.peasant-macro-dialog-force .saving-roll-dialog input[type="number"]:invalid {
   background: var(--input-background-color, #2a2a2a) !important;
   color: var(--input-text-color, #e0e0e0) !important;
-  border-color: var(--input-border-color, #555) !important;
-  box-shadow: none !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
   outline: none !important;
 }
 
 /* Dedicated macro input class: hard-lock textbox style to sheet tokens */
 .window-app.peasant-macro-dialog-force .pc-macro-input,
-.app.dialog.peasant-macro-dialog-force .pc-macro-input,
+.peasant-macro-dialog-force .pc-macro-input,
 .window-app.peasant-macro-dialog .pc-macro-input,
-.app.dialog.peasant-macro-dialog .pc-macro-input,
+.peasant-macro-dialog .pc-macro-input,
 .peasant-macro-dialog .pc-macro-input {
   width: 100% !important;
   min-height: 32px !important;
@@ -7853,580 +7336,31 @@ gap: 8px !important;
 .window-app.peasant-macro-dialog-force .pc-macro-input:hover,
 .window-app.peasant-macro-dialog-force .pc-macro-input:focus,
 .window-app.peasant-macro-dialog-force .pc-macro-input:invalid,
-.app.dialog.peasant-macro-dialog-force .pc-macro-input:hover,
-.app.dialog.peasant-macro-dialog-force .pc-macro-input:focus,
-.app.dialog.peasant-macro-dialog-force .pc-macro-input:invalid,
+.peasant-macro-dialog-force .pc-macro-input:hover,
+.peasant-macro-dialog-force .pc-macro-input:focus,
+.peasant-macro-dialog-force .pc-macro-input:invalid,
 .window-app.peasant-macro-dialog .pc-macro-input:hover,
 .window-app.peasant-macro-dialog .pc-macro-input:focus,
 .window-app.peasant-macro-dialog .pc-macro-input:invalid,
-.app.dialog.peasant-macro-dialog .pc-macro-input:hover,
-.app.dialog.peasant-macro-dialog .pc-macro-input:focus,
-.app.dialog.peasant-macro-dialog .pc-macro-input:invalid,
+.peasant-macro-dialog .pc-macro-input:hover,
+.peasant-macro-dialog .pc-macro-input:focus,
+.peasant-macro-dialog .pc-macro-input:invalid,
 .peasant-macro-dialog .pc-macro-input:hover,
 .peasant-macro-dialog .pc-macro-input:focus,
 .peasant-macro-dialog .pc-macro-input:invalid {
   background: var(--input-background-color, #2a2a2a) !important;
   color: var(--input-text-color, #e0e0e0) !important;
-  border-color: var(--input-border-color, #555) !important;
-  box-shadow: none !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
   outline: none !important;
 }
 
 .window-app.peasant-macro-dialog-force .pc-macro-input::placeholder,
-.app.dialog.peasant-macro-dialog-force .pc-macro-input::placeholder,
+.peasant-macro-dialog-force .pc-macro-input::placeholder,
 .window-app.peasant-macro-dialog .pc-macro-input::placeholder,
-.app.dialog.peasant-macro-dialog .pc-macro-input::placeholder,
+.peasant-macro-dialog .pc-macro-input::placeholder,
 .peasant-macro-dialog .pc-macro-input::placeholder {
   color: var(--color-light-5, #9f8475) !important;
-}
-
-/* Absolute macro input fallback: target roll-dialog content directly,
-   even if wrapper classes are missing on the runtime dialog root. */
-.app.dialog .skill-roll-dialog input[type="number"],
-.app.dialog .skill-roll-dialog input[type="text"],
-.app.dialog .saving-roll-dialog input[type="number"],
-.app.dialog .saving-roll-dialog input[type="text"],
-.window-app .skill-roll-dialog input[type="number"],
-.window-app .skill-roll-dialog input[type="text"],
-.window-app .saving-roll-dialog input[type="number"],
-.window-app .saving-roll-dialog input[type="text"],
-.application .skill-roll-dialog input[type="number"],
-.application .skill-roll-dialog input[type="text"],
-.application .saving-roll-dialog input[type="number"],
-.application .saving-roll-dialog input[type="text"],
-.app.dialog .pc-macro-input,
-.window-app .pc-macro-input,
-.application .pc-macro-input {
-  width: 100% !important;
-  min-height: 32px !important;
-  padding: 6px 8px !important;
-  background: var(--input-background-color, #2a2a2a) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-  border: 1px solid var(--input-border-color, #555) !important;
-  border-radius: 3px !important;
-  box-shadow: none !important;
-  outline: none !important;
-  appearance: textfield !important;
-}
-
-.app.dialog .skill-roll-dialog input[type="number"]:hover,
-.app.dialog .skill-roll-dialog input[type="number"]:focus,
-.app.dialog .skill-roll-dialog input[type="number"]:invalid,
-.app.dialog .saving-roll-dialog input[type="number"]:hover,
-.app.dialog .saving-roll-dialog input[type="number"]:focus,
-.app.dialog .saving-roll-dialog input[type="number"]:invalid,
-.window-app .skill-roll-dialog input[type="number"]:hover,
-.window-app .skill-roll-dialog input[type="number"]:focus,
-.window-app .skill-roll-dialog input[type="number"]:invalid,
-.window-app .saving-roll-dialog input[type="number"]:hover,
-.window-app .saving-roll-dialog input[type="number"]:focus,
-.window-app .saving-roll-dialog input[type="number"]:invalid,
-.application .skill-roll-dialog input[type="number"]:hover,
-.application .skill-roll-dialog input[type="number"]:focus,
-.application .skill-roll-dialog input[type="number"]:invalid,
-.application .saving-roll-dialog input[type="number"]:hover,
-.application .saving-roll-dialog input[type="number"]:focus,
-.application .saving-roll-dialog input[type="number"]:invalid,
-.app.dialog .pc-macro-input:hover,
-.app.dialog .pc-macro-input:focus,
-.app.dialog .pc-macro-input:invalid,
-.window-app .pc-macro-input:hover,
-.window-app .pc-macro-input:focus,
-.window-app .pc-macro-input:invalid,
-.application .pc-macro-input:hover,
-.application .pc-macro-input:focus,
-.application .pc-macro-input:invalid {
-  background: var(--input-background-color, #2a2a2a) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-  border-color: var(--input-border-color, #555) !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-/* Structural fallback for macro dialogs using native :has support.
-   This applies even if no macro classes/hooks are present. */
-.app.dialog:has(.skill-roll-dialog) input[type="number"],
-.app.dialog:has(.skill-roll-dialog) input[type="text"],
-.app.dialog:has(.saving-roll-dialog) input[type="number"],
-.app.dialog:has(.saving-roll-dialog) input[type="text"],
-.window-app:has(.skill-roll-dialog) input[type="number"],
-.window-app:has(.skill-roll-dialog) input[type="text"],
-.window-app:has(.saving-roll-dialog) input[type="number"],
-.window-app:has(.saving-roll-dialog) input[type="text"] {
-  background: var(--color-cool-4, #302831) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-  border: 1px solid var(--color-cool-4, #302831) !important;
-  border-radius: 3px !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-.app.dialog:has(.skill-roll-dialog) input[type="number"]:hover,
-.app.dialog:has(.skill-roll-dialog) input[type="number"]:focus,
-.app.dialog:has(.saving-roll-dialog) input[type="number"]:hover,
-.app.dialog:has(.saving-roll-dialog) input[type="number"]:focus,
-.window-app:has(.skill-roll-dialog) input[type="number"]:hover,
-.window-app:has(.skill-roll-dialog) input[type="number"]:focus,
-.window-app:has(.saving-roll-dialog) input[type="number"]:hover,
-.window-app:has(.saving-roll-dialog) input[type="number"]:focus {
-  background: var(--color-cool-4, #302831) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-  border-color: var(--color-cool-3, #584a75) !important;
-}
-
-/* Blessing popup: match sheet window background + wound-button style actions */
-.window-app.peasant-core .blessing-menu,
-.blessing-menu {
-  background: var(--background) !important;
-  border: 1px solid var(--color-border) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7) !important;
-  padding-top: calc(var(--header-height, 30px) + 8px) !important;
-}
-
-.window-app.peasant-core .blessing-menu .blessing-menu-handle,
-.blessing-menu .blessing-menu-handle {
-  background: var(--table-header-bg-color, var(--color-cool-4)) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-}
-
-.window-app.peasant-core .blessing-menu .apply-blessing,
-.window-app.peasant-core .blessing-menu .clear-blessing,
-.blessing-menu .apply-blessing,
-.blessing-menu .clear-blessing {
-  --button-size: 28px;
-  width: auto !important;
-  min-width: max-content !important;
-  min-height: var(--button-size) !important;
-  padding: 0 0.5rem !important;
-  margin: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  white-space: nowrap;
-  background: var(--button-background-color) !important;
-  border: 1px solid var(--button-border-color) !important;
-  color: var(--button-text-color) !important;
-  border-radius: 4px !important;
-  line-height: normal !important;
-  cursor: var(--cursor-pointer) !important;
-}
-
-.window-app.peasant-core .blessing-menu .apply-blessing:hover,
-.window-app.peasant-core .blessing-menu .clear-blessing:hover,
-.blessing-menu .apply-blessing:hover,
-.blessing-menu .clear-blessing:hover {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-}
-
-.window-app.peasant-core .blessing-menu .apply-blessing:active,
-.window-app.peasant-core .blessing-menu .clear-blessing:active,
-.blessing-menu .apply-blessing:active,
-.blessing-menu .clear-blessing:active {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-}
-
-/* Wounds popup: match the same popup styling system as Blessing/Take/Heal windows */
-.window-app.peasant-core .actor-sheet .wounds-menu,
-.wounds-menu {
-  background: var(--background) !important;
-  border: 1px solid var(--color-border) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7) !important;
-  padding-top: calc(var(--header-height, 30px) + 8px) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu-handle,
-.wounds-menu-handle {
-  background: var(--table-header-bg-color, var(--color-cool-4)) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .wound-tag,
-.wounds-menu .wound-tag {
-  background: transparent !important;
-  border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
-  border-radius: 4px !important;
-  padding: 4px 8px !important;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .wound-tag.tag-hover-active,
-.wounds-menu .wound-tag.tag-hover-active,
-.window-app.peasant-core .actor-sheet .wounds-menu .wound-tag:focus-visible,
-.wounds-menu .wound-tag:focus-visible {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .wound-tag span,
-.wounds-menu .wound-tag span {
-  color: #e0e0e0 !important;
-  font-weight: 700 !important;
-  transition: color 0.2s ease !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .wound-tag.tag-hover-active span,
-.wounds-menu .wound-tag.tag-hover-active span {
-  color: var(--button-hover-text-color) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .remove-condition,
-.wounds-menu .remove-condition {
-  --button-size: 18px;
-  width: var(--button-size) !important;
-  min-width: var(--button-size) !important;
-  height: var(--button-size) !important;
-  min-height: var(--button-size) !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: var(--button-background-color) !important;
-  border: 1px solid var(--button-border-color) !important;
-  color: var(--button-text-color) !important;
-  border-radius: 4px !important;
-  line-height: 1 !important;
-  cursor: var(--cursor-pointer) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .remove-condition:hover,
-.wounds-menu .remove-condition:hover,
-.window-app.peasant-core .actor-sheet .wounds-menu .remove-condition:active,
-.wounds-menu .remove-condition:active {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .remove-condition.tag-hover-active,
-.wounds-menu .remove-condition.tag-hover-active {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .add-wound-btn,
-.wounds-menu .add-wound-btn {
-  --button-size: 28px;
-  width: 100% !important;
-  min-width: 100% !important;
-  min-height: var(--button-size) !important;
-  padding: 0 0.5rem !important;
-  margin-top: 6px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.25rem !important;
-  background: var(--button-background-color) !important;
-  border: 1px solid var(--button-border-color) !important;
-  color: var(--button-text-color) !important;
-  border-radius: 4px !important;
-  line-height: normal !important;
-  cursor: var(--cursor-pointer) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .add-wound-btn:hover,
-.wounds-menu .add-wound-btn:hover,
-.window-app.peasant-core .actor-sheet .wounds-menu .add-wound-btn:active,
-.wounds-menu .add-wound-btn:active {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu .no-active-wounds,
-.wounds-menu .no-active-wounds {
-  color: #9aa0a6 !important;
-}
-
-/* HP/Stress Take/Heal popups: match Blessing popup background treatment */
-.window-app.peasant-core .actor-sheet .damage-controls,
-.window-app.peasant-core .actor-sheet .heal-controls,
-.window-app.peasant-core .actor-sheet .stress-damage-controls,
-.window-app.peasant-core .actor-sheet .stress-heal-controls,
-.damage-controls,
-.heal-controls,
-.stress-damage-controls,
-.stress-heal-controls {
-  background: var(--background) !important;
-  border: 1px solid var(--color-border) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7) !important;
-  padding-top: calc(var(--header-height, 30px) + 8px) !important;
-}
-
-.window-app.peasant-core .actor-sheet .damage-controls-handle,
-.window-app.peasant-core .actor-sheet .heal-controls-handle,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle,
-.damage-controls-handle,
-.heal-controls-handle,
-.stress-damage-controls-handle,
-.stress-heal-controls-handle {
-  background: var(--table-header-bg-color, var(--color-cool-4)) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-}
-
-/* Popup header bars (wound / damage / heal / stress / blessing) */
-.window-app.peasant-core .actor-sheet .wounds-menu-handle,
-.window-app.peasant-core .actor-sheet .damage-controls-handle,
-.window-app.peasant-core .actor-sheet .heal-controls-handle,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle,
-.window-app.peasant-core .blessing-menu .blessing-menu-handle,
-.wounds-menu-handle,
-.damage-controls-handle,
-.heal-controls-handle,
-.stress-damage-controls-handle,
-.stress-heal-controls-handle,
-.blessing-menu-handle {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  box-sizing: border-box !important;
-  height: var(--header-height, 30px) !important;
-  overflow: hidden !important;
-  padding: 0 0.5rem !important;
-  gap: 0.25rem !important;
-  z-index: 40 !important;
-  cursor: var(--cursor-grab, move) !important;
-  background: var(--color-header-background) !important;
-  font-size: var(--font-size-13) !important;
-  color: var(--color-light-1) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-  border-radius: 4px 4px 0 0 !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu-handle:active,
-.window-app.peasant-core .actor-sheet .damage-controls-handle:active,
-.window-app.peasant-core .actor-sheet .heal-controls-handle:active,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle:active,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle:active,
-.window-app.peasant-core .blessing-menu .blessing-menu-handle:active,
-.wounds-menu-handle:active,
-.damage-controls-handle:active,
-.heal-controls-handle:active,
-.stress-damage-controls-handle:active,
-.stress-heal-controls-handle:active,
-.blessing-menu-handle:active {
-  cursor: var(--cursor-grab-down, move) !important;
-}
-
-.window-app.peasant-core .actor-sheet .popup-handle-title,
-.window-app.peasant-core .popup-handle-title,
-.popup-handle-title {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  font-size: var(--font-size-13) !important;
-  font-family: var(--font-body) !important;
-  font-weight: 700 !important;
-  margin: 0 !important;
-  padding-right: 2rem !important;
-  line-height: var(--header-height, 30px) !important;
-  border: none !important;
-  overflow: hidden !important;
-  text-align: left !important;
-  white-space: nowrap !important;
-  text-overflow: ellipsis !important;
-  color: var(--color-light-1) !important;
-  pointer-events: none;
-  user-select: none;
-}
-
-/* Match Foundry V2 header-control close button style for these popup headers */
-.window-app.peasant-core .actor-sheet .wounds-menu-handle .header-control,
-.window-app.peasant-core .actor-sheet .damage-controls-handle .header-control,
-.window-app.peasant-core .actor-sheet .heal-controls-handle .header-control,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle .header-control,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle .header-control,
-.window-app.peasant-core .blessing-menu .blessing-menu-handle .header-control,
-.wounds-menu-handle .header-control,
-.damage-controls-handle .header-control,
-.heal-controls-handle .header-control,
-.stress-damage-controls-handle .header-control,
-.stress-heal-controls-handle .header-control,
-.blessing-menu-handle .header-control {
-  position: absolute !important;
-  top: 50% !important;
-  right: 0.5rem !important;
-  left: auto !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-  flex: none !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  --button-text-color: var(--color-light-1) !important;
-  --button-background-color: none !important;
-  --button-size: 1.25rem !important;
-  width: var(--button-size) !important;
-  min-width: var(--button-size) !important;
-  height: var(--button-size) !important;
-  min-height: var(--button-size) !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: 1px solid transparent !important;
-  border-radius: 4px !important;
-  line-height: normal !important;
-  background: transparent !important;
-  color: var(--button-text-color) !important;
-  box-shadow: none !important;
-  text-shadow: none !important;
-  transition: background-color 120ms ease, color 120ms ease !important;
-  cursor: var(--cursor-pointer) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .damage-controls-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .heal-controls-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle .header-control:hover,
-.window-app.peasant-core .blessing-menu .blessing-menu-handle .header-control:hover,
-.wounds-menu-handle .header-control:hover,
-.damage-controls-handle .header-control:hover,
-.heal-controls-handle .header-control:hover,
-.stress-damage-controls-handle .header-control:hover,
-.stress-heal-controls-handle .header-control:hover,
-.blessing-menu-handle .header-control:hover {
-  background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
-  border-color: var(--button-hover-border-color, var(--button-border-color)) !important;
-  color: var(--button-hover-text-color, var(--color-light-1)) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .damage-controls-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .heal-controls-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle .header-control:active,
-.window-app.peasant-core .blessing-menu .blessing-menu-handle .header-control:active,
-.wounds-menu-handle .header-control:active,
-.damage-controls-handle .header-control:active,
-.heal-controls-handle .header-control:active,
-.stress-damage-controls-handle .header-control:active,
-.stress-heal-controls-handle .header-control:active,
-.blessing-menu-handle .header-control:active {
-  background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
-  border-color: var(--button-hover-border-color, var(--button-border-color)) !important;
-  color: var(--button-hover-text-color, var(--color-light-1)) !important;
-}
-
-/* Blessing popup header parity: keep it on the same header/close system as the other popups */
-.window-app.peasant-core .actor-sheet .blessing-menu {
-  padding-top: calc(var(--header-height, 30px) + 8px) !important;
-}
-
-.window-app.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle {
-  display: flex !important;
-  align-items: center !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: var(--header-height, 30px) !important;
-  padding: 0 0.5rem !important;
-  background: var(--color-header-background) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-  border-radius: 4px 4px 0 0 !important;
-  cursor: var(--cursor-grab, move) !important;
-}
-
-/* Popup form controls: match the sheet's standard input/select styling */
-.window-app.peasant-core .actor-sheet .damage-controls input[type="number"],
-.window-app.peasant-core .actor-sheet .damage-controls input[type="text"],
-.window-app.peasant-core .actor-sheet .damage-controls select,
-.window-app.peasant-core .actor-sheet .heal-controls input[type="number"],
-.window-app.peasant-core .actor-sheet .heal-controls input[type="text"],
-.window-app.peasant-core .actor-sheet .heal-controls select,
-.window-app.peasant-core .actor-sheet .stress-damage-controls input[type="number"],
-.window-app.peasant-core .actor-sheet .stress-damage-controls input[type="text"],
-.window-app.peasant-core .actor-sheet .stress-damage-controls select,
-.window-app.peasant-core .actor-sheet .stress-heal-controls input[type="number"],
-.window-app.peasant-core .actor-sheet .stress-heal-controls input[type="text"],
-.window-app.peasant-core .actor-sheet .stress-heal-controls select,
-.damage-controls input[type="number"],
-.damage-controls input[type="text"],
-.damage-controls select,
-.heal-controls input[type="number"],
-.heal-controls input[type="text"],
-.heal-controls select,
-.stress-damage-controls input[type="number"],
-.stress-damage-controls input[type="text"],
-.stress-damage-controls select,
-.stress-heal-controls input[type="number"],
-.stress-heal-controls input[type="text"],
-.stress-heal-controls select {
-  background: var(--input-background-color, #2a2a2a) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-  border: 1px solid var(--input-border-color, #555) !important;
-  border-radius: 3px !important;
-  box-shadow: none !important;
-}
-
-.window-app.peasant-core .actor-sheet .damage-controls input[type="number"]:hover,
-.window-app.peasant-core .actor-sheet .damage-controls input[type="number"]:focus,
-.window-app.peasant-core .actor-sheet .damage-controls input[type="text"]:hover,
-.window-app.peasant-core .actor-sheet .damage-controls input[type="text"]:focus,
-.window-app.peasant-core .actor-sheet .damage-controls select:hover,
-.window-app.peasant-core .actor-sheet .damage-controls select:focus,
-.window-app.peasant-core .actor-sheet .heal-controls input[type="number"]:hover,
-.window-app.peasant-core .actor-sheet .heal-controls input[type="number"]:focus,
-.window-app.peasant-core .actor-sheet .heal-controls input[type="text"]:hover,
-.window-app.peasant-core .actor-sheet .heal-controls input[type="text"]:focus,
-.window-app.peasant-core .actor-sheet .heal-controls select:hover,
-.window-app.peasant-core .actor-sheet .heal-controls select:focus,
-.window-app.peasant-core .actor-sheet .stress-damage-controls input[type="number"]:hover,
-.window-app.peasant-core .actor-sheet .stress-damage-controls input[type="number"]:focus,
-.window-app.peasant-core .actor-sheet .stress-damage-controls input[type="text"]:hover,
-.window-app.peasant-core .actor-sheet .stress-damage-controls input[type="text"]:focus,
-.window-app.peasant-core .actor-sheet .stress-damage-controls select:hover,
-.window-app.peasant-core .actor-sheet .stress-damage-controls select:focus,
-.window-app.peasant-core .actor-sheet .stress-heal-controls input[type="number"]:hover,
-.window-app.peasant-core .actor-sheet .stress-heal-controls input[type="number"]:focus,
-.window-app.peasant-core .actor-sheet .stress-heal-controls input[type="text"]:hover,
-.window-app.peasant-core .actor-sheet .stress-heal-controls input[type="text"]:focus,
-.window-app.peasant-core .actor-sheet .stress-heal-controls select:hover,
-.window-app.peasant-core .actor-sheet .stress-heal-controls select:focus,
-.damage-controls input[type="number"]:hover,
-.damage-controls input[type="number"]:focus,
-.damage-controls input[type="text"]:hover,
-.damage-controls input[type="text"]:focus,
-.damage-controls select:hover,
-.damage-controls select:focus,
-.heal-controls input[type="number"]:hover,
-.heal-controls input[type="number"]:focus,
-.heal-controls input[type="text"]:hover,
-.heal-controls input[type="text"]:focus,
-.heal-controls select:hover,
-.heal-controls select:focus,
-.stress-damage-controls input[type="number"]:hover,
-.stress-damage-controls input[type="number"]:focus,
-.stress-damage-controls input[type="text"]:hover,
-.stress-damage-controls input[type="text"]:focus,
-.stress-damage-controls select:hover,
-.stress-damage-controls select:focus,
-.stress-heal-controls input[type="number"]:hover,
-.stress-heal-controls input[type="number"]:focus,
-.stress-heal-controls input[type="text"]:hover,
-.stress-heal-controls input[type="text"]:focus,
-.stress-heal-controls select:hover,
-.stress-heal-controls select:focus {
-  background: var(--input-background-color, #2a2a2a) !important;
-  border-color: var(--input-border-color, #555) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-  outline: none !important;
 }
 
 /* Notable combat tags: match Wound button/Foundry button styling */
@@ -8439,7 +7373,7 @@ gap: 8px !important;
   padding: 0 0.45rem !important;
   border: 1px solid var(--button-border-color) !important;
   border-radius: 4px !important;
-  background: var(--button-background-color) !important;
+  background: transparent !important;
   color: var(--button-text-color) !important;
   line-height: 1.2 !important;
   white-space: nowrap;
@@ -8472,7 +7406,7 @@ gap: 8px !important;
   min-height: var(--button-size) !important;
   padding: 0 0.55rem !important;
   border-radius: 4px !important;
-  background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color, #9a8462) !important;
   color: var(--button-text-color, #e5cfaa) !important;
   line-height: 1.2 !important;
@@ -8549,7 +7483,7 @@ gap: 8px !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0.2rem;
-  background: var(--button-background-color) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color) !important;
   color: var(--button-text-color) !important;
   border-radius: 4px !important;
@@ -8609,7 +7543,7 @@ gap: 8px !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0.2rem;
-  background: var(--button-background-color) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color) !important;
   color: var(--button-text-color) !important;
   border-radius: 4px !important;
@@ -8637,7 +7571,7 @@ gap: 8px !important;
 /* Notable combat tag editor: align with inventory/sheet control styling */
 .window-app.peasant-core .peasant-tag-editor .current-tags-list,
 .peasant-tag-editor .current-tags-list {
-  background: var(--background) !important;
+  background: transparent !important;
   border: 1px solid var(--color-border) !important;
   border-radius: 4px !important;
 }
@@ -8670,9 +7604,9 @@ gap: 8px !important;
 .peasant-tag-editor .tag-type-select:active,
 .peasant-tag-editor .tag-type-select:open {
   background: #333 !important;
-  border-color: var(--button-hover-border-color, #c9b183) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
   outline: none !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 /* Prevent Foundry/browser invalid/focus chrome from showing red on the notable tag select. */
@@ -8686,8 +7620,8 @@ gap: 8px !important;
 .window-app.peasant-core .peasant-tag-editor .tag-type-select:invalid:focus-visible,
 .peasant-tag-editor .tag-type-select:invalid:focus,
 .peasant-tag-editor .tag-type-select:invalid:focus-visible {
-  border-color: var(--button-hover-border-color, #c9b183) !important;
-  box-shadow: none !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .window-app.peasant-core .peasant-tag-editor .add-tag-section .form-group,
@@ -8728,8 +7662,8 @@ gap: 8px !important;
 .peasant-tag-editor .tag-input-area input[type="number"]:focus-visible,
 .peasant-tag-editor .tag-input-area input[type="text"]:focus-visible {
   background: #333 !important;
-  border-color: #c084fc !important;
-  box-shadow: 0 0 4px rgba(192, 132, 252, 0.4) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 /* Keep invalid text/number fields styled like the system purple focus state (no red). */
@@ -8741,8 +7675,8 @@ gap: 8px !important;
 .peasant-tag-editor .tag-input-area input[type="text"]:invalid,
 .peasant-tag-editor .tag-input-area input[type="number"]:user-invalid,
 .peasant-tag-editor .tag-input-area input[type="text"]:user-invalid {
-  border-color: #c084fc !important;
-  box-shadow: 0 0 4px rgba(192, 132, 252, 0.4) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
   outline: none !important;
 }
 
@@ -8768,20 +7702,20 @@ gap: 8px !important;
 .peasant-tag-editor .tag-input-area select:focus,
 .peasant-tag-editor .tag-input-area select:focus-visible {
   background: #333 !important;
-  border-color: #c084fc !important;
-  box-shadow: 0 0 4px rgba(192, 132, 252, 0.4) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 .window-app.peasant-core .peasant-tag-editor .tag-input-area select:invalid,
 .peasant-tag-editor .tag-input-area select:invalid {
-  border-color: #c084fc !important;
-  box-shadow: 0 0 4px rgba(192, 132, 252, 0.4) !important;
+  border-color: var(--pc-foundry-input-focus-border) !important;
+  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
   outline: none !important;
 }
 
 .window-app.peasant-core .peasant-tag-editor .pc-tag-description-placeholder,
 .peasant-tag-editor .pc-tag-description-placeholder {
-  background: var(--background) !important;
+  background: transparent !important;
   border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
   border-radius: 4px !important;
   color: var(--button-text-color, #e0e0e0) !important;
@@ -8817,7 +7751,7 @@ gap: 8px !important;
   padding: 15px;
   border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
   border-radius: 4px;
-  background: var(--background);
+  background: transparent;
 }
 
 .window-app.peasant-core .peasant-tag-editor .defense-section-label,
@@ -8936,7 +7870,7 @@ gap: 8px !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0 !important;
-  background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color, #9a8462) !important;
   color: var(--button-text-color, #e5cfaa) !important;
   border-radius: 4px !important;
@@ -9000,7 +7934,7 @@ gap: 8px !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0 !important;
-  background: var(--button-background-color) !important;
+  background: transparent !important;
   border: 1px solid var(--button-border-color) !important;
   color: var(--button-text-color) !important;
   border-radius: 4px !important;
@@ -9235,274 +8169,574 @@ gap: 8px !important;
   border-color: var(--button-hover-border-color, var(--pc-accent-border, #9f8475)) !important;
 }
 
-/* Hide drag-handle glyphs on popup windows (dragging still works) */
-.wounds-menu-handle::before,
-.damage-controls-handle::before,
-.heal-controls-handle::before,
-.stress-damage-controls-handle::before,
-.stress-heal-controls-handle::before,
-.blessing-menu-handle::before,
-.window-app.peasant-core .actor-sheet .wounds-menu-handle::before,
-.window-app.peasant-core .actor-sheet .damage-controls-handle::before,
-.window-app.peasant-core .actor-sheet .heal-controls-handle::before,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle::before,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle::before,
-.window-app.peasant-core .actor-sheet .blessing-menu-handle::before {
-  content: none !important;
-  display: none !important;
-}
-
 /* Read-only description popups: keep width bounded with heavy content */
 .window-app.pc-readonly-description-dialog,
-.app.dialog.pc-readonly-description-dialog {
+.pc-readonly-description-dialog {
   width: min(720px, 90vw) !important;
   max-width: 90vw !important;
 }
 
 .window-app.pc-readonly-description-dialog .window-content,
 .window-app.pc-readonly-description-dialog .dialog-content,
-.app.dialog.pc-readonly-description-dialog .window-content,
-.app.dialog.pc-readonly-description-dialog .dialog-content {
+.pc-readonly-description-dialog .window-content,
+.pc-readonly-description-dialog .dialog-content {
   overflow-x: hidden !important;
 }
 
 .window-app.pc-readonly-description-dialog .pc-readonly-description,
-.app.dialog.pc-readonly-description-dialog .pc-readonly-description {
+.pc-readonly-description-dialog .pc-readonly-description {
   max-height: 70vh !important;
   overflow-y: auto !important;
   overflow-x: auto !important;
 }
 
 .window-app.pc-readonly-description-dialog .pc-readonly-description *,
-.app.dialog.pc-readonly-description-dialog .pc-readonly-description * {
+.pc-readonly-description-dialog .pc-readonly-description * {
   max-width: 100% !important;
   box-sizing: border-box;
 }
 
 .window-app.pc-readonly-description-dialog .pc-readonly-description pre,
-.app.dialog.pc-readonly-description-dialog .pc-readonly-description pre,
+.pc-readonly-description-dialog .pc-readonly-description pre,
 .window-app.pc-readonly-description-dialog .pc-readonly-description code,
-.app.dialog.pc-readonly-description-dialog .pc-readonly-description code {
+.pc-readonly-description-dialog .pc-readonly-description code {
   white-space: pre-wrap !important;
   word-break: break-word !important;
   overflow-wrap: anywhere !important;
 }
 
-/* Final parity pass: popup headers (including Blessing) match the same style/behavior */
-.window-app.peasant-core .actor-sheet .wounds-menu,
-.window-app.peasant-core .actor-sheet .damage-controls,
-.window-app.peasant-core .actor-sheet .heal-controls,
-.window-app.peasant-core .actor-sheet .stress-damage-controls,
-.window-app.peasant-core .actor-sheet .stress-heal-controls,
-.window-app.peasant-core .actor-sheet .blessing-menu,
-.peasant-core .actor-sheet .wounds-menu,
-.peasant-core .actor-sheet .damage-controls,
-.peasant-core .actor-sheet .heal-controls,
-.peasant-core .actor-sheet .stress-damage-controls,
-.peasant-core .actor-sheet .stress-heal-controls,
-.peasant-core .actor-sheet .blessing-menu,
-.wounds-menu,
-.damage-controls,
-.heal-controls,
-.stress-damage-controls,
-.stress-heal-controls,
-.blessing-menu {
-  padding-top: calc(var(--header-height, 30px) + 8px) !important;
+/* Shared Foundry window body/actions for Peasant Core popups/dialogs */
+:root {
+  --pc-window-edge: var(--color-border, var(--color-cool-4, #302831));
+  --pc-window-radius: 6px;
 }
 
-.window-app.peasant-core .actor-sheet .wounds-menu-handle,
-.window-app.peasant-core .actor-sheet .damage-controls-handle,
-.window-app.peasant-core .actor-sheet .heal-controls-handle,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle,
-.window-app.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle,
-.peasant-core .actor-sheet .wounds-menu-handle,
-.peasant-core .actor-sheet .damage-controls-handle,
-.peasant-core .actor-sheet .heal-controls-handle,
-.peasant-core .actor-sheet .stress-damage-controls-handle,
-.peasant-core .actor-sheet .stress-heal-controls-handle,
-.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle,
-.wounds-menu-handle,
-.damage-controls-handle,
-.heal-controls-handle,
-.stress-damage-controls-handle,
-.stress-heal-controls-handle,
-.blessing-menu-handle {
-  background: var(--color-header-background) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-  height: var(--header-height, 30px) !important;
-  z-index: 40 !important;
+.pc-resource-dialog:not(.minimized, .minimizing, .maximizing),
+.peasant-macro-dialog:not(.minimized, .minimizing, .maximizing),
+.peasant-macro-dialog-force:not(.minimized, .minimizing, .maximizing) {
+  min-width: 320px;
+  min-height: 180px;
 }
 
-.window-app.peasant-core .actor-sheet .wounds-menu-handle .header-control,
-.window-app.peasant-core .actor-sheet .damage-controls-handle .header-control,
-.window-app.peasant-core .actor-sheet .heal-controls-handle .header-control,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle .header-control,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle .header-control,
-.window-app.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle .header-control,
-.peasant-core .actor-sheet .wounds-menu-handle .header-control,
-.peasant-core .actor-sheet .damage-controls-handle .header-control,
-.peasant-core .actor-sheet .heal-controls-handle .header-control,
-.peasant-core .actor-sheet .stress-damage-controls-handle .header-control,
-.peasant-core .actor-sheet .stress-heal-controls-handle .header-control,
-.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle .header-control,
-.wounds-menu-handle .header-control,
-.damage-controls-handle .header-control,
-.heal-controls-handle .header-control,
-.stress-damage-controls-handle .header-control,
-.stress-heal-controls-handle .header-control,
-.blessing-menu-handle .header-control {
-  border: 1px solid transparent !important;
-  border-radius: 3px !important;
+.pc-damage-dialog:not(.minimized, .minimizing, .maximizing),
+.pc-defense-prompt-dialog:not(.minimized, .minimizing, .maximizing),
+.pc-flexible-damage-dialog:not(.minimized, .minimizing, .maximizing),
+.pc-force-pass-dialog:not(.minimized, .minimizing, .maximizing),
+.pc-location-by-skill-dialog:not(.minimized, .minimizing, .maximizing),
+.pc-incoming-hit-dialog:not(.minimized, .minimizing, .maximizing) {
+  min-width: 360px;
+  min-height: 220px;
+}
+
+.pc-heal-dialog:not(.minimized, .minimizing, .maximizing),
+.pc-stress-dialog:not(.minimized, .minimizing, .maximizing),
+.pc-waiting-dialog:not(.minimized, .minimizing, .maximizing) {
+  min-width: 300px;
+  min-height: 160px;
+}
+
+.pc-blessing-dialog:not(.minimized, .minimizing, .maximizing) {
+  min-width: 320px;
+  min-height: 240px;
+}
+
+.pc-description-editor:not(.minimized, .minimizing, .maximizing) {
+  min-width: 520px;
+  min-height: 420px;
+}
+
+.pc-notable-combat-tag-editor:not(.minimized, .minimizing, .maximizing) {
+  min-width: 420px;
+  min-height: 360px;
+}
+
+.pc-readonly-description-dialog:not(.minimized, .minimizing, .maximizing) {
+  min-width: 480px;
+  min-height: 260px;
+}
+
+:is(
+  .pc-resource-dialog,
+  .pc-description-editor,
+  .pc-notable-combat-tag-editor,
+  .peasant-tag-editor,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force,
+  .window-app.macro-sheet,
+  #macro-config
+) {
+  background: var(--pc-sheet-surface) !important;
+  border: 1px solid var(--pc-window-edge) !important;
+  border-radius: var(--pc-window-radius) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.72) !important;
+  color: var(--color-light-1, #e0e0e0) !important;
+}
+
+:is(
+  .pc-resource-dialog,
+  .pc-description-editor,
+  .pc-notable-combat-tag-editor,
+  .peasant-tag-editor,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force,
+  .window-app.macro-sheet,
+  #macro-config
+) :is(.window-content, .dialog-content) {
   background: transparent !important;
-  color: var(--color-light-1) !important;
+  color: var(--color-light-1, #e0e0e0) !important;
 }
 
-.window-app.peasant-core .actor-sheet .wounds-menu-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .damage-controls-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .heal-controls-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle .header-control:hover,
-.window-app.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle .header-control:hover,
-.peasant-core .actor-sheet .wounds-menu-handle .header-control:hover,
-.peasant-core .actor-sheet .damage-controls-handle .header-control:hover,
-.peasant-core .actor-sheet .heal-controls-handle .header-control:hover,
-.peasant-core .actor-sheet .stress-damage-controls-handle .header-control:hover,
-.peasant-core .actor-sheet .stress-heal-controls-handle .header-control:hover,
-.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle .header-control:hover,
-.wounds-menu-handle .header-control:hover,
-.damage-controls-handle .header-control:hover,
-.heal-controls-handle .header-control:hover,
-.stress-damage-controls-handle .header-control:hover,
-.stress-heal-controls-handle .header-control:hover,
-.blessing-menu-handle .header-control:hover {
-  background: var(--color-warm-2, #c2483e) !important;
-  border-color: transparent !important;
-  color: var(--color-light-1, #fff) !important;
-}
-
-.window-app.peasant-core .actor-sheet .wounds-menu-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .damage-controls-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .heal-controls-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .stress-damage-controls-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .stress-heal-controls-handle .header-control:active,
-.window-app.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle .header-control:active,
-.peasant-core .actor-sheet .wounds-menu-handle .header-control:active,
-.peasant-core .actor-sheet .damage-controls-handle .header-control:active,
-.peasant-core .actor-sheet .heal-controls-handle .header-control:active,
-.peasant-core .actor-sheet .stress-damage-controls-handle .header-control:active,
-.peasant-core .actor-sheet .stress-heal-controls-handle .header-control:active,
-.peasant-core .actor-sheet .blessing-menu .blessing-menu-handle .header-control:active,
-.wounds-menu-handle .header-control:active,
-.damage-controls-handle .header-control:active,
-.heal-controls-handle .header-control:active,
-.stress-damage-controls-handle .header-control:active,
-.stress-heal-controls-handle .header-control:active,
-.blessing-menu-handle .header-control:active {
-  background: var(--color-warm-3, #7a251d) !important;
-  border-color: transparent !important;
-  color: var(--color-light-1, #fff) !important;
-}
-
-/* Popup description/tag editor headers: match wounds popup header styling. */
-.window-app.peasant-core .peasant-tag-editor .peasant-tag-header,
-.peasant-core .peasant-tag-editor .peasant-tag-header,
-.peasant-tag-editor .peasant-tag-header,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header,
-.peasant-core .peasant-skill-floating .peasant-desc-header,
-.peasant-skill-floating .peasant-desc-header {
+:is(
+  .pc-resource-dialog,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force
+) .window-content {
   display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+
+:is(
+  .pc-resource-dialog,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force
+) .dialog-form.standard-form {
+  display: flex !important;
+  flex-direction: column !important;
   flex-wrap: nowrap !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+:is(
+  .pc-resource-dialog,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force
+) .dialog-content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+:is(
+  .pc-resource-dialog .dialog-buttons,
+  .pc-description-editor .form-footer,
+  .pc-notable-combat-tag-editor .form-footer,
+  .peasant-tag-editor .form-footer,
+  .window-app.peasant-macro-dialog .dialog-buttons,
+  .peasant-macro-dialog .dialog-buttons,
+  .window-app.peasant-macro-dialog-force .dialog-buttons,
+  .peasant-macro-dialog-force .dialog-buttons,
+  .window-app.peasant-macro-dialog .form-footer,
+  .peasant-macro-dialog .form-footer,
+  .window-app.peasant-macro-dialog-force .form-footer,
+  .peasant-macro-dialog-force .form-footer,
+  .window-app.macro-sheet footer,
+  #macro-config footer
+) {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
-  justify-content: flex-start !important;
-  position: relative !important;
-  box-sizing: border-box !important;
-  height: var(--header-height, 30px) !important;
-  overflow: hidden !important;
-  padding: 0 0.5rem !important;
-  gap: 0.25rem !important;
-  z-index: 40 !important;
-  cursor: var(--cursor-grab, move) !important;
-  background: var(--color-header-background) !important;
-  font-size: var(--font-size-13) !important;
-  color: var(--color-light-1) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-  border-radius: 4px 4px 0 0 !important;
+  gap: 0.5rem !important;
+  margin-top: auto !important;
   flex: 0 0 auto !important;
-  margin: 0 !important;
 }
 
-.window-app.peasant-core .peasant-tag-editor .peasant-tag-header:active,
-.peasant-core .peasant-tag-editor .peasant-tag-header:active,
-.peasant-tag-editor .peasant-tag-header:active,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header:active,
-.peasant-core .peasant-skill-floating .peasant-desc-header:active,
-.peasant-skill-floating .peasant-desc-header:active {
-  cursor: var(--cursor-grab-down, move) !important;
+:is(
+  .pc-resource-dialog .dialog-buttons button,
+  .pc-description-editor .form-footer button,
+  .pc-notable-combat-tag-editor .form-footer button,
+  .peasant-tag-editor .form-footer button,
+  .window-app.peasant-macro-dialog .dialog-buttons button,
+  .peasant-macro-dialog .dialog-buttons button,
+  .window-app.peasant-macro-dialog-force .dialog-buttons button,
+  .peasant-macro-dialog-force .dialog-buttons button,
+  .window-app.peasant-macro-dialog .form-footer button,
+  .peasant-macro-dialog .form-footer button,
+  .window-app.peasant-macro-dialog-force .form-footer button,
+  .peasant-macro-dialog-force .form-footer button,
+  .window-app.macro-sheet footer button,
+  #macro-config footer button
+) {
+  --button-size: calc(1.25 * var(--input-height));
+  flex: 1 !important;
 }
 
-.window-app.peasant-core .peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control,
-.peasant-core .peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control,
-.peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control,
-.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control,
-.peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control,
-.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control,
-.peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control {
-  position: absolute !important;
-  top: 50% !important;
-  right: 0.5rem !important;
-  left: auto !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-  width: 1.5rem !important;
-  min-width: 1.5rem !important;
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
+.pc-resource-dialog .window-content {
+  padding: 12px !important;
+}
+
+.pc-resource-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.pc-resource-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--color-light-2, #d7c7ad);
+  font-weight: 700;
+}
+
+.pc-resource-form label span {
+  line-height: 1.2;
+}
+
+.pc-resource-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.pc-damage-grid {
+  grid-template-columns: minmax(92px, 1fr) 72px minmax(110px, 1fr);
+}
+
+.pc-heal-grid {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.pc-resource-form input[type="number"],
+.pc-resource-form select {
+  width: 100%;
+  min-height: 32px;
+}
+
+.pc-resource-checks,
+.pc-blessing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pc-resource-checks label,
+.pc-blessing-grid label {
+  flex-direction: row;
+  align-items: center;
+  min-height: 30px;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.pc-resource-single-field {
+  max-width: 100%;
+}
+
+.pc-wounds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pc-wound-tag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid var(--pc-accent-border-muted);
+  border-radius: 4px;
+  color: var(--color-light-2, #d7c7ad);
+  font-weight: 800;
+}
+
+.pc-wound-tag.tag-hover-active,
+.pc-wound-tag:focus-visible {
+  background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75));
+  border-color: var(--button-hover-border-color, #c9b183);
+  color: var(--button-hover-text-color, #f2dfbd);
+  outline: none;
+}
+
+.pc-remove-condition {
+  flex: 0 0 26px !important;
+  width: 26px !important;
+  height: 24px !important;
+  min-height: 24px !important;
   padding: 0 !important;
   margin: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: var(--font-size-14) !important;
-  line-height: 1 !important;
-  text-align: center !important;
-  border: 1px solid transparent !important;
-  border-radius: 3px !important;
-  background: transparent !important;
-  color: var(--color-light-1, #fff) !important;
+}
+
+.pc-remove-condition.tag-hover-active {
+  background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
+  border-color: var(--button-hover-border-color, #c9b183) !important;
+  color: var(--button-hover-text-color, #f2dfbd) !important;
+}
+
+.pc-resource-empty {
+  padding: 8px 4px;
+  color: var(--color-light-4, #a9a095);
+  font-style: italic;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .pc-damage-grid,
+  .pc-heal-grid,
+  .pc-resource-checks,
+  .pc-blessing-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Match Foundry's settings inputs: hover stays neutral, focus uses an inset outline. */
+:is(
+  .peasant-core,
+  .window-app.peasant-core,
+  .pc-resource-dialog,
+  .pc-description-editor,
+  .pc-notable-combat-tag-editor,
+  .peasant-tag-editor,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force,
+  .window-app.macro-sheet,
+  #macro-config,
+  .window-app.pc-defense-prompt-dialog,
+  .pc-defense-prompt-dialog,
+  .window-app.pc-force-pass-dialog,
+  .pc-force-pass-dialog,
+  .window-app.pc-location-by-skill-dialog,
+  .pc-location-by-skill-dialog,
+  .window-app.pc-incoming-hit-dialog,
+  .pc-incoming-hit-dialog
+) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .pc-input, .pc-select, .pc-textarea, .pc-macro-input) {
+  outline: 1px solid transparent !important;
+  outline-offset: -2px !important;
+  transition: outline-color 0.5s !important;
+}
+
+:is(
+  .peasant-core,
+  .window-app.peasant-core,
+  .pc-resource-dialog,
+  .pc-description-editor,
+  .pc-notable-combat-tag-editor,
+  .peasant-tag-editor,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force,
+  .window-app.macro-sheet,
+  #macro-config,
+  .window-app.pc-defense-prompt-dialog,
+  .pc-defense-prompt-dialog,
+  .window-app.pc-force-pass-dialog,
+  .pc-force-pass-dialog,
+  .window-app.pc-location-by-skill-dialog,
+  .pc-location-by-skill-dialog,
+  .window-app.pc-incoming-hit-dialog,
+  .pc-incoming-hit-dialog
+) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .pc-input, .pc-select, .pc-textarea, .pc-macro-input):hover:not(:focus):not(:focus-visible) {
+  background: var(--input-background-color, #2a2a2a) !important;
+  border-color: var(--input-border-color, #555) !important;
   box-shadow: none !important;
-  text-shadow: none !important;
-  z-index: 45 !important;
+  outline: 1px solid transparent !important;
+  outline-offset: -2px !important;
+  transition: outline-color 0.5s !important;
 }
 
-.window-app.peasant-core .peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control:hover,
-.peasant-core .peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control:hover,
-.peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control:hover,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control:hover,
-.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control:hover,
-.peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control:hover,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control:hover,
-.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control:hover,
-.peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control:hover {
-  background: var(--color-warm-2, #c2483e) !important;
-  border-color: transparent !important;
-  color: var(--color-light-1, #fff) !important;
+:is(
+  .peasant-core,
+  .window-app.peasant-core,
+  .pc-resource-dialog,
+  .pc-description-editor,
+  .pc-notable-combat-tag-editor,
+  .peasant-tag-editor,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force,
+  .window-app.macro-sheet,
+  #macro-config,
+  .window-app.pc-defense-prompt-dialog,
+  .pc-defense-prompt-dialog,
+  .window-app.pc-force-pass-dialog,
+  .pc-force-pass-dialog,
+  .window-app.pc-location-by-skill-dialog,
+  .pc-location-by-skill-dialog,
+  .window-app.pc-incoming-hit-dialog,
+  .pc-incoming-hit-dialog
+) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .pc-input, .pc-select, .pc-textarea, .pc-macro-input):is(:focus, :focus-visible) {
+  background: var(--input-background-color, #2a2a2a) !important;
+  border-color: var(--input-border-color, transparent) !important;
+  box-shadow: var(--input-box-shadow, none) !important;
+  outline: 2px solid var(--pc-foundry-input-focus-outline) !important;
+  outline-offset: -2px !important;
+  transition: outline-color 0.5s !important;
 }
 
-.window-app.peasant-core .peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control:active,
-.peasant-core .peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control:active,
-.peasant-tag-editor .peasant-tag-header .peasant-tag-close.header-control:active,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control:active,
-.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control:active,
-.peasant-skill-floating .peasant-desc-header .peasant-skill-close.header-control:active,
-.window-app.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control:active,
-.peasant-core .peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control:active,
-.peasant-skill-floating .peasant-desc-header .peasant-combat-close.header-control:active {
-  background: var(--color-warm-3, #7a251d) !important;
-  border-color: transparent !important;
-  color: var(--color-light-1, #fff) !important;
+:is(
+  .peasant-core,
+  .window-app.peasant-core,
+  .pc-resource-dialog,
+  .pc-description-editor,
+  .pc-notable-combat-tag-editor,
+  .peasant-tag-editor,
+  .window-app.peasant-macro-dialog,
+  .peasant-macro-dialog,
+  .window-app.peasant-macro-dialog-force,
+  .peasant-macro-dialog-force,
+  .window-app.macro-sheet,
+  #macro-config
+) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .pc-input, .pc-select, .pc-textarea, .pc-macro-input):invalid:not(:focus):not(:focus-visible) {
+  background: var(--input-background-color, #2a2a2a) !important;
+  border-color: var(--input-border-color, #555) !important;
+  box-shadow: none !important;
+  outline: 1px solid transparent !important;
+  outline-offset: -2px !important;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control,
+.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 82px;
+  height: 30px;
+  color: #f4ead7;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control:hover:not(:focus-within),
+.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control:hover:not(:focus-within) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control:focus-within,
+.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control:focus-within {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"],
+.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"] {
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 22px 0 6px !important;
+  text-align: right !important;
+  color: inherit !important;
+  background: var(--input-background-color, rgba(49, 40, 49, 0.88)) !important;
+  border: 1px solid var(--input-border-color, rgba(203, 191, 154, 0.72)) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  outline: 1px solid transparent !important;
+  outline-offset: -2px !important;
+  font-weight: 700 !important;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"]:hover,
+.window-app.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"]:invalid,
+.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"]:hover,
+.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"]:invalid {
+  background: var(--input-background-color, rgba(49, 40, 49, 0.88)) !important;
+  border: 1px solid var(--input-border-color, rgba(203, 191, 154, 0.72)) !important;
+  box-shadow: none !important;
+  outline: 1px solid transparent !important;
+  outline-offset: -2px !important;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"]:is(:focus, :focus-visible),
+.peasant-core .actor-sheet .pc-setting-control .pc-setting-number-suffix-control > input[type="number"]:is(:focus, :focus-visible) {
+  background: var(--input-background-color, #2a2a2a) !important;
+  border-color: var(--input-border-color, transparent) !important;
+  box-shadow: var(--input-box-shadow, none) !important;
+  outline: 2px solid var(--pc-foundry-input-focus-outline) !important;
+  outline-offset: -2px !important;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-number-suffix-control > input[type="number"]::-webkit-outer-spin-button,
+.window-app.peasant-core .actor-sheet .pc-setting-number-suffix-control > input[type="number"]::-webkit-inner-spin-button,
+.peasant-core .actor-sheet .pc-setting-number-suffix-control > input[type="number"]::-webkit-outer-spin-button,
+.peasant-core .actor-sheet .pc-setting-number-suffix-control > input[type="number"]::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-number-suffix-control > input[type="number"],
+.peasant-core .actor-sheet .pc-setting-number-suffix-control > input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.window-app.peasant-core .actor-sheet .pc-setting-number-suffix-control .pc-setting-number-suffix,
+.peasant-core .actor-sheet .pc-setting-number-suffix-control .pc-setting-number-suffix {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  padding: 0;
+  transform: translateY(-50%);
+  color: rgba(244, 234, 215, 0.58);
+  pointer-events: none;
+  user-select: none;
+}
+
+.pc-portrait-lozenge-input:hover:not(:focus):not(:focus-visible) {
+  background: var(--pc-sheet-surface) !important;
+  box-shadow: none !important;
+}
+
+.pc-portrait-lozenge-input:is(:focus, :focus-visible) {
+  background: var(--pc-sheet-surface) !important;
+  box-shadow: none !important;
+}
+
+.pc-portrait-hp-input:hover:not(:focus):not(:focus-visible),
+.pc-portrait-hp-input:is(:focus, :focus-visible),
+.pc-portrait-resource-max-input:hover:not(:focus):not(:focus-visible),
+.pc-portrait-resource-max-input:is(:focus, :focus-visible),
+.pc-portrait-resource-value-input:hover:not(:focus):not(:focus-visible),
+.pc-portrait-resource-value-input:is(:focus, :focus-visible),
+.combat-tag input[type="number"]:hover:not(:focus):not(:focus-visible),
+.combat-tag input[type="number"]:is(:focus, :focus-visible),
+.skill-uses-box .skill-uses-current:hover:not(:focus):not(:focus-visible),
+.skill-uses-box .skill-uses-current:is(:focus, :focus-visible),
+.combat-uses-box .combat-uses-current:hover:not(:focus):not(:focus-visible),
+.combat-uses-box .combat-uses-current:is(:focus, :focus-visible) {
+  background: transparent !important;
+}
+
+.pc-hex-attributes .pc-attr-hex-score-input:hover:not(:focus):not(:focus-visible) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.08)),
+    var(--pc-hex-face) !important;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.48) !important;
+}
+
+.pc-hex-attributes .pc-attr-hex-score-input:is(:focus, :focus-visible) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.08)),
+    var(--pc-hex-face) !important;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.48) !important;
 }
 
 /* Final seize-size lock: keep all combat tracker seize buttons identical */

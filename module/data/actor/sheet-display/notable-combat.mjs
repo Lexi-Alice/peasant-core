@@ -2,7 +2,7 @@ import {
   getCombatDefenseSummary,
   normalizeCombatDefense
 } from "../combat-defense.mjs";
-import { COMBAT_VIEW_TAG_TYPES, getCombatCustomTags } from "../combat-tags.mjs";
+import { COMBAT_VIEW_TAG_TYPES, getCombatCustomTags, getCombatMagnetismGrade } from "../combat-tags.mjs";
 import {
   COMBAT_HALT_BUFF_TYPE_COST,
   COMBAT_HALT_BUFF_TYPE_CUSTOM,
@@ -37,7 +37,7 @@ import {
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
-import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
+import { applyDieRate, formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
 export function prepareActorNotableCombatContext(data, actor) {
@@ -149,10 +149,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       modifiedDamageDice = damageResult.diceCount;
       modifiedDamageValue = damageResult.diceValue;
       modifiedDamageFlat = damageResult.flat + flatDamageMod;
-      damageDisplay = `${modifiedDamageDice}d${modifiedDamageValue}`;
-      if (modifiedDamageFlat !== 0) {
-        damageDisplay += modifiedDamageFlat > 0 ? `+${modifiedDamageFlat}` : `${modifiedDamageFlat}`;
-      }
+      damageDisplay = formatCombatDiceDisplay(modifiedDamageDice, modifiedDamageValue, modifiedDamageFlat);
       if (combat.damage.type) damageDisplay += ` ${combat.damage.type}`;
     }
 
@@ -172,10 +169,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       modifiedHealDice = healResult.diceCount;
       modifiedHealValue = healResult.diceValue;
       modifiedHealFlat = healResult.flat + flatDamageMod;
-      healDisplay = `${modifiedHealDice}d${modifiedHealValue}`;
-      if (modifiedHealFlat !== 0) {
-        healDisplay += modifiedHealFlat > 0 ? `+${modifiedHealFlat}` : `${modifiedHealFlat}`;
-      }
+      healDisplay = formatCombatDiceDisplay(modifiedHealDice, modifiedHealValue, modifiedHealFlat);
       if (combat.heal.type) healDisplay += ` ${combat.heal.type}`;
     }
 
@@ -195,10 +189,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       modifiedManifestDice = manifestResult.diceCount;
       modifiedManifestValue = manifestResult.diceValue;
       modifiedManifestFlat = manifestResult.flat + flatDamageMod;
-      manifestDisplay = `${modifiedManifestDice}d${modifiedManifestValue}`;
-      if (modifiedManifestFlat !== 0) {
-        manifestDisplay += modifiedManifestFlat > 0 ? `+${modifiedManifestFlat}` : `${modifiedManifestFlat}`;
-      }
+      manifestDisplay = formatCombatDiceDisplay(modifiedManifestDice, modifiedManifestValue, modifiedManifestFlat);
     }
 
     const hasTagUses = combat.tagUses && combat.tagUses.max > 0;
@@ -218,6 +209,9 @@ export function prepareActorNotableCombatContext(data, actor) {
     const hasDefense = defenseData.responses.length > 0;
     const hasReach = combat.reach > 0;
     const hasStability = !!combat.stability;
+    const hasOverkill = !!combat.overkill;
+    const magnetismGrade = getCombatMagnetismGrade(combat);
+    const hasMagnetism = magnetismGrade > 0;
     const hasStrengthen = !!combat.stability && !!combat.strengthen;
     const customTags = getCombatCustomTags(combat);
     const hasCustom = customTags.length > 0;
@@ -249,6 +243,8 @@ export function prepareActorNotableCombatContext(data, actor) {
       defense: { has: hasDefense, label: "Defense", value: defenseSummary },
       reach: { has: hasReach, label: "Reach", value: combat.reach },
       stability: { has: hasStability, label: "Stability", value: "" },
+      overkill: { has: hasOverkill, label: "Overkill", value: "" },
+      magnetism: { has: hasMagnetism, label: "Magnetism", value: `Grade ${magnetismGrade}` },
       strengthen: { has: hasStrengthen, label: "Strengthen", value: "" },
       custom: { has: hasCustom, tags: customTags },
       self: { has: combat.self, label: "Self", value: "" }
@@ -322,6 +318,9 @@ export function prepareActorNotableCombatContext(data, actor) {
       defenseData,
       defenseSummary,
       hasStability,
+      hasOverkill,
+      hasMagnetism,
+      magnetismGrade,
       hasStrengthen,
       hasResourceCosts,
       resourceCostsDisplay,
@@ -332,7 +331,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       activeTags,
       customTags,
       tagOrder: combat.tagOrder || [],
-      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasHeal || hasManifest || hasTagUses || hasSections || hasAoe || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
+      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasTagUses || hasSections || hasAoe || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
     };
   });
 }

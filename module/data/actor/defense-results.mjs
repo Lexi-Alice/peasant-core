@@ -16,7 +16,7 @@ export function getDefenseEffectivenessForTargeting(defenseData, targetingType) 
 export function getAccuracyPenaltyFromDefenseRoll(defenseData, targetingType, rollResult) {
   const effectiveness = getDefenseEffectivenessForTargeting(defenseData, targetingType);
   const mosPer = parseCombatDefenseMosPer(effectiveness?.mosPer);
-  const accuracyPenalty = Number.parseInt(effectiveness?.accuracyPenalty, 10) || 0;
+  const accuracyPenalty = Math.abs(Number.parseInt(effectiveness?.accuracyPenalty, 10) || 0);
   const totalMoS = Number(rollResult?.totalMoS);
 
   if (!Number.isFinite(totalMoS) || totalMoS <= 0 || mosPer <= 0 || accuracyPenalty === 0) {
@@ -83,5 +83,25 @@ export function isMageDefenseDamageRedirect(attackRoll, defensePromptResult) {
     && attackRoll?.rollResult?.failureDueToDefense
     && defense.block
     && defense.blockType === "Mage"
+  );
+}
+
+export function isShieldDefenseDamageBlock(attackRoll, defensePromptResult) {
+  const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
+  return !!(
+    defensePromptResult?.selection === "defense"
+    && attackRoll?.rollResult?.failureDueToDefense
+    && defense.block
+    && defense.blockType === "Shield"
+  );
+}
+
+export function isWeaponDefenseDamageBlock(attackRoll, defensePromptResult) {
+  const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
+  return !!(
+    defensePromptResult?.selection === "defense"
+    && attackRoll?.rollResult?.failureDueToDefense
+    && defense.block
+    && defense.blockType === "Weapon"
   );
 }

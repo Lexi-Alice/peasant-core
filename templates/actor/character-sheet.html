@@ -2,7 +2,7 @@
   <div class="character-header pc-character-banner{{#if hasCustomIdentitySelection}} has-custom-popovers{{/if}}">
     <div class="pc-banner-identity">
     {{#if @root.editable}}
-      <input type="text" name="name" value="{{actor.name}}" class="character-name pc-banner-name-input" placeholder="Character Name" />
+      <input type="text" name="name" value="{{actor.name}}" class="character-name pc-banner-name-input pc-input-plain" placeholder="Character Name" />
     {{else}}
       <div class="character-name pc-banner-title">{{actor.name}}</div>
     {{/if}}
@@ -10,7 +10,7 @@
     <div class="pc-banner-subtitle{{#if @root.editable}} is-editing{{/if}}">
     {{#if @root.editable}}
       <div class="character-field-popover">
-        <select name="system.race" class="character-field">
+        <select name="system.race" class="character-field pc-select">
           <option value="Human" {{#if (eq actor.system.race "Human")}} selected{{/if}}>Human</option>
           <option value="Eve" {{#if (eq actor.system.race "Eve")}} selected{{/if}}>Eve</option>
           <option value="Taru" {{#if (eq actor.system.race "Taru")}} selected{{/if}}>Taru</option>
@@ -23,7 +23,7 @@
           <option value="Custom" {{#if customRaceSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customRaceSelected}}
-          <input type="text" name="system.customRace" class="character-field-popover-input" value="{{actor.system.customRace}}" placeholder="Custom race" />
+          <input type="text" name="system.customRace" class="character-field-popover-input pc-input" value="{{actor.system.customRace}}" placeholder="Custom race" />
         {{/if}}
       </div>
     {{else}}
@@ -32,14 +32,14 @@
     
     {{#if @root.editable}}
       <div class="character-field-popover">
-        <select name="system.origin" class="character-field">
+        <select name="system.origin" class="character-field pc-select">
           {{#each originOptions as |origin|}}
             <option value="{{origin.value}}" {{#if origin.selected}}selected{{/if}}>{{origin.label}}</option>
           {{/each}}
           <option value="Custom" {{#if customOriginSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customOriginSelected}}
-          <input type="text" name="system.customOrigin" class="character-field-popover-input" value="{{actor.system.customOrigin}}" placeholder="Custom origin" />
+          <input type="text" name="system.customOrigin" class="character-field-popover-input pc-input" value="{{actor.system.customOrigin}}" placeholder="Custom origin" />
         {{/if}}
       </div>
     {{else}}
@@ -48,7 +48,7 @@
     
     {{#if @root.editable}}
       <div class="character-field-popover">
-        <select name="system.specificOrigin" class="character-field">
+        <select name="system.specificOrigin" class="character-field pc-select">
           <option value="Soldier" {{#if (eq actor.system.specificOrigin "Soldier")}} selected{{/if}}>Soldier</option>
           <option value="Merchant" {{#if (eq actor.system.specificOrigin "Merchant")}} selected{{/if}}>Merchant</option>
           <option value="Noble" {{#if (eq actor.system.specificOrigin "Noble")}} selected{{/if}}>Noble</option>
@@ -66,14 +66,10 @@
           <option value="Umbral Explorer" {{#if (eq actor.system.specificOrigin "Umbral Explorer")}} selected{{/if}}>Umbral Explorer</option>
           <option value="Bandit" {{#if (eq actor.system.specificOrigin "Bandit")}} selected{{/if}}>Bandit</option>
           <option value="Deprived" {{#if (eq actor.system.specificOrigin "Deprived")}} selected{{/if}}>Deprived</option>
-          <option value="Scholar" {{#if (eq actor.system.specificOrigin "Scholar")}} selected{{/if}}>Scholar</option>
-          <option value="Bureaucrat" {{#if (eq actor.system.specificOrigin "Bureaucrat")}} selected{{/if}}>Bureaucrat</option>
-          <option value="Engineer" {{#if (eq actor.system.specificOrigin "Engineer")}} selected{{/if}}>Engineer</option>
-          <option value="Priest" {{#if (eq actor.system.specificOrigin "Priest")}} selected{{/if}}>Priest</option>
           <option value="Custom" {{#if customSpecificOriginSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customSpecificOriginSelected}}
-          <input type="text" name="system.customSpecificOrigin" class="character-field-popover-input" value="{{actor.system.customSpecificOrigin}}" placeholder="Custom specific origin" />
+          <input type="text" name="system.customSpecificOrigin" class="character-field-popover-input pc-input" value="{{actor.system.customSpecificOrigin}}" placeholder="Custom specific origin" />
         {{/if}}
       </div>
     {{else}}
@@ -95,9 +91,9 @@
         <div class="pc-banner-ap-meter" role="meter" aria-label="Action points" aria-valuemin="0" aria-valuenow="{{apBar.value}}" aria-valuemax="{{apBar.max}}">
           <div class="pc-banner-ap-label{{#if @root.editable}} is-editing{{/if}}">
             {{#if @root.editable}}
-              <input type="number" name="system.ap.value" value="{{actor.system.ap.value}}" min="0" inputmode="numeric" class="pc-banner-ap-input" aria-label="Current AP">
+              <input type="number" name="system.ap.value" value="{{actor.system.ap.value}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" class="pc-banner-ap-input pc-input" aria-label="Current AP">
               <span>/</span>
-              <input type="number" name="system.ap.max" value="{{actor.system.ap.max}}" min="0" inputmode="numeric" class="pc-banner-ap-input" aria-label="Maximum AP">
+              <input type="number" name="system.ap.max" value="{{actor.system.ap.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" class="pc-banner-ap-input pc-input" aria-label="Maximum AP">
               <span>AP</span>
             {{else}}
               {{apBar.value}} / {{apBar.max}} AP
@@ -133,13 +129,13 @@
             {{#if @root.editable}}
               <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" aria-label="Initiative">
                 <span class="pc-portrait-lozenge-frame">
-                  <input type="text" data-field="system.initiative" class="pc-portrait-lozenge-input" value="{{actor.system.initiative}}" aria-label="Initiative">
+                  <input type="text" data-field="system.initiative" class="pc-portrait-lozenge-input pc-input" value="{{actor.system.initiative}}" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Initiative">
                 </span>
                 <span class="pc-portrait-lozenge-label">Initiative</span>
               </label>
               <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" title="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
                 <span class="pc-portrait-lozenge-frame">
-                  <input type="number" data-field="system.movement" class="pc-portrait-lozenge-input" value="{{actor.system.movement}}" min="0" inputmode="numeric" aria-label="Movement">
+                  <input type="number" data-field="system.movement" class="pc-portrait-lozenge-input pc-input" value="{{actor.system.movement}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Movement">
                 </span>
                 <span class="pc-portrait-lozenge-label">Movement</span>
               </label>
@@ -187,10 +183,10 @@
                 </span>
               </div>
               <label class="pc-portrait-hp-side pc-portrait-hp-temp" title="Temporary HP">
-                <input type="number" class="pc-portrait-hp-input pc-portrait-thp-input" value="{{#if hpBar.tempValue}}{{hpBar.tempValue}}{{/if}}" min="0" inputmode="numeric" placeholder="0" aria-label="Temporary HP">
+                <input type="number" class="pc-portrait-hp-input pc-portrait-thp-input pc-input" value="{{#if hpBar.tempValue}}{{hpBar.tempValue}}{{/if}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Temporary HP">
               </label>
               <label class="pc-portrait-hp-side pc-portrait-hp-bolstered" title="Bolstered HP max {{hpBar.bolsteredMax}}">
-                <input type="number" class="pc-portrait-hp-input pc-portrait-bhp-input" value="{{#if hpBar.bolsteredValue}}{{hpBar.bolsteredValue}}{{/if}}" min="0" max="{{hpBar.bolsteredMax}}" inputmode="numeric" placeholder="0" aria-label="Bolstered HP">
+                <input type="number" class="pc-portrait-hp-input pc-portrait-bhp-input pc-input" value="{{#if hpBar.bolsteredValue}}{{hpBar.bolsteredValue}}{{/if}}" min="0" max="{{hpBar.bolsteredMax}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Bolstered HP">
               </label>
             </div>
           </div>
@@ -217,7 +213,7 @@
                   </span>
                   {{#if @root.editable}}
                     <span class="pc-portrait-stress-max-edit">
-                      <input type="number" class="pc-portrait-stress-count-input" data-stress-type="physical" value="{{stressBars.physical.count}}" min="0" inputmode="numeric" aria-label="Physical stress columns">
+                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="physical" value="{{stressBars.physical.count}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Physical stress columns">
                     </span>
                   {{else}}
                     <span>{{stressBars.physical.totalSeverity}} / {{stressBars.physical.maxSeverity}}</span>
@@ -251,7 +247,7 @@
                   </span>
                   {{#if @root.editable}}
                     <span class="pc-portrait-stress-max-edit">
-                      <input type="number" class="pc-portrait-stress-count-input" data-stress-type="mental" value="{{stressBars.mental.count}}" min="0" inputmode="numeric" aria-label="Mental stress columns">
+                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="mental" value="{{stressBars.mental.count}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Mental stress columns">
                     </span>
                   {{else}}
                     <span>{{stressBars.mental.totalSeverity}} / {{stressBars.mental.maxSeverity}}</span>
@@ -287,7 +283,7 @@
                   </span>
                   {{#if @root.editable}}
                     <span class="pc-portrait-stress-max-edit">
-                      <input type="number" class="pc-portrait-stress-count-input" data-stress-type="general" value="{{stressBars.general.count}}" min="0" inputmode="numeric" aria-label="General stress columns">
+                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="general" value="{{stressBars.general.count}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="General stress columns">
                     </span>
                   {{else}}
                     <span>{{stressBars.general.totalSeverity}} / {{stressBars.general.maxSeverity}}</span>
@@ -321,9 +317,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.stamina.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input" data-resource="stamina" value="{{resourceBars.stamina.max}}" min="0" inputmode="numeric" aria-label="Stamina maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="stamina" value="{{resourceBars.stamina.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Stamina maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input" data-resource="stamina" value="{{resourceBars.stamina.value}}" min="0" max="{{resourceBars.stamina.max}}" inputmode="numeric" aria-label="Stamina current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="stamina" value="{{resourceBars.stamina.value}}" min="0" max="{{resourceBars.stamina.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Stamina current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -341,9 +337,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.attunement.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input" data-resource="attunement" value="{{resourceBars.attunement.max}}" min="0" inputmode="numeric" aria-label="Attunement maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="attunement" value="{{resourceBars.attunement.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Attunement maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input" data-resource="attunement" value="{{resourceBars.attunement.value}}" min="0" max="{{resourceBars.attunement.max}}" inputmode="numeric" aria-label="Attunement current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="attunement" value="{{resourceBars.attunement.value}}" min="0" max="{{resourceBars.attunement.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Attunement current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -365,9 +361,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.capacity.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input" data-resource="capacity" value="{{resourceBars.capacity.max}}" min="0" inputmode="numeric" aria-label="Capacity maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="capacity" value="{{resourceBars.capacity.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Capacity maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input" data-resource="capacity" value="{{resourceBars.capacity.value}}" min="0" max="{{resourceBars.capacity.max}}" inputmode="numeric" aria-label="Capacity current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="capacity" value="{{resourceBars.capacity.value}}" min="0" max="{{resourceBars.capacity.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Capacity current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -385,9 +381,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.edge.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input" data-resource="edge" value="{{resourceBars.edge.max}}" min="0" inputmode="numeric" aria-label="{{resourceBars.edge.label}} maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="edge" value="{{resourceBars.edge.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="{{resourceBars.edge.label}} maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input" data-resource="edge" value="{{resourceBars.edge.value}}" min="0" max="{{resourceBars.edge.max}}" inputmode="numeric" aria-label="{{resourceBars.edge.label}} current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="edge" value="{{resourceBars.edge.value}}" min="0" max="{{resourceBars.edge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="{{resourceBars.edge.label}} current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -407,7 +403,7 @@
               </div>
               {{#if @root.editable}}
                 <div style="display: flex; align-items: center; gap: 6px;">
-                  <input type="text" name="system.haltValues" value="{{actor.system.haltValues}}" class="halt-input">
+                  <input type="text" name="system.haltValues" value="{{actor.system.haltValues}}" class="halt-input pc-input">
                 </div>
               {{else}}
                 <span class="halt-value">{{#each haltDisplay as |part index|}}<span class="{{#if part.isHard}}hard-val{{/if}}">{{part.value}}</span>{{#unless @last}}/{{/unless}}{{/each}}</span>
@@ -424,7 +420,7 @@
                   <span style="margin-left: 2px;">:</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
-                  <input type="text" name="system.naturalHaltValues" value="{{actor.system.naturalHaltValues}}" class="halt-input">
+                  <input type="text" name="system.naturalHaltValues" value="{{actor.system.naturalHaltValues}}" class="halt-input pc-input">
                 </div>
               {{else}}
                 <div class="halt-label-group">
@@ -445,131 +441,12 @@
               </button>
               <span class="halt-title">Thresholds:</span>
               <span class="halt-value {{#if woundThresholdsReduced}}wounded-thresholds{{/if}}">{{woundThresholds}}</span>
-
-              <div class="wounds-menu hidden">
-                <div class="wounds-menu-handle window-header flexrow">
-                  <h4 class="window-title popup-handle-title">Active Wounds</h4>
-                  <button type="button" class="close-wounds header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
-                </div>
-
-                {{#if actor.system.conditions.wounded}}
-                  <div class="wound-tag">
-                    <span>WOUNDED</span>
-                    <button type="button" class="remove-condition" data-condition="wounded">&times;</button>
-                  </div>
-                {{/if}}
-
-                {{#each activeConditions as |cond|}}
-                  <div class="wound-tag">
-                    <span>{{cond.label}}</span>
-                    <button type="button" class="remove-condition" data-condition="{{cond.key}}">&times;</button>
-                  </div>
-                {{/each}}
-
-                {{#unless hasConditions}}
-                  <div class="no-active-wounds" style="font-style: italic; font-size: 11px; text-align: center; padding-top: 4px;">No active wounds</div>
-                {{/unless}}
-
-                <button type="button" class="add-wound-btn" title="Add Wound">
-                  <span style="font-size: 16px;">+</span>
-                </button>
-              </div>
             </div>
             {{/unless}}
           </div>
         </div>
       </div>
     </aside>
-    <div class="hp-grid-container">
-      <!-- HIDDEN DAMAGE CONTROLS -->
-      <div class="damage-controls hidden">
-          <div class="damage-controls-handle window-header flexrow">
-              <h4 class="window-title popup-handle-title">Take Damage</h4>
-              <button type="button" class="close-damage header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
-          </div>
-          
-          <div style="display: flex; gap: 5px; align-items: center; width: 100%; flex-wrap: nowrap;">
-              <select name="damageType" style="flex: 1; font-size: 11px; padding: 4px; min-width: 80px;">
-                  <option value="blunt">Blunt</option>
-                  <option value="hybrid">Hybrid</option>
-                  <option value="lethal">Lethal</option>
-                  <option value="critical">Critical</option>
-              </select>
-              <input type="number" name="damageAmount" value="5" min="1" style="flex: 0 0 50px; text-align: center;">
-              <select name="damageLocation" style="flex: 1; font-size: 11px; padding: 4px; min-width: 90px;">
-                  <option value="Head">Head</option>
-                  <option value="Torso" selected>Torso</option>
-                  <option value="RightArm">Right Arm</option>
-                  <option value="LeftArm">Left Arm</option>
-                  <option value="RightLeg">Right Leg</option>
-                  <option value="LeftLeg">Left Leg</option>
-              </select>
-          </div>
-
-          <div style="display: flex; gap: 15px; width: 100%; justify-content: center; margin-top: 4px;">
-              <label title="Ignore HALT and Hard Location (unless Natural)">
-                  <input type="checkbox" name="damageAP">
-                  Armor Pen?
-              </label>
-              <label title="Multiply armor HALT using the actor's Armor Charge multiplier">
-                  <input type="checkbox" name="damageArmorCharge">
-                  Armor Charge?
-              </label>
-          </div>
-
-          <button type="button" class="apply-damage">
-              Apply Damage
-          </button>
-      </div>
-      
-      <!-- HIDDEN HEALING CONTROLS -->
-      <div class="heal-controls hidden">
-          <div class="heal-controls-handle window-header flexrow">
-              <h4 class="window-title popup-handle-title">Heal Damage</h4>
-              <button type="button" class="close-heal header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
-          </div>
-          
-          <div style="display: flex; gap: 5px; align-items: center; width: 100%; flex-wrap: nowrap;">
-              <input type="number" name="healAmount" value="5" min="1" style="flex: 0 0 50px; text-align: center;">
-              <select name="healType" style="flex: 1; font-size: 11px; padding: 4px; min-width: 100px;">
-                  <option value="temporary">Temporary Heal</option>
-                  <option value="greater">Greater Heal</option>
-              </select>
-          </div>
-          
-          <button type="button" class="apply-heal">
-              Apply Healing
-          </button>
-      </div>
-      
-      <!-- HIDDEN STRESS DAMAGE CONTROLS -->
-      <div class="stress-damage-controls hidden">
-          <div class="stress-damage-controls-handle window-header flexrow">
-              <h4 class="window-title popup-handle-title stress-damage-title">Take Stress</h4>
-              <button type="button" class="close-stress-damage header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
-          </div>
-          
-          <input type="number" name="stressAmount" value="1" min="1">
-          
-          <button type="button" class="apply-stress-damage">
-              Apply Stress
-          </button>
-      </div>
-      
-      <!-- HIDDEN STRESS HEALING CONTROLS -->
-      <div class="stress-heal-controls hidden">
-          <div class="stress-heal-controls-handle window-header flexrow">
-              <h4 class="window-title popup-handle-title stress-heal-title">Heal Stress</h4>
-              <button type="button" class="close-stress-heal header-control icon fa-solid fa-xmark" title="Close" aria-label="Close"></button>
-          </div>
-          
-          <input type="number" name="stressHealAmount" value="1" min="1">
-          
-          <button type="button" class="apply-stress-heal">
-              Apply Stress Healing
-          </button>
-      </div>
-    </div>
   <!-- ATTRIBUTES TABLE -->
   <div class="attributes-resources-container">
     <div class="left-column">
@@ -580,7 +457,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" title="Click to open Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.build" value="{{actor.system.build}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Build score">
+                <input type="number" name="system.build" value="{{actor.system.build}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Build score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.build}}</div>
               {{/if}}
@@ -593,7 +470,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" title="Click to open Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.reflex" value="{{actor.system.reflex}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Reflex score">
+                <input type="number" name="system.reflex" value="{{actor.system.reflex}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Reflex score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.reflex}}</div>
               {{/if}}
@@ -602,7 +479,7 @@
               <button type="button" class="attr-save-clickable attr-reflex-save-primary" data-action="rollAttributeSave" data-save="reflex">{{attributes.reflexSave}}</button>
               {{#if @root.editable}}
                 {{#if reflexAoeSaveEnabled}}
-                  <input type="text" name="system.reflexAoeSaveTarget" value="{{reflexAoeSaveTarget}}" class="attr-input-text reflex-aoe-save-input" placeholder="AoE" inputmode="numeric" aria-label="AoE Reflex Save">
+                  <input type="text" name="system.reflexAoeSaveTarget" value="{{reflexAoeSaveTarget}}" class="attr-input-text reflex-aoe-save-input pc-input" placeholder="AoE" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="AoE Reflex Save">
                   <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-remove" title="Remove AoE Reflex Save">-</button>
                 {{else}}
                   <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-add" title="Add AoE Reflex Save">+</button>
@@ -622,7 +499,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" title="Click to open Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.intuition" value="{{actor.system.intuition}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Intuition score">
+                <input type="number" name="system.intuition" value="{{actor.system.intuition}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Intuition score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.intuition}}</div>
               {{/if}}
@@ -635,7 +512,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" title="Click to open Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.learn" value="{{actor.system.learn}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Learn score">
+                <input type="number" name="system.learn" value="{{actor.system.learn}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Learn score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.learn}}</div>
               {{/if}}
@@ -648,7 +525,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" title="Click to open Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.charisma" value="{{actor.system.charisma}}" class="attr-input pc-attr-hex-score-input" min="0" max="9" aria-label="Charisma score">
+                <input type="number" name="system.charisma" value="{{actor.system.charisma}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Charisma score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.charisma}}</div>
               {{/if}}
@@ -693,7 +570,5 @@
 
   {{> "systems/peasant-core/templates/actor/parts/character-inventory.html" }}
   {{> "systems/peasant-core/templates/actor/parts/character-settings.html" }}
-
-  {{> "systems/peasant-core/templates/actor/parts/character-blessing-menu.html" }}
 </div>
 

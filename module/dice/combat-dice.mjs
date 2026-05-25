@@ -9,17 +9,32 @@ export function parseCombatDiceValue(rawDiceValue, rawDiceBonus = 0) {
   return { diceValue, diceBonus: explicitBonus || embeddedBonus };
 }
 
-export function formatCombatDiceValue(rawDiceValue, rawDiceBonus = 0) {
+export function formatCombatDiceValue(rawDiceValue, rawDiceBonus = 0, { allowZero = false } = {}) {
   const { diceValue, diceBonus } = parseCombatDiceValue(rawDiceValue, rawDiceBonus);
-  if (diceValue <= 0) return "";
+  if (diceValue < 0 || (!allowZero && diceValue <= 0)) return "";
   return diceBonus > 0 ? `${diceValue}+${diceBonus}` : `${diceValue}`;
+}
+
+export function formatCombatDiceDisplay(rawDiceCount, rawDiceValue, rawFlat = 0, rawDiceBonus = 0) {
+  const diceCount = Number.parseInt(rawDiceCount, 10) || 0;
+  const { diceValue, diceBonus } = parseCombatDiceValue(rawDiceValue, rawDiceBonus);
+  const flat = Number.parseInt(rawFlat, 10) || 0;
+
+  if (diceCount <= 0 || diceValue <= 0) return `${flat + diceBonus}`;
+
+  let display = `${diceCount}d${formatCombatDiceValue(diceValue, diceBonus)}`;
+  if (flat !== 0) display += flat > 0 ? `+${flat}` : `${flat}`;
+  return display;
 }
 
 export function hasCombatDice(rollData) {
   if (!rollData) return false;
+  if (rollData.enabled) return true;
   const diceCount = Number.parseInt(rollData.diceCount, 10) || 0;
-  const { diceValue } = parseCombatDiceValue(rollData.diceValue, rollData.diceBonus);
-  return diceCount > 0 && diceValue > 0;
+  const { diceValue, diceBonus } = parseCombatDiceValue(rollData.diceValue, rollData.diceBonus);
+  const flat = Number.parseInt(rollData.flat, 10) || 0;
+  const type = String(rollData.type ?? "").trim();
+  return diceCount > 0 || diceValue > 0 || diceBonus > 0 || flat !== 0 || !!type;
 }
 
 /**

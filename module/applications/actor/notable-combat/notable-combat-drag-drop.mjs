@@ -1,200 +1,174 @@
+import { delegate, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
 export function setupNotableCombatDragDropControls(sheet, html, { sheetDocument } = {}) {
-  const doc = sheetDocument ?? sheet?._getElementDocument?.(html?.[0]) ?? document;
+  const root = toElement(html);
+  if (!root) return;
 
-  setupCombatTagDragDrop(sheet, html);
-  setupCombatRowDragDrop(sheet, html, doc);
+  const doc = sheetDocument ?? sheet?._getElementDocument?.(root) ?? root.ownerDocument ?? document;
+
+  setupCombatTagDragDrop(sheet, root);
+  setupCombatRowDragDrop(sheet, root, doc);
 }
 
-export function setupNotableCombatTagEditorDrag(sheet, $container, combatIndex, { onChanged } = {}) {
-  const $list = $container.find(".current-tags-list");
+export function setupNotableCombatTagEditorDrag(sheet, container, combatIndex, { onChanged } = {}) {
+  const root = toElement(container);
+  const list = root?.querySelector(".current-tags-list");
+  if (!list) return;
+
   let draggedTag = null;
 
-  $list.find(".editor-tag-draggable").each((_, el) => {
-    const $el = $(el);
+  for (const tag of qsa(list, ".editor-tag-draggable")) {
+    tag.addEventListener("dragstart", (event) => {
+      if (tag.dataset.removePressed === "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (event.target?.closest?.(".remove-tag-btn")) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
 
-    $el.on("dragstart", (e) => {
-      if ($el.attr("data-remove-pressed") === "true") {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
+      draggedTag = tag;
+      tag.classList.add("dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", tag.dataset.tagKey || tag.dataset.tagType || "");
       }
-      if ($(e.target).closest(".remove-tag-btn").length) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-      draggedTag = $el[0];
-      $el.addClass("dragging");
-      e.originalEvent.dataTransfer.effectAllowed = "move";
-      e.originalEvent.dataTransfer.setData("text/plain", $el.data("tag-key") || $el.data("tag-type"));
     });
 
-    $el.on("dragend", () => {
-      $el.removeClass("dragging");
-      $list.find(".editor-tag-draggable").removeClass("drag-over-left drag-over-right dragging");
+    tag.addEventListener("dragend", () => {
+      tag.classList.remove("dragging");
+      clearDragMarkers(list, ".editor-tag-draggable", "drag-over-left", "drag-over-right", "dragging");
       draggedTag = null;
     });
 
-    $el.on("dragover", (e) => {
-      e.preventDefault();
-      e.originalEvent.dataTransfer.dropEffect = "move";
-      if (draggedTag && draggedTag !== $el[0]) {
-        const rect = $el[0].getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        if (e.originalEvent.clientX < midX) {
-          $el.addClass("drag-over-left").removeClass("drag-over-right");
-        } else {
-          $el.addClass("drag-over-right").removeClass("drag-over-left");
-        }
-      }
+    tag.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      if (!draggedTag || draggedTag === tag) return;
+
+      const rect = tag.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      clearDragMarkers(list, ".editor-tag-draggable", "drag-over-left", "drag-over-right");
+      tag.classList.toggle("drag-over-left", event.clientX < midX);
+      tag.classList.toggle("drag-over-right", event.clientX >= midX);
     });
 
-    $el.on("dragleave", () => {
-      $el.removeClass("drag-over-left drag-over-right");
+    tag.addEventListener("dragleave", () => {
+      tag.classList.remove("drag-over-left", "drag-over-right");
     });
 
-    $el.on("drop", async (e) => {
-      e.preventDefault();
-      $el.removeClass("drag-over-left drag-over-right");
+    tag.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      tag.classList.remove("drag-over-left", "drag-over-right");
 
-      if (!draggedTag || draggedTag === $el[0]) return;
+      if (!draggedTag || draggedTag === tag) return;
 
-      const draggedType = $(draggedTag).data("tag-type");
-      const draggedKey = String($(draggedTag).data("tag-key") || draggedType || "");
-      const draggedRawCustomIndex = $(draggedTag).data("custom-index");
-      const draggedCustomIndex = Number.isInteger(draggedRawCustomIndex) ? draggedRawCustomIndex : parseInt(draggedRawCustomIndex, 10);
-      const targetType = $el.data("tag-type");
-      const targetKey = String($el.data("tag-key") || targetType || "");
-      const targetRawCustomIndex = $el.data("custom-index");
-      const targetCustomIndex = Number.isInteger(targetRawCustomIndex) ? targetRawCustomIndex : parseInt(targetRawCustomIndex, 10);
-      if (!draggedType || !targetType || !draggedKey || !targetKey || draggedKey === targetKey) return;
+      const dragged = getTagDescriptor(draggedTag);
+      const target = getTagDescriptor(tag);
+      if (!dragged.type || !target.type || !dragged.key || !target.key || dragged.key === target.key) return;
 
-      if (draggedType === "custom" && targetType === "custom" && !Number.isNaN(draggedCustomIndex) && !Number.isNaN(targetCustomIndex)) {
-        const rect = $el[0].getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        const result = await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIndex, draggedCustomIndex, targetCustomIndex, {
-          insertAfter: e.originalEvent.clientX >= midX
-        });
+      const insertAfter = isDropAfter(tag, event.clientX);
+      if (dragged.type === "custom" && target.type === "custom" && !Number.isNaN(dragged.customIndex) && !Number.isNaN(target.customIndex)) {
+        const result = await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIndex, dragged.customIndex, target.customIndex, { insertAfter });
         if (result?.changed) onChanged?.();
         return;
       }
 
-      const rect = $el[0].getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      const result = await sheet.actor.reorderPeasantNotableCombatTag?.(combatIndex, draggedType, targetType, {
-        insertAfter: e.originalEvent.clientX >= midX
-      });
+      const result = await sheet.actor.reorderPeasantNotableCombatTag?.(combatIndex, dragged.type, target.type, { insertAfter });
       if (result?.changed) onChanged?.();
     });
-  });
+  }
 }
 
-function setupCombatTagDragDrop(sheet, html) {
-  html.on("dragstart", ".combat-tag-draggable", (ev) => {
+function setupCombatTagDragDrop(sheet, root) {
+  delegate(root, "dragstart", ".combat-tag-draggable", (event, tag) => {
     try {
-      const $el = $(ev.currentTarget);
-      const tagType = $el.data("tag-type");
-      const rawCustomIndex = $el.data("custom-index");
-      const customIndex = Number.isInteger(rawCustomIndex) ? rawCustomIndex : parseInt(rawCustomIndex, 10);
-      const tagKey = String($el.data("tag-key") || (tagType === "custom" && !Number.isNaN(customIndex) ? `custom:${customIndex}` : String(tagType || "")));
-      const container = $el.closest(".combat-tags-inline");
-      const combatIdx = parseInt(container.attr("data-combat-index"));
+      const tagData = getTagDescriptor(tag);
+      const container = tag.closest(".combat-tags-inline");
+      const combatIndex = Number.parseInt(container?.dataset.combatIndex, 10);
 
-      if (!tagType || !tagKey || Number.isNaN(combatIdx)) return;
+      if (!tagData.type || !tagData.key || Number.isNaN(combatIndex)) return;
 
-      $el.addClass("dragging");
-      ev.originalEvent.dataTransfer.effectAllowed = "move";
-      ev.originalEvent.dataTransfer.setData("text/plain", `tag:${combatIdx}:${tagKey}`);
+      tag.classList.add("dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", `tag:${combatIndex}:${tagData.key}`);
+      }
 
-      sheet._tagDragState = { combatIndex: combatIdx, tagType, tagKey, customIndex: Number.isNaN(customIndex) ? -1 : customIndex };
+      sheet._tagDragState = {
+        combatIndex,
+        tagType: tagData.type,
+        tagKey: tagData.key,
+        customIndex: Number.isNaN(tagData.customIndex) ? -1 : tagData.customIndex
+      };
     } catch (e) {
       pcLog.debug("tag dragstart failed", e);
     }
   });
 
-  html.on("dragend", ".combat-tag-draggable", (ev) => {
+  delegate(root, "dragend", ".combat-tag-draggable", (event, tag) => {
     try {
-      $(ev.currentTarget).removeClass("dragging");
-      html.find(".combat-tag-draggable").removeClass("drag-over-left drag-over-right");
+      tag.classList.remove("dragging");
+      clearDragMarkers(root, ".combat-tag-draggable", "drag-over-left", "drag-over-right");
       sheet._tagDragState = null;
     } catch (e) {}
   });
 
-  html.on("dragover", ".combat-tag-draggable", (ev) => {
+  delegate(root, "dragover", ".combat-tag-draggable", (event, tag) => {
     try {
-      ev.preventDefault();
-      ev.originalEvent.dataTransfer.dropEffect = "move";
-
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
       if (!sheet._tagDragState) return;
 
-      const $el = $(ev.currentTarget);
-      const container = $el.closest(".combat-tags-inline");
-      const combatIdx = parseInt(container.attr("data-combat-index"));
+      const container = tag.closest(".combat-tags-inline");
+      const combatIndex = Number.parseInt(container?.dataset.combatIndex, 10);
+      if (combatIndex !== sheet._tagDragState.combatIndex) return;
 
-      if (combatIdx !== sheet._tagDragState.combatIndex) return;
-      const targetRawCustomIndex = $el.data("custom-index");
-      const targetCustomIndex = Number.isInteger(targetRawCustomIndex) ? targetRawCustomIndex : parseInt(targetRawCustomIndex, 10);
-      const targetType = $el.data("tag-type");
-      const targetKey = String($el.data("tag-key") || (targetType === "custom" && !Number.isNaN(targetCustomIndex) ? `custom:${targetCustomIndex}` : String(targetType || "")));
-      if (targetKey === sheet._tagDragState.tagKey) return;
+      const target = getTagDescriptor(tag);
+      if (target.key === sheet._tagDragState.tagKey) return;
 
-      const rect = ev.currentTarget.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      html.find(".combat-tag-draggable").removeClass("drag-over-left drag-over-right");
-
-      if (ev.originalEvent.clientX < midX) {
-        $el.addClass("drag-over-left");
-      } else {
-        $el.addClass("drag-over-right");
-      }
+      clearDragMarkers(root, ".combat-tag-draggable", "drag-over-left", "drag-over-right");
+      tag.classList.toggle("drag-over-left", !isDropAfter(tag, event.clientX));
+      tag.classList.toggle("drag-over-right", isDropAfter(tag, event.clientX));
     } catch (e) {}
   });
 
-  html.on("dragleave", ".combat-tag-draggable", (ev) => {
-    $(ev.currentTarget).removeClass("drag-over-left drag-over-right");
+  delegate(root, "dragleave", ".combat-tag-draggable", (event, tag) => {
+    tag.classList.remove("drag-over-left", "drag-over-right");
   });
 
-  html.on("drop", ".combat-tag-draggable", async (ev) => {
+  delegate(root, "drop", ".combat-tag-draggable", async (event, tag) => {
     try {
-      ev.preventDefault();
-      html.find(".combat-tag-draggable").removeClass("drag-over-left drag-over-right");
+      event.preventDefault();
+      clearDragMarkers(root, ".combat-tag-draggable", "drag-over-left", "drag-over-right");
 
       if (!sheet._tagDragState) return;
 
-      const $el = $(ev.currentTarget);
-      const container = $el.closest(".combat-tags-inline");
-      const combatIdx = parseInt(container.attr("data-combat-index"));
-      const targetType = $el.data("tag-type");
-      const draggedType = sheet._tagDragState.tagType;
-      const draggedKey = sheet._tagDragState.tagKey;
-      const draggedCustomIndex = sheet._tagDragState.customIndex;
-      const targetRawCustomIndex = $el.data("custom-index");
-      const targetCustomIndex = Number.isInteger(targetRawCustomIndex) ? targetRawCustomIndex : parseInt(targetRawCustomIndex, 10);
-      const targetKey = String($el.data("tag-key") || (targetType === "custom" && !Number.isNaN(targetCustomIndex) ? `custom:${targetCustomIndex}` : String(targetType || "")));
+      const container = tag.closest(".combat-tags-inline");
+      const combatIndex = Number.parseInt(container?.dataset.combatIndex, 10);
+      const target = getTagDescriptor(tag);
+      const { tagType: draggedType, tagKey: draggedKey, customIndex: draggedCustomIndex } = sheet._tagDragState;
 
-      if (combatIdx !== sheet._tagDragState.combatIndex) return;
-      if (targetKey === draggedKey) return;
+      if (combatIndex !== sheet._tagDragState.combatIndex) return;
+      if (target.key === draggedKey) return;
 
-      if (draggedType === "custom" && targetType === "custom" && !Number.isNaN(draggedCustomIndex) && !Number.isNaN(targetCustomIndex)) {
-        const rect = ev.currentTarget.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        const result = await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIdx, draggedCustomIndex, targetCustomIndex, {
-          insertAfter: ev.originalEvent.clientX >= midX,
+      const insertAfter = isDropAfter(tag, event.clientX);
+      if (draggedType === "custom" && target.type === "custom" && !Number.isNaN(draggedCustomIndex) && !Number.isNaN(target.customIndex)) {
+        const result = await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIndex, draggedCustomIndex, target.customIndex, {
+          insertAfter,
           render: false
         });
-        if (result?.changed) {
-          sheet.render(false);
-        }
+        if (result?.changed) sheet.render(false);
         sheet._tagDragState = null;
         return;
       }
 
-      const rect = ev.currentTarget.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      const result = await sheet.actor.reorderPeasantNotableCombatTag?.(combatIdx, draggedType, targetType, {
-        insertAfter: ev.originalEvent.clientX >= midX,
+      const result = await sheet.actor.reorderPeasantNotableCombatTag?.(combatIndex, draggedType, target.type, {
+        insertAfter,
         render: false
       });
       if (result?.changed) sheet.render(false);
@@ -206,89 +180,67 @@ function setupCombatTagDragDrop(sheet, html) {
   });
 }
 
-function setupCombatRowDragDrop(sheet, html, sheetDocument) {
-  html.on("dragstart", ".notable-combats-list .combat-item", (ev) => {
+function setupCombatRowDragDrop(sheet, root, sheetDocument) {
+  delegate(root, "dragstart", ".notable-combats-list .combat-item", (event, item) => {
     try {
-      const el = $(ev.currentTarget);
-      let index = parseInt(el.attr("data-combat-index"));
-      if (Number.isNaN(index)) index = el.index();
+      const index = resolveElementIndex(item, "data-combat-index");
       if (Number.isNaN(index)) return;
-      const dt = ev.originalEvent.dataTransfer;
-      if (dt) {
-        dt.effectAllowed = "move";
-        dt.setData("text/plain", `combat:${index}`);
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", `combat:${index}`);
       }
-      el.addClass("dragging");
+      item.classList.add("dragging");
       sheet._combatDragState = { fromIndex: index };
     } catch (e) {
       pcLog.debug("combat dragstart failed", e);
     }
   });
 
-  html.on("dragend", ".notable-combats-list .combat-item", (ev) => {
+  delegate(root, "dragend", ".notable-combats-list .combat-item", (event, item) => {
     try {
-      $(ev.currentTarget).removeClass("dragging");
+      item.classList.remove("dragging");
       sheet._combatDragState = null;
-      getSheetJQ(sheet).find(".notable-combats-list .combat-item").removeClass("drag-over-top drag-over-bottom");
+      clearDragMarkers(root, ".notable-combats-list .combat-item", "drag-over-top", "drag-over-bottom");
     } catch (e) {}
   });
 
-  html.on("dragover", ".notable-combats-list, .notable-combats-list .combat-item", (ev) => {
+  delegate(root, "dragover", ".notable-combats-list, .notable-combats-list .combat-item", (event) => {
     try {
-      ev.preventDefault();
-      const dt = ev.originalEvent.dataTransfer;
-      if (dt) dt.dropEffect = "move";
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
 
-      const x = ev.originalEvent.clientX;
-      const y = ev.originalEvent.clientY;
-      const el = sheetDocument.elementFromPoint(x, y);
+      const el = sheetDocument.elementFromPoint(event.clientX, event.clientY);
       if (!el) return;
-      const $closest = $(el).closest(".notable-combats-list .combat-item");
-      const items = getSheetJQ(sheet).find(".notable-combats-list .combat-item");
-      items.removeClass("drag-over-top drag-over-bottom");
+      const closest = el.closest?.(".notable-combats-list .combat-item");
+      const items = getCombatItems(root);
+      clearDragMarkers(root, ".notable-combats-list .combat-item", "drag-over-top", "drag-over-bottom");
 
       if (!sheet._combatDragState) return;
-      let toIndex;
-      if ($closest.length) {
-        toIndex = parseInt($closest.attr("data-combat-index"));
-        if (Number.isNaN(toIndex)) toIndex = $closest.index();
-      } else {
-        toIndex = items.length;
-      }
+      const toIndex = closest ? resolveElementIndex(closest, "data-combat-index") : items.length;
       if (Number.isNaN(toIndex)) return;
 
       const fromIndex = sheet._combatDragState.fromIndex;
       if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) return;
 
-      if (toIndex >= items.length) {
-        if (items.length) items.last().addClass("drag-over-bottom");
-      } else {
-        items.eq(toIndex).addClass("drag-over-top");
-      }
+      markVerticalDropTarget(items, toIndex);
     } catch (e) {}
   });
 
-  html.on("dragleave", ".notable-combats-list", () => {
-    try { getSheetJQ(sheet).find(".notable-combats-list .combat-item").removeClass("drag-over-top drag-over-bottom"); } catch (e) {}
+  delegate(root, "dragleave", ".notable-combats-list", () => {
+    try { clearDragMarkers(root, ".notable-combats-list .combat-item", "drag-over-top", "drag-over-bottom"); } catch (e) {}
   });
 
-  html.on("drop", ".notable-combats-list, .notable-combats-list .combat-item", async (ev) => {
+  delegate(root, "drop", ".notable-combats-list, .notable-combats-list .combat-item", async (event) => {
     try {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const data = ev.originalEvent.dataTransfer.getData("text/plain");
+      event.preventDefault();
+      event.stopPropagation();
+      const data = event.dataTransfer?.getData("text/plain") ?? "";
       if (!data.startsWith("combat:")) return;
-      const fromIndex = parseInt(data.replace("combat:", ""));
+      const fromIndex = Number.parseInt(data.replace("combat:", ""), 10);
       if (Number.isNaN(fromIndex)) return;
 
-      const dropTarget = $(ev.target).closest(".combat-item");
-      let toIndex = null;
-      if (dropTarget.length) {
-        toIndex = parseInt(dropTarget.attr("data-combat-index"));
-        if (Number.isNaN(toIndex)) toIndex = dropTarget.index();
-      } else {
-        toIndex = html.find(".notable-combats-list .combat-item").length;
-      }
+      const dropTarget = event.target?.closest?.(".combat-item");
+      const toIndex = dropTarget ? resolveElementIndex(dropTarget, "data-combat-index") : getCombatItems(root).length;
       if (Number.isNaN(toIndex)) return;
 
       sheet._combatDragState = null;
@@ -300,12 +252,37 @@ function setupCombatRowDragDrop(sheet, html, sheetDocument) {
   });
 }
 
-function getSheetJQ(sheet) {
-  try {
-    const jq = sheet?._getSheetJQ?.();
-    if (jq?.length) return jq;
-  } catch (e) {
-    /* ignore */
-  }
-  return sheet?.element ?? $();
+function getCombatItems(root) {
+  return qsa(root, ".notable-combats-list .combat-item");
+}
+
+function clearDragMarkers(root, selector, ...classes) {
+  for (const item of qsa(root, selector)) item.classList.remove(...classes);
+}
+
+function markVerticalDropTarget(items, toIndex) {
+  if (!items.length) return;
+  if (toIndex >= items.length) items[items.length - 1].classList.add("drag-over-bottom");
+  else items[toIndex]?.classList.add("drag-over-top");
+}
+
+function resolveElementIndex(element, attr) {
+  const el = toElement(element);
+  let index = Number.parseInt(el?.getAttribute(attr), 10);
+  if (Number.isNaN(index) && el?.parentElement) index = Array.from(el.parentElement.children).indexOf(el);
+  return index;
+}
+
+function getTagDescriptor(tag) {
+  const type = tag?.dataset?.tagType;
+  const rawCustomIndex = tag?.dataset?.customIndex;
+  const customIndex = Number.isInteger(rawCustomIndex) ? rawCustomIndex : Number.parseInt(rawCustomIndex, 10);
+  const key = String(tag?.dataset?.tagKey || (type === "custom" && !Number.isNaN(customIndex) ? `custom:${customIndex}` : String(type || "")));
+  return { type, key, customIndex };
+}
+
+function isDropAfter(element, clientX) {
+  const rect = element.getBoundingClientRect();
+  const midX = rect.left + rect.width / 2;
+  return clientX >= midX;
 }

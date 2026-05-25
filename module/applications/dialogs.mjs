@@ -1,8 +1,9 @@
 function getApplicationElement(appOrElement) {
   if (!appOrElement) return null;
-  if (appOrElement instanceof HTMLElement) return appOrElement;
-  if (appOrElement?.element instanceof HTMLElement) return appOrElement.element;
-  if (appOrElement?.element?.[0] instanceof HTMLElement) return appOrElement.element[0];
+  if (appOrElement?.nodeType === 1 && typeof appOrElement.querySelector === "function") return appOrElement;
+  if (appOrElement?.element?.nodeType === 1 && typeof appOrElement.element.querySelector === "function") return appOrElement.element;
+  if (appOrElement?.element?.[0]?.nodeType === 1 && typeof appOrElement.element[0].querySelector === "function") return appOrElement.element[0];
+  if (appOrElement?.[0]?.nodeType === 1 && typeof appOrElement[0].querySelector === "function") return appOrElement[0];
   return null;
 }
 
@@ -16,11 +17,11 @@ function normalizeDialogIcon(icon) {
     .replace(/\bfab\b/g, "fa-brands");
 }
 
-export function renderDialogCompat(data, options = {}) {
+export function renderDialogV2(data, options = {}) {
   const DialogV2Class = foundry?.applications?.api?.DialogV2;
 
   if (!DialogV2Class) {
-    throw new Error(options?.missingDialogMessage || "Peasant Core requires Foundry's DialogV2.");
+    throw new Error("Peasant Core requires Foundry's DialogV2.");
   }
 
   const configuredButtons = Object.entries(data?.buttons ?? {}).map(([action, button]) => ({
@@ -32,7 +33,7 @@ export function renderDialogCompat(data, options = {}) {
     callback: async (event, buttonEl, dialogApp) => {
       if (typeof button?.callback !== "function") return action;
       const dialogElement = getApplicationElement(dialogApp)
-        ?? buttonEl?.closest?.(".window-app, .application")
+        ?? buttonEl?.closest?.(".application, dialog")
         ?? null;
       const jq = dialogElement ? $(dialogElement) : $(buttonEl?.form ?? buttonEl);
       return button.callback(jq);
@@ -69,17 +70,19 @@ export function renderDialogCompat(data, options = {}) {
   if (options?.window) {
     renderOptions.window = { ...(options.window ?? {}), ...(renderOptions.window ?? {}) };
   }
-  dialog.render(renderOptions);
-
   const runRender = () => {
     const dialogElement = getApplicationElement(dialog);
     if (!dialogElement) return;
     const jq = $(dialogElement);
-    if (classes.length) jq.addClass(classes.join(" "));
     if (typeof data?.render === "function") data.render(jq);
   };
 
-  setTimeout(runRender, 0);
-  setTimeout(runRender, 40);
+  const renderPromise = typeof options?.parent?.renderChild === "function"
+    ? options.parent.renderChild(dialog, renderOptions)
+    : dialog.render(renderOptions);
+
+  Promise.resolve(renderPromise)
+    .then(runRender)
+    .catch((err) => console.error("Peasant Core | Failed to render DialogV2.", err));
   return dialog;
 }

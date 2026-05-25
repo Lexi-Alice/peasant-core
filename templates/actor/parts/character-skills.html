@@ -28,11 +28,11 @@
               <div style="flex: 0 0 24px; text-align: center; display: flex; align-items: center; justify-content: center;">
                 <input type="checkbox" class="skill-sig-checkbox" {{#if skill.sig}}checked{{/if}} data-field="sig" title="Sig?">
               </div>
-              <input type="number" value="{{skill.class}}" class="skill-input skill-class" min="1" max="10" placeholder="C" data-field="class" style="flex: 0 0 30px;">
-              <input type="text" value="{{skill.rank}}" class="skill-input skill-rank" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" title="Enter 0-4 or 'U' for untrained">
+              <input type="number" value="{{skill.class}}" class="skill-input skill-class pc-input" min="1" max="10" placeholder="C" data-field="class" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px;">
+              <input type="text" value="{{skill.rank}}" class="skill-input skill-rank pc-input" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" title="Enter 0-4 or 'U' for untrained">
               <button type="button" class="skill-toggle-type" title="Switch to Special Skill" style="flex: 0 0 12px; width: 12px; height: 12px; padding: 0; font-size: 10px; border: none; background: transparent; color: #666; cursor: pointer; align-self: center; margin: 0 2px 0 0; line-height: 1;">&times;</button>
             {{else}}
-              <select class="skill-select" data-field="type" style="flex: 0 0 75px; height: 24px; font-size: 11px;">
+              <select class="skill-select pc-select" data-field="type" style="flex: 0 0 75px; height: 24px; font-size: 11px;">
                 <option value="standard">Standard</option>
                 <option value="Stance" {{#if (eq skill.type "Stance")}}selected{{/if}}>Stance</option>
                 <option value="Perk" {{#if (eq skill.type "Perk")}}selected{{/if}}>Perk</option>
@@ -45,27 +45,27 @@
                 <option value="Other" {{#if (eq skill.type "Other")}}selected{{/if}}>Other</option>
               </select>
               {{#if (eq skill.type "TM")}}
-                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="Grade" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade pc-input" min="0" placeholder="Grade" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{else if (eq skill.type "Perk")}}
-                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="Grade" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade pc-input" min="0" placeholder="Grade" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{else if (eq skill.type "Spellcraft")}}
-                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="C#" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade pc-input" min="0" placeholder="C#" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{else if (eq skill.type "Gate")}}
-                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade" min="0" placeholder="C#" data-field="specialGrade" style="flex: 0 0 52px; margin-left: 2px;">
+                <input type="number" value="{{skill.specialGradeInput}}" class="skill-input skill-special-grade pc-input" min="0" placeholder="C#" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
               {{/if}}
             {{/if}}
 
-            <input type="text" value="{{skill.name}}" class="skill-input skill-name" placeholder="Skill name" data-field="name" style="flex: 1; margin-left: 2px;">
+            <input type="text" value="{{skill.name}}" class="skill-input skill-name pc-input" placeholder="Skill name" data-field="name" style="flex: 1; margin-left: 2px;">
             <button type="button" class="skill-desc-btn" title="Edit Description" style="margin-left:6px; background:#666; color:#fff; border:none; border-radius:3px; width:20px; height:20px; line-height:16px; padding:0; cursor:pointer;">+</button>
             {{#if skill.allowToHitAcc}}
-              <input type="text" value="{{skill.tohit}}" class="skill-input skill-tohit" placeholder="TH" data-field="tohit" style="flex: 0 0 30px; margin-left: 2px;">
-              <input type="text" value="{{skill.accuracy}}" class="skill-input skill-accuracy" placeholder="Acc" data-field="accuracy" style="flex: 0 0 30px; margin-left: 2px;">
+              <input type="text" value="{{skill.tohit}}" class="skill-input skill-tohit pc-input" placeholder="TH" data-field="tohit" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
+              <input type="text" value="{{skill.accuracy}}" class="skill-input skill-accuracy pc-input" placeholder="Acc" data-field="accuracy" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
             {{/if}}
             {{#if skill.sig}}
-              <input type="number" value="{{skill.usesMax}}" class="skill-input skill-uses-max" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
+              <input type="number" value="{{skill.usesMax}}" class="skill-input skill-uses-max pc-input" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
             {{/if}}
-            <input type="text" value="{{skill.ap}}" class="skill-input skill-ap" placeholder="AP" data-field="ap" style="flex: 0 0 30px; margin-left: 2px;">
-            <input type="text" value="{{skill.sp}}" class="skill-input skill-sp" placeholder="SP" data-field="sp" style="flex: 0 0 30px; margin-left: 2px;">
+            <input type="text" value="{{skill.ap}}" class="skill-input skill-ap pc-input" placeholder="AP" data-field="ap" inputmode="numeric" style="flex: 0 0 30px; margin-left: 2px;">
+            <input type="text" value="{{skill.sp}}" class="skill-input skill-sp pc-input" placeholder="SP" data-field="sp" inputmode="numeric" style="flex: 0 0 30px; margin-left: 2px;">
             <div class="skill-actions" style="display: flex; gap: 2px; flex: 0 0 auto;">
               <button type="button" class="skill-indent" title="Indent" style="padding: 0 4px; font-size: 10px;">&rarr;</button>
               <button type="button" class="skill-outdent" title="Outdent" style="padding: 0 4px; font-size: 10px;">&larr;</button>
@@ -108,7 +108,7 @@
                   <span class="skill-uses-display">
                     <span class="uses-label">Uses</span>
                     <div class="skill-uses-box">
-                      <input type="number" class="skill-uses-current" data-index="{{index}}" value="{{skill.usesCurrent}}">
+                      <input type="number" class="skill-uses-current pc-input-plain" data-index="{{index}}" value="{{skill.usesCurrent}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
                       <span class="uses-separator">/ {{skill.usesMax}}</span>
                     </div>
                   </span>

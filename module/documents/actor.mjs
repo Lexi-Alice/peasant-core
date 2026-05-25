@@ -1,4 +1,4 @@
-import { absorbBolsteredFromCounts, absorbTempHpFromCounts, splitDamageCounts, sumDamageCounts, toSimplifiedHpDamage } from "../data/actor/damage.mjs";
+import { absorbBolsteredFromCounts, absorbTempHpFromCounts, applyDamageResistanceToCounts, splitDamageCounts, sumDamageCounts, toSimplifiedHpDamage, toSimplifiedHpDamageFromCounts } from "../data/actor/damage.mjs";
 import {
   COMBAT_HALT_BUFF_TYPE_COST,
   COMBAT_HALT_BUFF_TYPE_CUSTOM,
@@ -13,7 +13,7 @@ import {
   sanitizeCombatHaltBuffType
 } from "../data/actor/combat-modifiers.mjs";
 import { createDefaultCombatDefense, normalizeCombatDefense } from "../data/actor/combat-defense.mjs";
-import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
+import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
 import { getDefaultEdgeLabelMode, normalizeEdgeResourceEntry, sanitizeEdgeLabelMode } from "../data/actor/edge-resources.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor } from "../data/actor/helpers.mjs";
 import { parseHpValueCommand } from "../data/actor/hp-commands.mjs";
@@ -82,43 +82,52 @@ export class PeasantActor extends Actor {
     }
   }
 
+  async _applyPeasantSimplifiedHpDamageValue(scaledDamage) {
+    const maxHealth = getActorHealthMax(this);
+    const currentHealthRaw = Number(this.system?.health?.value);
+    const currentHealth = Number.isFinite(currentHealthRaw)
+      ? Math.max(0, Math.min(currentHealthRaw, maxHealth))
+      : maxHealth;
+    const damageValue = Math.max(0, Math.floor(Number(scaledDamage) || 0));
+
+    if (damageValue <= 0) {
+      return { ok: true, value: currentHealth, scaledDamage: 0, tempUsed: 0, bolsteredUsed: 0 };
+    }
+
+    let remaining = damageValue;
+    let tempHp = Math.max(0, Number(this.system?.temporaryHp?.value) || 0);
+    let bolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
+
+    const tempUsed = Math.min(tempHp, remaining);
+    tempHp -= tempUsed;
+    remaining -= tempUsed;
+
+    const bolsteredUsed = Math.min(bolsteredHp, remaining);
+    bolsteredHp -= bolsteredUsed;
+    remaining -= bolsteredUsed;
+
+    const newHealth = Math.max(0, currentHealth - remaining);
+    const newTempHpMax = Math.max(0, maxHealth - newHealth);
+    const newTempHpValue = Math.min(tempHp, newTempHpMax);
+    const bolsteredCap = getActorBolsteredMax(this);
+
+    await this.update({
+      "system.health.value": newHealth,
+      "system.health.max": maxHealth,
+      "system.temporaryHp.value": newTempHpValue,
+      "system.temporaryHp.max": newTempHpMax,
+      "system.bolsteredHp": Math.max(0, Math.min(bolsteredHp, bolsteredCap))
+    });
+
+    return { ok: true, value: newHealth, scaledDamage: damageValue, tempUsed, bolsteredUsed };
+  }
+
   async applyPeasantDamage(amount, dmgType, hardLocation = false) {
     if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Damage amount must be positive." };
 
     if (isSimplifiedHpActor(this)) {
-      const maxHealth = getActorHealthMax(this);
-      const currentHealthRaw = Number(this.system?.health?.value);
-      const currentHealth = Number.isFinite(currentHealthRaw)
-        ? Math.max(0, Math.min(currentHealthRaw, maxHealth))
-        : maxHealth;
-
       const scaledDamage = toSimplifiedHpDamage(amount, dmgType, hardLocation);
-      let remaining = scaledDamage;
-      let tempHp = Math.max(0, Number(this.system?.temporaryHp?.value) || 0);
-      let bolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
-
-      const tempUsed = Math.min(tempHp, remaining);
-      tempHp -= tempUsed;
-      remaining -= tempUsed;
-
-      const bolsteredUsed = Math.min(bolsteredHp, remaining);
-      bolsteredHp -= bolsteredUsed;
-      remaining -= bolsteredUsed;
-
-      const newHealth = Math.max(0, currentHealth - remaining);
-      const newTempHpMax = Math.max(0, maxHealth - newHealth);
-      const newTempHpValue = Math.min(tempHp, newTempHpMax);
-      const bolsteredCap = getActorBolsteredMax(this);
-
-      await this.update({
-        "system.health.value": newHealth,
-        "system.health.max": maxHealth,
-        "system.temporaryHp.value": newTempHpValue,
-        "system.temporaryHp.max": newTempHpMax,
-        "system.bolsteredHp": Math.max(0, Math.min(bolsteredHp, bolsteredCap))
-      });
-
-      return { ok: true, value: newHealth, scaledDamage, tempUsed, bolsteredUsed };
+      return this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
     }
 
     const hp = this?.system?.hp;
@@ -215,8 +224,12 @@ export class PeasantActor extends Actor {
       isHard = !!this.system?.[flags.hard] || !!this.system?.[flags.naturalHard];
     }
 
+    const resistedCounts = applyDamageResistanceToCounts(splitDamageCounts(netDamage, normalizedType), this);
+    const resistedNetDamage = sumDamageCounts(resistedCounts);
+
     if (isSimplifiedHpActor(this)) {
-      const result = await this.applyPeasantDamage(netDamage, normalizedType, isHard);
+      const scaledDamage = toSimplifiedHpDamageFromCounts(resistedCounts, isHard);
+      const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
       return {
         ...result,
         location,
@@ -225,6 +238,7 @@ export class PeasantActor extends Actor {
         netDamage,
         normalizedType,
         isHybrid,
+        damageToGrid: result?.scaledDamage ?? scaledDamage,
         isHard,
         useArmorCharge,
         isAP,
@@ -237,8 +251,8 @@ export class PeasantActor extends Actor {
     let tempHpUsed = 0;
     let bolsteredHpUsed = 0;
 
-    let remainingCounts = splitDamageCounts(netDamage, normalizedType);
-    if (netDamage > 0) {
+    let remainingCounts = resistedCounts;
+    if (resistedNetDamage > 0) {
       const tempResult = absorbTempHpFromCounts(remainingCounts, tempHp);
       remainingCounts = tempResult.remaining;
       tempHpUsed = tempResult.tempUsed;
@@ -361,6 +375,109 @@ export class PeasantActor extends Actor {
       bolsteredHpUsed,
       breakOccurred,
       events
+    };
+  }
+
+  async applyPeasantLocationlessDamage({
+    amount,
+    type
+  } = {}) {
+    const normalizedType = normalizeAppliedDamageType(type);
+    if (normalizedType === "flexible") {
+      return { ok: false, message: "Flexible damage needs a concrete damage type before it can be applied." };
+    }
+
+    const damageAmount = Number(amount);
+    if (!Number.isFinite(damageAmount) || damageAmount <= 0) {
+      return { ok: false, message: "Damage amount must be positive." };
+    }
+
+    const resistedCounts = applyDamageResistanceToCounts(splitDamageCounts(damageAmount, normalizedType), this);
+    const resistedDamage = sumDamageCounts(resistedCounts);
+
+    if (isSimplifiedHpActor(this)) {
+      const scaledDamage = toSimplifiedHpDamageFromCounts(resistedCounts, false);
+      const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
+      return {
+        ...result,
+        locationless: true,
+        haltUsed: 0,
+        netDamage: damageAmount,
+        normalizedType,
+        isHybrid: normalizedType === "hybrid",
+        damageToGrid: result?.scaledDamage ?? scaledDamage,
+        isHard: false,
+        useArmorCharge: false,
+        isAP: false,
+        ignoreHaltReduction: true
+      };
+    }
+
+    let tempHp = this.system?.temporaryHp?.value || 0;
+    let bolsteredHp = this.system?.bolsteredHp || 0;
+    let tempHpUsed = 0;
+    let bolsteredHpUsed = 0;
+
+    let remainingCounts = resistedCounts;
+    if (resistedDamage > 0) {
+      const tempResult = absorbTempHpFromCounts(remainingCounts, tempHp);
+      remainingCounts = tempResult.remaining;
+      tempHpUsed = tempResult.tempUsed;
+      tempHp = tempResult.tempRemaining;
+
+      const bolsteredResult = absorbBolsteredFromCounts(remainingCounts, bolsteredHp);
+      remainingCounts = bolsteredResult.remaining;
+      bolsteredHpUsed = bolsteredResult.bolsteredUsed;
+      bolsteredHp = bolsteredResult.bolsteredRemaining;
+    }
+
+    const damageToGrid = sumDamageCounts(remainingCounts);
+    const hp = this.system?.hp;
+    if (!hp?.grid || !Number.isFinite(hp.rows) || !Number.isFinite(hp.cols) || typeof hp.applyDamage !== "function") {
+      return { ok: false, message: "HP grid is not available for this actor." };
+    }
+
+    if (remainingCounts.critical > 0) hp.applyDamage("critical", remainingCounts.critical, false);
+    if (remainingCounts.lethal > 0) hp.applyDamage("lethal", remainingCounts.lethal, false);
+    if (remainingCounts.blunt > 0) hp.applyDamage("blunt", remainingCounts.blunt, false);
+
+    const totalCells = hp.rows * hp.cols;
+    let regularCells = 0;
+    for (const rowData of hp.grid) {
+      for (const cellState of rowData) {
+        if (cellState === 0) regularCells++;
+      }
+    }
+
+    const newTempHpMax = totalCells - regularCells;
+    const newTempHpValue = Math.min(tempHp, newTempHpMax);
+
+    await this.update({
+      "system.hp.grid": hp.grid.map(row => [...row]),
+      "system.health.value": regularCells,
+      "system.health.max": totalCells,
+      "system.temporaryHp.value": newTempHpValue,
+      "system.temporaryHp.max": newTempHpMax,
+      "system.bolsteredHp": bolsteredHp
+    });
+
+    return {
+      ok: true,
+      value: regularCells,
+      locationless: true,
+      haltUsed: 0,
+      netDamage: damageAmount,
+      normalizedType,
+      isHybrid: normalizedType === "hybrid",
+      damageToGrid,
+      isHard: false,
+      useArmorCharge: false,
+      isAP: false,
+      ignoreHaltReduction: true,
+      tempHpUsed,
+      bolsteredHpUsed,
+      breakOccurred: false,
+      events: []
     };
   }
 
@@ -668,9 +785,11 @@ export class PeasantActor extends Actor {
       rangeRate: "",
       resourceCosts: [],
       speed: { type: "", splitSecondCurrent: 0, splitSecondMax: 0 },
-      damage: { diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
-      heal: { diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
-      manifest: { diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0 },
+      damage: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
+      overkill: false,
+      magnetism: { grade: 0 },
+      heal: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
+      manifest: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0 },
       tagUses: { current: 0, max: 0 },
       sections: { current: 0, max: 0 },
       aoe: { value: 0, type: "" },
@@ -689,6 +808,7 @@ export class PeasantActor extends Actor {
     merged.resourceCosts = Array.isArray(existing.resourceCosts) ? existing.resourceCosts : [];
     merged.speed = { ...defaults.speed, ...(existing.speed || {}) };
     merged.damage = { ...defaults.damage, ...(existing.damage || {}) };
+    merged.magnetism = normalizeCombatMagnetism(existing.magnetism);
     merged.heal = { ...defaults.heal, ...(existing.heal || {}) };
     merged.manifest = { ...defaults.manifest, ...(existing.manifest || {}) };
     merged.tagUses = { ...defaults.tagUses, ...(existing.tagUses || {}) };
@@ -937,13 +1057,19 @@ export class PeasantActor extends Actor {
         combat.rangeRate = "";
         break;
       case "damage":
-        combat.damage = { diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
+        combat.damage = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
+        break;
+      case "overkill":
+        combat.overkill = false;
+        break;
+      case "magnetism":
+        combat.magnetism = { grade: 0 };
         break;
       case "heal":
-        combat.heal = { diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
+        combat.heal = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
         break;
       case "manifest":
-        combat.manifest = { diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0 };
+        combat.manifest = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0 };
         break;
       case "tagUses":
         combat.tagUses = { current: 0, max: 0 };
@@ -1024,6 +1150,7 @@ export class PeasantActor extends Actor {
         break;
       case "damage":
         combat.damage = {
+          enabled: true,
           diceCount: Number.parseInt(data.damage?.diceCount, 10) || 0,
           diceValue: Number.parseInt(data.damage?.diceValue, 10) || 0,
           diceBonus: Number.parseInt(data.damage?.diceBonus, 10) || 0,
@@ -1031,8 +1158,15 @@ export class PeasantActor extends Actor {
           type: String(data.damage?.type ?? "")
         };
         break;
+      case "overkill":
+        combat.overkill = true;
+        break;
+      case "magnetism":
+        combat.magnetism = normalizeCombatMagnetism(data.magnetism);
+        break;
       case "heal":
         combat.heal = {
+          enabled: true,
           diceCount: Number.parseInt(data.heal?.diceCount, 10) || 0,
           diceValue: Number.parseInt(data.heal?.diceValue, 10) || 0,
           diceBonus: Number.parseInt(data.heal?.diceBonus, 10) || 0,
@@ -1042,6 +1176,7 @@ export class PeasantActor extends Actor {
         break;
       case "manifest":
         combat.manifest = {
+          enabled: true,
           diceCount: Number.parseInt(data.manifest?.diceCount, 10) || 0,
           diceValue: Number.parseInt(data.manifest?.diceValue, 10) || 0,
           diceBonus: Number.parseInt(data.manifest?.diceBonus, 10) || 0,
