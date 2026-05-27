@@ -1,7 +1,8 @@
 import { computeBaseAttrToHits, computeBaseSaves } from "../../../data/actor/attributes.mjs";
 import { getCombatFlatDamageModifier } from "../../../data/actor/combat-modifiers.mjs";
+import { hasOptionalInteger, parseOptionalInteger } from "../../../data/actor/helpers.mjs";
 import { PC_CONSCIOUSNESS_SAVE_FLAG, PC_SAVE_MODIFIER_FLAG } from "../../../data/actor/sheet-settings.mjs";
-import { applyDieRate } from "../../../dice/combat-dice.mjs";
+import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 import { performConsciousnessCheck, performSavingRoll, performSkillRoll, performUntrainedSkillRoll } from "../../../dice/rolls.mjs";
 import { applyMessageMode, escapeHtml } from "../../../utils/chat.mjs";
@@ -150,6 +151,18 @@ export async function rollCombatTagFromElement(sheet, event, target) {
     const combats = sheet.actor.system.notableCombats || [];
     const combat = combats[idx] || {};
     const combatName = combat.name || "Combat";
+
+    if (rollType === "heal" && hasCombatDice(combat.heal)) {
+      await startNotableCombatRoll({
+        actor: sheet.actor,
+        combatIndex: idx,
+        sheet,
+        promptForTargets: true,
+        rollMode: "heal"
+      });
+      return;
+    }
+
     const combatMods = sheet.actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
     const diceRateMod = parseInt(combatMods.diceRate) || 0;
     const flatDamageMod = getCombatFlatDamageModifier(combatMods);
@@ -234,10 +247,10 @@ export async function rollCombatTagFromElement(sheet, event, target) {
     const typeDisplay = typeLabel ? `<span style="color: #aaa; font-size: 11px; margin-left: 6px;">${typeLabel}</span>` : "";
     const rollId = `dice-roll-${Date.now()}`;
     const rollCardClass = rollType === "damage" ? " pc-damage-roll-card" : (rollType === "heal" ? " pc-heal-roll-card" : (rollType === "manifest" ? " pc-manifest-roll-card" : ""));
-    const chatHtml = `<div class="skill-roll-card${rollCardClass}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-  <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+    const chatHtml = `<fieldset class="skill-roll-card${rollCardClass}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  <legend>
     ${escapeHtml(combatName)}
-  </div>
+  </legend>
   <div style="display: flex; flex-direction: column; gap: 6px;">
     <div style="display: flex; gap: 6px;">
       <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
@@ -255,7 +268,7 @@ export async function rollCombatTagFromElement(sheet, event, target) {
       <div>Flat Modifier: ${flat > 0 ? "+" : ""}${flat}</div>` : ""}
     </div>
   </div>
-</div>`;
+</fieldset>`;
 
     await ChatMessage.create(applyMessageMode({
       user: game.user.id,
@@ -279,8 +292,10 @@ export async function rollSkillFromElement(sheet, event, target) {
     const combatMods = sheet.actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
     const toHitMod = parseInt(combatMods.toHit) || 0;
     const accuracyMod = parseInt(combatMods.accuracy) || 0;
-    const baseTohit = Number.isFinite(parseInt(skill.tohit)) ? parseInt(skill.tohit) : 7;
-    const baseAccuracy = parseInt(skill.accuracy) || 0;
+    const skillTohit = parseOptionalInteger(skill.tohit, { min: 1 });
+    const skillAccuracy = parseOptionalInteger(skill.accuracy, { allowSign: true });
+    const baseTohit = hasOptionalInteger(skillTohit) ? skillTohit : 7;
+    const baseAccuracy = skillAccuracy ?? 0;
     const skillCalc = applyToHitAccuracy(baseTohit, baseAccuracy, toHitMod, accuracyMod, 2);
     const tohit = skillCalc.toHit;
     const accuracy = skillCalc.accuracy;

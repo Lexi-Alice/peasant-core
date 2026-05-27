@@ -1,3 +1,4 @@
+import { normalizeRangeRateValue } from "../../data/actor/combat-tags.mjs";
 import { escapeHtml } from "../../utils/chat.mjs";
 import { renderDialogV2 } from "../dialogs.mjs";
 
@@ -11,13 +12,13 @@ export async function showRangeRatePrompt({
   targetLabel = "",
   selectedDamageType = null,
   cardClass = "",
+  rollMode = "",
   rollNotableCombat = null
 } = {}) {
-  const rrValues = String(combat?.rangeRate || "").split("/");
-  while (rrValues.length < 4) rrValues.push("");
+  const rrValues = normalizeRangeRateValue(combat?.rangeRate);
   const ordinals = ["1st", "2nd", "3rd", "4th"];
   const optionsHtml = rrValues.map((value, index) => {
-    const displayValue = escapeHtml((value || "").trim() || "-");
+    const displayValue = escapeHtml(value === null ? "-" : String(value));
     return `<option value="${index}">${ordinals[index]}: ${displayValue}</option>`;
   }).join("");
 
@@ -73,7 +74,8 @@ export async function showRangeRatePrompt({
               rollOverrides,
               targetLabel,
               selectedDamageType,
-              cardClass
+              cardClass,
+              rollMode
             });
             finalize(result);
             return true;

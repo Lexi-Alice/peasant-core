@@ -12,7 +12,17 @@ export const COMBAT_COST_RESOURCE_TYPES = Object.freeze([
   "Mental Stress"
 ]);
 
+export function normalizeHaltValues(raw) {
+  const parts = Array.isArray(raw) ? raw.slice(0, 4) : String(raw || "").split("/").slice(0, 4);
+  while (parts.length < 4) parts.push(0);
+  return parts.map(value => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+  });
+}
+
 export function normalizeHaltSlashValue(raw) {
+  if (Array.isArray(raw)) return normalizeHaltValues(raw).join("/");
   const cleaned = String(raw || "").replace(/[^\d/]/g, "");
   let parts = cleaned.split("/").map(part => {
     const digits = part.replace(/\D/g, "");
@@ -24,6 +34,7 @@ export function normalizeHaltSlashValue(raw) {
 }
 
 export function normalizeHaltSlashValueEditable(raw) {
+  if (Array.isArray(raw)) return normalizeHaltSlashValue(raw);
   const cleaned = String(raw || "").replace(/[^\d/]/g, "");
   let parts = cleaned.split("/").map(part => part.replace(/\D/g, ""));
   if (parts.length > 4) parts = parts.slice(0, 4);
@@ -32,7 +43,7 @@ export function normalizeHaltSlashValueEditable(raw) {
 }
 
 export function parseHaltSlashValues(raw) {
-  return normalizeHaltSlashValue(raw).split("/").map(value => Number.parseInt(value, 10) || 0);
+  return normalizeHaltValues(raw);
 }
 
 export function sanitizeCombatHaltBuffType(rawType) {
@@ -87,7 +98,7 @@ export function sanitizeCombatHaltBuffEntry(entry) {
   const customName = String(safe.customName ?? "").trim();
   return {
     type,
-    values: normalizeHaltSlashValue(safe.values ?? "0/0/0/0"),
+    values: normalizeHaltValues(safe.values ?? [0, 0, 0, 0]),
     value,
     resourceType: type === COMBAT_HALT_BUFF_TYPE_COST ? resourceType : "",
     customName: type === COMBAT_HALT_BUFF_TYPE_CUSTOM ? customName : ""

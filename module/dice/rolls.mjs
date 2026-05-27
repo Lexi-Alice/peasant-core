@@ -6,8 +6,12 @@ import { rollPeasantCriticalExplosion } from "./exploding.mjs";
 import { applyMessageMode, escapeHtml } from "../utils/chat.mjs";
 import { pcLog } from "../utils/logging.mjs";
 
-function getRollCardClassAttribute(extraClass = "") {
-  const safeClass = String(extraClass || "").replace(/[^a-zA-Z0-9_-]/g, "");
+function getRollCardClassAttribute(...extraClasses) {
+  const safeClass = extraClasses
+    .flatMap((extraClass) => String(extraClass || "").split(/\s+/))
+    .map((className) => className.replace(/[^a-zA-Z0-9_-]/g, ""))
+    .filter(Boolean)
+    .join(" ");
   return safeClass ? ` ${safeClass}` : "";
 }
 
@@ -52,10 +56,10 @@ export async function performConsciousnessCheck({
   const outcomeBackground = isSuccess ? 'rgba(34, 197, 94, 0.2)' : 'rgba(220, 38, 38, 0.2)';
   const outcomeBorder = isSuccess ? '1px solid #22c55e' : '1px solid #dc2626';
 
-  const content = `<div class="skill-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+  const content = `<fieldset class="skill-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+    <legend>
       ${escapeHtml(skillName)}
-    </div>
+    </legend>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;"></div>
       <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
@@ -66,7 +70,7 @@ export async function performConsciousnessCheck({
         ${isSuccess ? 'Success' : 'Failure'}
       </div>
     </div>
-  </div>`;
+  </fieldset>`;
   await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content, style }));
 }
 
@@ -111,10 +115,10 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
 
   const rollId = `skill-roll-${Date.now()}`;
 
-  const chatContent = `<div class="skill-roll-card${getRollCardClassAttribute(cardClass)}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+  const chatContent = `<fieldset class="skill-roll-card${getRollCardClassAttribute(cardClass)}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+    <legend>
       ${escapeHtml(skillName)}
-    </div>
+    </legend>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
         <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
@@ -139,7 +143,7 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
         ${resultText}
       </div>
     </div>
-  </div>`;
+  </fieldset>`;
 
   const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
   return {
@@ -198,10 +202,10 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
   const outcomeBorder = isSuccess ? '1px solid #22c55e' : '1px solid #dc2626';
 
   const rollId = `untrained-roll-${Date.now()}`;
-  const chatContent = `<div class="skill-roll-card${getRollCardClassAttribute(cardClass)}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+  const chatContent = `<fieldset class="skill-roll-card${getRollCardClassAttribute(cardClass)}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+    <legend>
       ${escapeHtml(skillName)}
-    </div>
+    </legend>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
         <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
@@ -226,7 +230,7 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
         ${resultText}
       </div>
     </div>
-  </div>`;
+  </fieldset>`;
 
   const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
   return {
@@ -270,10 +274,10 @@ export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', 
   const rollId = `saving-roll-${Date.now()}`;
   const allDiceDisplay = allDice.map((die, index) => index === minIndex ? `<span style="color: #888;">${die}</span>` : die).join(', ');
 
-  const chatContent = `<div class="skill-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+  const chatContent = `<fieldset class="skill-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+    <legend>
       ${escapeHtml(skillName)}
-    </div>
+    </legend>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
         <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
@@ -296,7 +300,7 @@ export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', 
         ${isSuccess ? 'Success' : 'Failure'}
       </div>
     </div>
-  </div>`;
+  </fieldset>`;
 
   const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
   return {

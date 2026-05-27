@@ -1,5 +1,5 @@
 import { getCombatDefenseSummary } from "../../../data/actor/combat-defense.mjs";
-import { COMBAT_EDITOR_TAG_TYPES, getCombatCustomTags } from "../../../data/actor/combat-tags.mjs";
+import { COMBAT_EDITOR_TAG_TYPES, formatRangeRateValue, getCombatCustomTags, hasRangeRateValue } from "../../../data/actor/combat-tags.mjs";
 import { formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 
 export function getActiveNotableCombatEditorTags(combatData) {
@@ -60,7 +60,7 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
     case "range":
       return combatData.range > 0 ? `Range: ${combatData.range}` : null;
     case "rangeRate":
-      return (combatData.rangeRate && combatData.rangeRate !== "///") ? `Range-Rate: ${combatData.rangeRate}` : null;
+      return hasRangeRateValue(combatData.rangeRate) ? `Range-Rate: ${formatRangeRateValue(combatData.rangeRate)}` : null;
     case "damage":
       if (hasCombatDice(combatData.damage)) {
         let str = `Damage: ${formatCombatDiceDisplay(combatData.damage.diceCount, combatData.damage.diceValue, combatData.damage.flat, combatData.damage.diceBonus)}`;

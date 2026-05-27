@@ -55,6 +55,7 @@ export class PeasantDescriptionEditorApp extends DescriptionEditorBase {
     const context = await super._prepareContext(options);
     return Object.assign(context, {
       editorName: this.config.editorName,
+      existing: this.config.existing ?? "",
       documentUuid: this.config.documentUuid ?? ""
     });
   }

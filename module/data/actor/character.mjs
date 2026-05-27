@@ -1,10 +1,27 @@
 import { HPGridModel } from "./hp-model.mjs";
-import { normalizeCustomTagEntry } from "./combat-tags.mjs";
+import { normalizeCustomTagEntry, normalizeRangeRateValue } from "./combat-tags.mjs";
+import { normalizeHaltValues } from "./combat-modifiers.mjs";
+import { parseOptionalInteger } from "./helpers.mjs";
 const { fields } = foundry.data;
 
 export class PeasantCharacterModel extends foundry.abstract.DataModel {
   static migrateData(source) {
     const data = super.migrateData(source);
+    const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object ?? {}, key);
+    const migrateOptionalNumbers = (entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const next = { ...entry };
+      if (hasOwn(next, "tohit")) next.tohit = parseOptionalInteger(next.tohit, { min: 1 });
+      if (hasOwn(next, "accuracy")) next.accuracy = parseOptionalInteger(next.accuracy, { allowSign: true });
+      return next;
+    };
+    const migrateSkillOptionalNumbers = (skill) => {
+      if (!skill || typeof skill !== "object") return skill;
+      const next = migrateOptionalNumbers(skill);
+      if (hasOwn(next, "ap")) next.ap = parseOptionalInteger(next.ap, { min: 0 });
+      if (hasOwn(next, "sp")) next.sp = parseOptionalInteger(next.sp, { min: 0 });
+      return next;
+    };
     const migrateDiceBonus = (rollData) => {
       if (!rollData || typeof rollData !== "object") return rollData;
       const next = { ...rollData };
@@ -13,11 +30,32 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       if (diceValueMatch) {
         next.diceValue = Number.parseInt(diceValueMatch[1], 10) || 0;
         next.diceBonus = Number.parseInt(diceValueMatch[2], 10) || 0;
-      } else if (next.diceBonus == null) {
+      } else if (hasOwn(next, "diceBonus") && next.diceBonus == null) {
         next.diceBonus = 0;
       }
       return next;
     };
+
+    if (hasOwn(data, "haltValues")) data.haltValues = normalizeHaltValues(data.haltValues);
+    if (hasOwn(data, "naturalHaltValues")) data.naturalHaltValues = normalizeHaltValues(data.naturalHaltValues);
+    if (hasOwn(data, "reflexAoeSaveTarget")) data.reflexAoeSaveTarget = parseOptionalInteger(data.reflexAoeSaveTarget, { min: 1 });
+    if (hasOwn(data, "initiative")) data.initiative = parseOptionalInteger(data.initiative, { allowSign: true });
+
+    if (Array.isArray(data?.skills)) {
+      data.skills = data.skills.map(migrateSkillOptionalNumbers);
+    }
+
+    if (Array.isArray(data?.combatMods?.haltBuffs)) {
+      data.combatMods = {
+        ...data.combatMods,
+        haltBuffs: data.combatMods.haltBuffs.map((buff) => {
+          if (!buff || typeof buff !== "object") return buff;
+          const next = { ...buff };
+          if (hasOwn(next, "values")) next.values = normalizeHaltValues(next.values);
+          return next;
+        })
+      };
+    }
 
     if (Array.isArray(data?.notableCombats)) {
       data.notableCombats = data.notableCombats.map((combat) => {
@@ -32,14 +70,20 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         const migratedDamage = migrateDiceBonus(combat.damage);
         const migratedHeal = migrateDiceBonus(combat.heal);
         const migratedManifest = migrateDiceBonus(combat.manifest);
+        const migratedCustomTags = hasOwn(combat, "customTags") || hasOwn(combat, "customTag")
+          ? {
+              customTags: normalizedCustomTags,
+              customTag: normalizedCustomTags[0] ? { ...normalizedCustomTags[0] } : { name: "", value: "" }
+            }
+          : {};
 
         return {
-          ...combat,
+          ...migrateOptionalNumbers(combat),
           ...(migratedDamage ? { damage: migratedDamage } : {}),
           ...(migratedHeal ? { heal: migratedHeal } : {}),
           ...(migratedManifest ? { manifest: migratedManifest } : {}),
-          customTags: normalizedCustomTags,
-          customTag: normalizedCustomTags[0] ? { ...normalizedCustomTags[0] } : { name: "", value: "" }
+          ...(hasOwn(combat, "rangeRate") ? { rangeRate: normalizeRangeRateValue(combat.rangeRate) } : {}),
+          ...migratedCustomTags
         };
       });
     }
@@ -58,8 +102,8 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       portraitScale: new fields.NumberField({ initial: 1, min: 0.1, max: 5 }),
       
       // HALT & Hard Locations
-      haltValues: new fields.StringField({ initial: "0/0/0/0" }),
-      naturalHaltValues: new fields.StringField({ initial: "0/0/0/0" }),
+      haltValues: new fields.ArrayField(new fields.NumberField({ integer: true, min: 0, initial: 0 }), { initial: [0, 0, 0, 0] }),
+      naturalHaltValues: new fields.ArrayField(new fields.NumberField({ integer: true, min: 0, initial: 0 }), { initial: [0, 0, 0, 0] }),
       hardHead: new fields.BooleanField({ initial: false }),
       hardArms: new fields.BooleanField({ initial: false }),
       hardLegs: new fields.BooleanField({ initial: false }),
@@ -81,7 +125,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       build: new fields.NumberField({ integer: true, min: 0, max: 9, initial: 0 }),
       reflex: new fields.NumberField({ integer: true, min: 0, max: 9, initial: 0 }),
       reflexAoeSaveEnabled: new fields.BooleanField({ initial: false }),
-      reflexAoeSaveTarget: new fields.StringField({ initial: "" }),
+      reflexAoeSaveTarget: new fields.NumberField({ integer: true, min: 1, nullable: true, initial: null }),
       intuition: new fields.NumberField({ integer: true, min: 0, max: 9, initial: 0 }),
       learn: new fields.NumberField({ integer: true, min: 0, max: 9, initial: 0 }),
       charisma: new fields.NumberField({ integer: true, min: 0, max: 9, initial: 0 }),
@@ -115,7 +159,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         max: new fields.NumberField({ integer: true, min: 0, initial: 0 })
       }),
       movement: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-      initiative: new fields.StringField({ initial: "" }),
+      initiative: new fields.NumberField({ integer: true, nullable: true, initial: null }),
       // Global AP/SP
       ap: new fields.SchemaField({
         value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
@@ -134,7 +178,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         costMod: new fields.NumberField({ integer: true, initial: 0 }),
         haltBuffs: new fields.ArrayField(new fields.SchemaField({
           type: new fields.StringField({ initial: "" }), // halt, natural, flat, cost, custom
-          values: new fields.StringField({ initial: "0/0/0/0" }),
+          values: new fields.ArrayField(new fields.NumberField({ integer: true, min: 0, initial: 0 }), { initial: [0, 0, 0, 0] }),
           value: new fields.NumberField({ integer: true, initial: 0 }),
           resourceType: new fields.StringField({ initial: "" }),
           customName: new fields.StringField({ initial: "" })
@@ -178,10 +222,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         usesMax: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         usesCurrent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         name: new fields.StringField({ initial: "" }),
-        tohit: new fields.StringField({ initial: "" }),
-        accuracy: new fields.StringField({ initial: "" }),
-        ap: new fields.StringField({ initial: "" }),
-        sp: new fields.StringField({ initial: "" }),
+        tohit: new fields.NumberField({ integer: true, min: 1, nullable: true, initial: null }),
+        accuracy: new fields.NumberField({ integer: true, nullable: true, initial: null }),
+        ap: new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }),
+        sp: new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }),
         indent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         description: new fields.HTMLField({ initial: "" })
       }), { initial: [] }),
@@ -268,8 +312,8 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         usesMax: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         usesCurrent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         name: new fields.StringField({ initial: "" }),
-        tohit: new fields.StringField({ initial: "" }),
-        accuracy: new fields.StringField({ initial: "" }),
+        tohit: new fields.NumberField({ integer: true, min: 1, nullable: true, initial: null }),
+        accuracy: new fields.NumberField({ integer: true, nullable: true, initial: null }),
         indent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         description: new fields.HTMLField({ initial: "" }),
         // Tags for combat modifiers - use empty/zero values instead of null for better compatibility
@@ -289,7 +333,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
           splitSecondMax: new fields.NumberField({ integer: true, min: 0, initial: 0 })
         }),
         range: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-        rangeRate: new fields.StringField({ initial: "" }), // "x/x/x/x" format
+        rangeRate: new fields.ArrayField(new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }), { initial: [null, null, null, null] }),
         damage: new fields.SchemaField({
           enabled: new fields.BooleanField({ initial: false }),
           diceCount: new fields.NumberField({ integer: true, min: 0, initial: 0 }),

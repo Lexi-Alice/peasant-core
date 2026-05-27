@@ -58,14 +58,14 @@
             <input type="text" value="{{skill.name}}" class="skill-input skill-name pc-input" placeholder="Skill name" data-field="name" style="flex: 1; margin-left: 2px;">
             <button type="button" class="skill-desc-btn" title="Edit Description" style="margin-left:6px; background:#666; color:#fff; border:none; border-radius:3px; width:20px; height:20px; line-height:16px; padding:0; cursor:pointer;">+</button>
             {{#if skill.allowToHitAcc}}
-              <input type="text" value="{{skill.tohit}}" class="skill-input skill-tohit pc-input" placeholder="TH" data-field="tohit" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
+              <input type="text" value="{{skill.tohit}}" class="skill-input skill-tohit pc-input" placeholder="TH" data-field="tohit" inputmode="numeric" pattern="\d*" style="flex: 0 0 30px; margin-left: 2px;">
               <input type="text" value="{{skill.accuracy}}" class="skill-input skill-accuracy pc-input" placeholder="Acc" data-field="accuracy" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
             {{/if}}
             {{#if skill.sig}}
               <input type="number" value="{{skill.usesMax}}" class="skill-input skill-uses-max pc-input" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
             {{/if}}
-            <input type="text" value="{{skill.ap}}" class="skill-input skill-ap pc-input" placeholder="AP" data-field="ap" inputmode="numeric" style="flex: 0 0 30px; margin-left: 2px;">
-            <input type="text" value="{{skill.sp}}" class="skill-input skill-sp pc-input" placeholder="SP" data-field="sp" inputmode="numeric" style="flex: 0 0 30px; margin-left: 2px;">
+            <input type="text" value="{{skill.ap}}" class="skill-input skill-ap pc-input" placeholder="AP" data-field="ap" inputmode="numeric" pattern="\d*" style="flex: 0 0 30px; margin-left: 2px;">
+            <input type="text" value="{{skill.sp}}" class="skill-input skill-sp pc-input" placeholder="SP" data-field="sp" inputmode="numeric" pattern="\d*" style="flex: 0 0 30px; margin-left: 2px;">
             <div class="skill-actions" style="display: flex; gap: 2px; flex: 0 0 auto;">
               <button type="button" class="skill-indent" title="Indent" style="padding: 0 4px; font-size: 10px;">&rarr;</button>
               <button type="button" class="skill-outdent" title="Outdent" style="padding: 0 4px; font-size: 10px;">&larr;</button>
@@ -114,8 +114,8 @@
                   </span>
                 {{/if}}
 
-                {{#if skill.ap}}<span style="font-weight: bold; color: #aaa; margin-left: 5px;"> [{{skill.ap}}] AP</span>{{/if}}
-                {{#if skill.sp}}<span style="font-weight: bold; color: #aaa; margin-left: 5px;"> [{{skill.sp}}] SP</span>{{/if}}
+                {{#if skill.hasAp}}<span style="font-weight: bold; color: #aaa; margin-left: 5px;"> [{{skill.ap}}] AP</span>{{/if}}
+                {{#if skill.hasSp}}<span style="font-weight: bold; color: #aaa; margin-left: 5px;"> [{{skill.sp}}] SP</span>{{/if}}
               </li>
             {{/if}}
           {{/each}}

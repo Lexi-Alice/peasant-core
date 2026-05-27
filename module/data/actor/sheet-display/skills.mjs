@@ -36,6 +36,7 @@ import {
   formatThresholdValue,
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
+import { formatOptionalIntegerInput, hasOptionalInteger, parseOptionalInteger } from "../helpers.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
@@ -48,8 +49,14 @@ export function prepareActorSkillContext(data, actor, { logger = null } = {}) {
 
   try { logger?.debug?.("PeasantActorSheet.getData: using actor.skills", sourceSkills.map(s => ({ name: s.name, sig: !!s.sig }))); } catch (e) {}
   data.skills = (sourceSkills || []).map(skill => {
-    const baseAccuracy = parseInt(skill.accuracy) || 0;
-    const baseTohit = Number.isFinite(parseInt(skill.tohit)) ? parseInt(skill.tohit) : 7;
+    const tohitValue = parseOptionalInteger(skill.tohit, { min: 1 });
+    const accuracyValue = parseOptionalInteger(skill.accuracy, { allowSign: true });
+    const apValue = parseOptionalInteger(skill.ap, { min: 0 });
+    const spValue = parseOptionalInteger(skill.sp, { min: 0 });
+    const hasBaseTohit = hasOptionalInteger(tohitValue);
+    const hasBaseAccuracy = hasOptionalInteger(accuracyValue);
+    const baseAccuracy = accuracyValue ?? 0;
+    const baseTohit = hasBaseTohit ? tohitValue : 7;
     const skillCalc = applyToHitAccuracy(baseTohit, baseAccuracy, skillToHitMod, skillAccuracyMod, 2);
     const accuracyNum = skillCalc.accuracy;
     const modifiedTohit = skillCalc.toHit;
@@ -67,7 +74,7 @@ export function prepareActorSkillContext(data, actor, { logger = null } = {}) {
     const hasValidRank = isUntrainedRank || skill.rank === 0 || Number.isFinite(parseInt(skill.rank));
 
     if (isStandard) {
-      isDisplayable = skill.class && hasValidRank && skill.name && skill.tohit;
+      isDisplayable = skill.class && hasValidRank && skill.name && hasBaseTohit;
     } else {
       isDisplayable = skill.name;
     }
@@ -98,18 +105,19 @@ export function prepareActorSkillContext(data, actor, { logger = null } = {}) {
       specialTypeDisplay,
       specialGrade,
       specialGradeInput: hasSpecialGrade ? specialGrade : "",
-      accuracy: skill.accuracy || "",
+      tohit: formatOptionalIntegerInput(tohitValue),
+      accuracy: formatOptionalIntegerInput(accuracyValue, { showPlus: true }),
       accuracyNum,
-      hasToHit: allowToHitAcc && !!skill.tohit,
+      hasToHit: allowToHitAcc && hasBaseTohit,
       modifiedTohit,
-      hasAccuracy: allowToHitAcc && (accuracyNum !== 0 || baseAccuracy !== 0),
+      hasAccuracy: allowToHitAcc && (accuracyNum !== 0 || hasBaseAccuracy),
       accuracySign: accuracyNum >= 0 ? "+" : "",
-      ap: skill.ap || "",
+      ap: formatOptionalIntegerInput(apValue),
       usesMax: skill.usesMax || 0,
       usesCurrent: skill.usesCurrent || 0,
-      sp: skill.sp || "",
-      hasAp: !!skill.ap,
-      hasSp: !!skill.sp,
+      sp: formatOptionalIntegerInput(spValue),
+      hasAp: hasOptionalInteger(apValue),
+      hasSp: hasOptionalInteger(spValue),
       hasDescription,
       isDisplayable,
       isUntrainedRank

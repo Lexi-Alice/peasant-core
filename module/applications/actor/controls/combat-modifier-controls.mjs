@@ -28,7 +28,7 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
       sanitizeCombatCostResourceType(buff?.resourceType) === safeType
     );
   };
-  setupHaltInputSanitizer(root);
+  setupHaltInputSanitizer(sheet, root, runQueuedInputUpdate);
   setupHaltHardLocationToggle(sheet, root);
   const refreshCombatModifierHighlights = () => {
     for (const inputEl of qsa(root, ".combat-modifiers .combat-mod-input")) {
@@ -224,14 +224,14 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     sheet.render(false);
   });
 
-  setupReflexAoeSaveControls(sheet, root);
+  setupReflexAoeSaveControls(sheet, root, runQueuedInputUpdate);
 }
 
-function setupHaltInputSanitizer(html) {
+function setupHaltInputSanitizer(sheet, html, runQueuedInputUpdate) {
   const normalizeHaltValue = (raw) => normalizeHaltSlashValueEditable(raw);
   const finalizeHaltValue = (raw) => normalizeHaltSlashValue(raw);
 
-  const haltInputs = qsa(html, 'input[name="system.haltValues"], input[name="system.naturalHaltValues"]');
+  const haltInputs = qsa(html, 'input[data-field="system.haltValues"], input[data-field="system.naturalHaltValues"], input[name="system.haltValues"], input[name="system.naturalHaltValues"]');
   for (const el of haltInputs) {
     const normalized = normalizeHaltValue(el.value);
     if (normalized !== el.value) el.value = normalized;
@@ -266,10 +266,22 @@ function setupHaltInputSanitizer(html) {
       }
     });
 
-    const finalizeInput = (ev) => {
+    const finalizeInput = async (ev) => {
       const input = ev.currentTarget;
       const finalized = finalizeHaltValue(input.value || "");
       if (finalized !== input.value) input.value = finalized;
+      const field = input.dataset.field || input.name || "";
+      if (!sheet?.isEditable || !["system.haltValues", "system.naturalHaltValues"].includes(field)) return;
+
+      const natural = field === "system.naturalHaltValues";
+      const update = async () => {
+        await sheet.actor.setPeasantHaltValues?.(input.value, { natural, render: false });
+      };
+      if (typeof runQueuedInputUpdate === "function") {
+        await runQueuedInputUpdate(input, "_combatSaveQueue", "HALT values change", update);
+      } else {
+        await update();
+      }
     };
     inputElement.addEventListener("change", finalizeInput);
     inputElement.addEventListener("blur", finalizeInput);
@@ -286,7 +298,7 @@ function setupHaltHardLocationToggle(sheet, html) {
   });
 }
 
-function setupReflexAoeSaveControls(sheet, html) {
+function setupReflexAoeSaveControls(sheet, html, runQueuedInputUpdate) {
   const getDefaultReflexAoeSaveTarget = () => {
     const combatMods = sheet.actor.system.combatMods || { toHit: 0 };
     const toHitMod = Number.parseInt(combatMods.toHit, 10) || 0;
@@ -335,16 +347,32 @@ function setupReflexAoeSaveControls(sheet, html) {
     sheet._scheduleEditAutosaveChange(inputEl, 260);
   });
 
-  const normalizeReflexAoeInput = (ev, input) => {
+  const normalizeReflexAoeInput = async (ev, input) => {
     if (!sheet.isEditMode) return;
     const raw = String(input.value ?? "").trim();
     if (!raw) {
       input.value = "";
+      const update = async () => {
+        await sheet.actor.setPeasantReflexAoeSave?.(true, "", { render: false });
+      };
+      if (typeof runQueuedInputUpdate === "function") {
+        await runQueuedInputUpdate(input, "_combatSaveQueue", "Reflex AoE save change", update);
+      } else {
+        await update();
+      }
       return;
     }
     const parsed = Number.parseInt(raw, 10);
     const normalized = Number.isFinite(parsed) ? String(Math.max(2, parsed)) : "";
     if (normalized !== raw) input.value = normalized;
+    const update = async () => {
+      await sheet.actor.setPeasantReflexAoeSave?.(true, normalized, { render: false });
+    };
+    if (typeof runQueuedInputUpdate === "function") {
+      await runQueuedInputUpdate(input, "_combatSaveQueue", "Reflex AoE save change", update);
+    } else {
+      await update();
+    }
   };
   delegate(html, "change", ".reflex-aoe-save-input", normalizeReflexAoeInput);
   delegate(html, "blur", ".reflex-aoe-save-input", normalizeReflexAoeInput, true);

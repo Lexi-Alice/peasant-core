@@ -1,4 +1,5 @@
 import { applyDefensePenaltiesToRollResult } from "../../data/actor/defense-penalties.mjs";
+import { hasOptionalInteger, parseOptionalInteger } from "../../data/actor/helpers.mjs";
 import { applyToHitAccuracy } from "../../dice/roll-targets.mjs";
 import { performSkillRoll, performUntrainedSkillRoll } from "../../dice/rolls.mjs";
 import { pcLog } from "../../utils/logging.mjs";
@@ -38,11 +39,11 @@ export async function executeResolvedNotableCombatRoll({
   const resolvedDefenseAccuracyPenalty = Math.abs(Number(defenseAccuracyPenalty) || 0);
   const resolvedDefenseToHitPenalty = Number(defenseToHitPenalty) || 0;
 
-  const baseToHit = Number.isFinite(Number.parseInt(combat.tohit, 10))
-    ? Number.parseInt(combat.tohit, 10)
-    : 7;
-  const baseAccuracy = Number.parseInt(combat.accuracy, 10) || 0;
-  const accuracyHasValue = !(combat.accuracy === undefined || combat.accuracy === null || combat.accuracy === "");
+  const combatToHit = parseOptionalInteger(combat.tohit, { min: 1 });
+  const combatAccuracy = parseOptionalInteger(combat.accuracy, { allowSign: true });
+  const baseToHit = hasOptionalInteger(combatToHit) ? combatToHit : 7;
+  const baseAccuracy = combatAccuracy ?? 0;
+  const accuracyHasValue = hasOptionalInteger(combatAccuracy);
   const combatRollBaseName = `${combat.name || "Combat"} Roll`;
   const combatName = targetLabel ? `${combatRollBaseName} vs ${targetLabel}` : combatRollBaseName;
 

@@ -1,3 +1,5 @@
+import { parseOptionalInteger } from "./helpers.mjs";
+
 export const COMBAT_VIEW_TAG_TYPES = Object.freeze([
   "resourceCosts",
   "speed",
@@ -99,4 +101,25 @@ export function syncCombatCustomTags(combatData) {
   combatData.customTags = normalized;
   combatData.customTag = normalized[0] ? { ...normalized[0] } : { name: "", value: "" };
   return combatData;
+}
+
+export function normalizeRangeRateValue(raw) {
+  const parts = Array.isArray(raw) ? raw.slice(0, 4) : String(raw ?? "").split("/").slice(0, 4);
+  while (parts.length < 4) parts.push(null);
+  return parts.map(value => parseOptionalInteger(value, { min: 0 }));
+}
+
+export function formatRangeRateValue(raw) {
+  return normalizeRangeRateValue(raw)
+    .map(value => value === null ? "x" : String(value))
+    .join("/");
+}
+
+export function hasRangeRateValue(raw) {
+  return normalizeRangeRateValue(raw).some(value => value !== null);
+}
+
+export function getRangeRatePartInputValue(raw, index) {
+  const value = normalizeRangeRateValue(raw)[index];
+  return value === null ? "" : String(value);
 }

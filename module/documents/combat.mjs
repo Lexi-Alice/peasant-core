@@ -31,8 +31,13 @@ const sortCombatantsAscending = function(a, b) {
   return diff;
 };
 
+const getActorInitiativeScore = function(actor) {
+  const value = Number(actor?.system?.initiative);
+  return Number.isFinite(value) ? Math.trunc(value) : 0;
+};
+
 const getCombatantInitiativeScore = function(combatant) {
-  return parseInt(combatant?.actor?.system?.initiative) || 0;
+  return getActorInitiativeScore(combatant?.actor);
 };
 
 export class PeasantCombat extends Combat {}
@@ -184,7 +189,7 @@ function installPeasantCombatMethods() {
       if (!combatant || !combatant.actor) continue;
       
       const actor = combatant.actor;
-      const initiativeValue = actor.system?.initiative ? parseInt(actor.system.initiative) || 0 : 0;
+      const initiativeValue = getActorInitiativeScore(actor);
       const rollAsSave = !!actor.getFlag?.("peasant-core", PC_INITIATIVE_SAVE_FLAG);
       
       // Roll initiative dice: standard 2d6, or 3d6 keep highest 2 when actor flag is enabled.
@@ -359,10 +364,10 @@ function installPeasantCombatMethods() {
       
       detailsHTML += `<div>Initiative Score: <span style="cursor: pointer; padding: 2px 6px; background: #2a2a2a; border-radius: 3px; font-weight: bold; color: #9370db; border: 2px solid #7b68ee;">${r.initiativeValue >= 0 ? '+' : ''}${r.initiativeValue}</span></div>`;
       
-      const chatContent = `<div class="skill-roll-card pc-initiative-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-        <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+      const chatContent = `<fieldset class="skill-roll-card pc-initiative-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+        <legend>
           Initiative
-        </div>
+        </legend>
         <div style="display: flex; flex-direction: column; gap: 6px;">
           <div class="pc-initiative-result-row" style="display: flex; justify-content: flex-start; align-items: center; padding: 6px 0 2px; background: transparent; border-radius: 3px;">
             <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #9370db; border: 2px solid #7b68ee;">
@@ -373,7 +378,7 @@ function installPeasantCombatMethods() {
             ${detailsHTML}
           </div>
         </div>
-      </div>`;
+      </fieldset>`;
       
       messages.push({
         content: chatContent,

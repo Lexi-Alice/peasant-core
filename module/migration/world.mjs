@@ -1,11 +1,17 @@
 ﻿// Peasant Core world migrations
+import { normalizeHaltValues } from "../data/actor/combat-modifiers.mjs";
+import { normalizeRangeRateValue } from "../data/actor/combat-tags.mjs";
+import { parseOptionalInteger } from "../data/actor/helpers.mjs";
+
 export const PC_WORLD_MIGRATION_VERSION_SETTING = "worldMigrationVersion";
 const PC_WORLD_MIGRATION_NOTABLE_CUSTOM_TAGS = 1;
 const PC_WORLD_MIGRATION_DEFENSE_BLOCK = 2;
 const PC_WORLD_MIGRATION_DEFENSE_BLOCK_TYPES = 3;
 const PC_WORLD_MIGRATION_DEFENSE_BLOCK_CLEANUP = 4;
 const PC_WORLD_MIGRATION_CHARACTER_EXPERIMENTAL_REMOVAL = 5;
-const PC_WORLD_MIGRATION_LATEST = PC_WORLD_MIGRATION_CHARACTER_EXPERIMENTAL_REMOVAL;
+const PC_WORLD_MIGRATION_OPTIONAL_NUMBERS = 6;
+const PC_WORLD_MIGRATION_STRUCTURED_NUMBERS = 7;
+const PC_WORLD_MIGRATION_LATEST = PC_WORLD_MIGRATION_STRUCTURED_NUMBERS;
 const PC_CHARACTER_TYPES = new Set(["character"]);
 const PC_REMOVED_CHARACTER_EXPERIMENTAL_TYPE = "characterExperimental";
 
@@ -31,6 +37,87 @@ function normalizeNotableCombatCustomTags(combat) {
   if (customTags.length > 0) return customTags;
   const legacyCustomTag = normalizeNotableCombatCustomTagEntry(combat?.customTag || {});
   return legacyCustomTag.name ? [legacyCustomTag] : [];
+}
+
+function valuesEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function migrateSkillOptionalNumbers(skill) {
+  if (!skill || typeof skill !== "object") return { skill, changed: false };
+  const migrated = {
+    ...skill,
+    tohit: parseOptionalInteger(skill.tohit, { min: 1 }),
+    accuracy: parseOptionalInteger(skill.accuracy, { allowSign: true }),
+    ap: parseOptionalInteger(skill.ap, { min: 0 }),
+    sp: parseOptionalInteger(skill.sp, { min: 0 })
+  };
+  return { skill: migrated, changed: !valuesEqual(skill, migrated) };
+}
+
+function migrateCombatOptionalNumbers(combat) {
+  if (!combat || typeof combat !== "object") return { combat, changed: false };
+  const migrated = {
+    ...combat,
+    tohit: parseOptionalInteger(combat.tohit, { min: 1 }),
+    accuracy: parseOptionalInteger(combat.accuracy, { allowSign: true })
+  };
+  return { combat: migrated, changed: !valuesEqual(combat, migrated) };
+}
+
+function migrateCombatStructuredNumbers(combat) {
+  if (!combat || typeof combat !== "object") return { combat, changed: false };
+  const migrated = {
+    ...combat,
+    rangeRate: normalizeRangeRateValue(combat.rangeRate)
+  };
+  return { combat: migrated, changed: !valuesEqual(combat, migrated) };
+}
+
+function migrateSkillsOptionalNumbers(rawSkills) {
+  if (!Array.isArray(rawSkills)) return { skills: rawSkills, changed: false };
+  let changed = false;
+  const skills = rawSkills.map((skill) => {
+    const result = migrateSkillOptionalNumbers(skill);
+    changed = changed || result.changed;
+    return result.skill;
+  });
+  return { skills, changed };
+}
+
+function migrateNotableCombatOptionalNumbers(rawCombats) {
+  if (!Array.isArray(rawCombats)) return { combats: rawCombats, changed: false };
+  let changed = false;
+  const combats = rawCombats.map((combat) => {
+    const result = migrateCombatOptionalNumbers(combat);
+    changed = changed || result.changed;
+    return result.combat;
+  });
+  return { combats, changed };
+}
+
+function migrateNotableCombatStructuredNumbers(rawCombats) {
+  if (!Array.isArray(rawCombats)) return { combats: rawCombats, changed: false };
+  let changed = false;
+  const combats = rawCombats.map((combat) => {
+    const result = migrateCombatStructuredNumbers(combat);
+    changed = changed || result.changed;
+    return result.combat;
+  });
+  return { combats, changed };
+}
+
+function migrateHaltBuffStructuredNumbers(rawCombatMods) {
+  const combatMods = (rawCombatMods && typeof rawCombatMods === "object") ? rawCombatMods : {};
+  if (!Array.isArray(combatMods.haltBuffs)) return { combatMods, changed: false };
+  let changed = false;
+  const haltBuffs = combatMods.haltBuffs.map((buff) => {
+    if (!buff || typeof buff !== "object") return buff;
+    const migrated = { ...buff, values: normalizeHaltValues(buff.values) };
+    changed = changed || !valuesEqual(buff, migrated);
+    return migrated;
+  });
+  return { combatMods: { ...combatMods, haltBuffs }, changed };
 }
 
 function migrateNotableCombatCustomTags(rawCombats) {
@@ -156,8 +243,10 @@ export async function migrateWorldNotableCombatData() {
     }
 
     if (!isPeasantCharacterType(actor.type)) continue;
-    const rawCombats = actor._source?.system?.notableCombats ?? actor.system?.notableCombats;
+    const rawSystem = actor._source?.system ?? actor.system ?? {};
+    const rawCombats = rawSystem.notableCombats ?? actor.system?.notableCombats;
     let migrationState = { combats: rawCombats, changed: false };
+    const updateData = {};
 
     if (currentVersion < PC_WORLD_MIGRATION_NOTABLE_CUSTOM_TAGS) {
       migrationState = migrateNotableCombatCustomTags(migrationState.combats);
@@ -184,15 +273,52 @@ export async function migrateWorldNotableCombatData() {
       };
     }
 
+    if (currentVersion < PC_WORLD_MIGRATION_OPTIONAL_NUMBERS) {
+      const initiative = parseOptionalInteger(rawSystem.initiative, { allowSign: true });
+      if (!valuesEqual(rawSystem.initiative, initiative)) updateData["system.initiative"] = initiative;
+
+      const reflexAoeSaveTarget = parseOptionalInteger(rawSystem.reflexAoeSaveTarget, { min: 1 });
+      if (!valuesEqual(rawSystem.reflexAoeSaveTarget, reflexAoeSaveTarget)) {
+        updateData["system.reflexAoeSaveTarget"] = reflexAoeSaveTarget;
+      }
+
+      const skillsMigration = migrateSkillsOptionalNumbers(rawSystem.skills);
+      if (skillsMigration.changed) updateData["system.skills"] = skillsMigration.skills;
+
+      const combatOptionalMigration = migrateNotableCombatOptionalNumbers(migrationState.combats);
+      migrationState = {
+        combats: combatOptionalMigration.combats,
+        changed: migrationState.changed || combatOptionalMigration.changed
+      };
+    }
+
+    if (currentVersion < PC_WORLD_MIGRATION_STRUCTURED_NUMBERS) {
+      const haltValues = normalizeHaltValues(rawSystem.haltValues);
+      if (!valuesEqual(rawSystem.haltValues, haltValues)) updateData["system.haltValues"] = haltValues;
+
+      const naturalHaltValues = normalizeHaltValues(rawSystem.naturalHaltValues);
+      if (!valuesEqual(rawSystem.naturalHaltValues, naturalHaltValues)) updateData["system.naturalHaltValues"] = naturalHaltValues;
+
+      const combatModsMigration = migrateHaltBuffStructuredNumbers(rawSystem.combatMods);
+      if (combatModsMigration.changed) updateData["system.combatMods"] = combatModsMigration.combatMods;
+
+      const combatStructuredMigration = migrateNotableCombatStructuredNumbers(migrationState.combats);
+      migrationState = {
+        combats: combatStructuredMigration.combats,
+        changed: migrationState.changed || combatStructuredMigration.changed
+      };
+    }
+
     const { combats, changed } = migrationState;
-    if (!changed) continue;
+    if (changed) updateData["system.notableCombats"] = combats;
+    if (Object.keys(updateData).length === 0) continue;
 
     try {
-      await actor.update({ "system.notableCombats": combats }, { render: false });
+      await actor.update(updateData, { render: false });
       migratedActors += 1;
     } catch (err) {
       hadFailures = true;
-      console.error(`Peasant Core | Failed to migrate notable combat data for actor ${actor.name}:`, err);
+      console.error(`Peasant Core | Failed to migrate actor data for ${actor.name}:`, err);
     }
   }
 
@@ -201,7 +327,7 @@ export async function migrateWorldNotableCombatData() {
   }
 
   if (migratedActors > 0) {
-    console.log(`Peasant Core | Migrated notable combat data on ${migratedActors} actor(s).`);
+    console.log(`Peasant Core | Migrated actor data on ${migratedActors} actor(s).`);
   }
   if (migratedActorTypes > 0) {
     console.log(`Peasant Core | Converted ${migratedActorTypes} removed experimental actor type(s) to character.`);

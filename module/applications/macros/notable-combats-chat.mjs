@@ -1,5 +1,10 @@
 ﻿import { renderDialogV2 } from "../dialogs.mjs";
-import { applyDieRate } from "../../dice/combat-dice.mjs";
+import { applyDieRate, hasCombatDice } from "../../dice/combat-dice.mjs";
+import {
+  hasRangeRateValue,
+  normalizeRangeRateValue
+} from "../../data/actor/combat-tags.mjs";
+import { hasOptionalInteger, parseOptionalInteger } from "../../data/actor/helpers.mjs";
 import { applyToHitAccuracy } from "../../dice/roll-targets.mjs";
 import { performSkillRoll, performUntrainedSkillRoll } from "../../dice/rolls.mjs";
 import { applyMessageMode, escapeHtml } from "../../utils/chat.mjs";
@@ -191,13 +196,15 @@ export async function renderNotableCombatsChat() {
         const toHitMod = parseInt(combatMods.toHit) || 0;
         const accuracyMod = parseInt(combatMods.accuracy) || 0;
 
-        const baseTohit = Number.isFinite(parseInt(combat.tohit)) ? parseInt(combat.tohit) : 7;
-        const baseAccuracy = parseInt(combat.accuracy) || 0;
-        const accuracyHasValue = !(combat.accuracy === undefined || combat.accuracy === null || combat.accuracy === '');
+        const combatTohit = parseOptionalInteger(combat.tohit, { min: 1 });
+        const combatAccuracy = parseOptionalInteger(combat.accuracy, { allowSign: true });
+        const baseTohit = hasOptionalInteger(combatTohit) ? combatTohit : 7;
+        const baseAccuracy = combatAccuracy ?? 0;
+        const accuracyHasValue = hasOptionalInteger(combatAccuracy);
 
         const rankStr = String(combat.rank ?? '').trim().toLowerCase();
         const isUntrained = (rankStr === 'u');
-        const hasRangeRate = !!combat.rangeRate && combat.rangeRate !== '///';
+        const hasRangeRate = hasRangeRateValue(combat.rangeRate);
 
         const rollFns = await getRollFns();
 
@@ -225,11 +232,10 @@ export async function renderNotableCombatsChat() {
         };
 
         if (hasRangeRate) {
-          const rrValues = String(combat.rangeRate || '').split('/');
-          while (rrValues.length < 4) rrValues.push('');
+          const rrValues = normalizeRangeRateValue(combat.rangeRate);
           const ords = ['1st', '2nd', '3rd', '4th'];
           const optionsHtml = rrValues.map((val, i) => {
-            const displayVal = escapeHtml((val || '').trim() || '-');
+            const displayVal = escapeHtml(val === null ? '-' : String(val));
             return `<option value="${i}">${ords[i]}: ${displayVal}</option>`;
           }).join('');
 
@@ -296,6 +302,19 @@ export async function renderNotableCombatsChat() {
         const combat = combatsRaw[idx] || {};
         const combatName = combat.name || 'Combat';
 
+        if (rollType === 'heal' && hasCombatDice(combat.heal)) {
+          const startNotableCombatRoll = game.peasantCore?.startNotableCombatRoll;
+          if (typeof startNotableCombatRoll === 'function') {
+            await startNotableCombatRoll({
+              actor: actorNow,
+              combatIndex: idx,
+              promptForTargets: true,
+              rollMode: 'heal'
+            });
+            return;
+          }
+        }
+
         const combatMods = actorNow.system.combatMods || { diceRate: 0, flatDamage: 0 };
         const diceRateMod = parseInt(combatMods.diceRate) || 0;
         const flatDamageMod = parseInt(combatMods.flatDamage) || 0;
@@ -347,10 +366,10 @@ export async function renderNotableCombatsChat() {
         const rollId = `dice-roll-${Date.now()}`;
         const rollCardClass = rollType === 'damage' ? ' pc-damage-roll-card' : (rollType === 'heal' ? ' pc-heal-roll-card' : (rollType === 'manifest' ? ' pc-manifest-roll-card' : ''));
 
-        const chatHtml = `<div class="skill-roll-card${rollCardClass}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-  <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+        const chatHtml = `<fieldset class="skill-roll-card${rollCardClass}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+  <legend>
     ${escapeHtml(rollTitle)}
-  </div>
+  </legend>
   <div style="display: flex; flex-direction: column; gap: 6px;">
     <div style="display: flex; gap: 6px;">
       <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
@@ -368,7 +387,7 @@ export async function renderNotableCombatsChat() {
       <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}
     </div>
   </div>
-</div>`;
+</fieldset>`;
 
         await ChatMessage.create(applyMessageMode({
           user: game.user.id,

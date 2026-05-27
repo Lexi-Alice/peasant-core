@@ -129,7 +129,7 @@
             {{#if @root.editable}}
               <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" aria-label="Initiative">
                 <span class="pc-portrait-lozenge-frame">
-                  <input type="text" data-field="system.initiative" class="pc-portrait-lozenge-input pc-input" value="{{actor.system.initiative}}" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Initiative">
+                  <input type="text" name="system.initiative" data-field="system.initiative" class="pc-portrait-lozenge-input pc-input" value="{{initiativeInput}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Initiative">
                 </span>
                 <span class="pc-portrait-lozenge-label">Initiative</span>
               </label>
@@ -403,7 +403,7 @@
               </div>
               {{#if @root.editable}}
                 <div style="display: flex; align-items: center; gap: 6px;">
-                  <input type="text" name="system.haltValues" value="{{actor.system.haltValues}}" class="halt-input pc-input">
+                  <input type="text" data-field="system.haltValues" value="{{haltValuesInput}}" class="halt-input pc-input">
                 </div>
               {{else}}
                 <span class="halt-value">{{#each haltDisplay as |part index|}}<span class="{{#if part.isHard}}hard-val{{/if}}">{{part.value}}</span>{{#unless @last}}/{{/unless}}{{/each}}</span>
@@ -420,7 +420,7 @@
                   <span style="margin-left: 2px;">:</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
-                  <input type="text" name="system.naturalHaltValues" value="{{actor.system.naturalHaltValues}}" class="halt-input pc-input">
+                  <input type="text" data-field="system.naturalHaltValues" value="{{naturalHaltValuesInput}}" class="halt-input pc-input">
                 </div>
               {{else}}
                 <div class="halt-label-group">
@@ -479,7 +479,7 @@
               <button type="button" class="attr-save-clickable attr-reflex-save-primary" data-action="rollAttributeSave" data-save="reflex">{{attributes.reflexSave}}</button>
               {{#if @root.editable}}
                 {{#if reflexAoeSaveEnabled}}
-                  <input type="text" name="system.reflexAoeSaveTarget" value="{{reflexAoeSaveTarget}}" class="attr-input-text reflex-aoe-save-input pc-input" placeholder="AoE" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="AoE Reflex Save">
+                  <input type="text" data-field="system.reflexAoeSaveTarget" value="{{reflexAoeSaveTarget}}" class="attr-input-text reflex-aoe-save-input pc-input" placeholder="AoE" inputmode="numeric" pattern="\d*" aria-label="AoE Reflex Save">
                   <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-remove" title="Remove AoE Reflex Save">-</button>
                 {{else}}
                   <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-add" title="Add AoE Reflex Save">+</button>

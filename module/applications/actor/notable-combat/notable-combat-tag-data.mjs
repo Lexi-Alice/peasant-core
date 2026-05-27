@@ -6,6 +6,7 @@ import {
   normalizeCombatDefenseShieldArm,
   parseCombatDefenseMosPer
 } from "../../../data/actor/combat-defense.mjs";
+import { hasRangeRateValue, normalizeRangeRateValue } from "../../../data/actor/combat-tags.mjs";
 import { parseCombatDiceValue } from "../../../dice/combat-dice.mjs";
 import { qs, qsa, toElement } from "../../dom.mjs";
 
@@ -53,8 +54,8 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
       const rr2 = fieldValue(root, ".tag-rr-2");
       const rr3 = fieldValue(root, ".tag-rr-3");
       const rr4 = fieldValue(root, ".tag-rr-4");
-      const rrVal = `${rr1}/${rr2}/${rr3}/${rr4}`;
-      return rrVal !== "///" ? validTagData({ rangeRate: rrVal }) : invalidTagData();
+      const rangeRate = normalizeRangeRateValue([rr1, rr2, rr3, rr4]);
+      return hasRangeRateValue(rangeRate) ? validTagData({ rangeRate }) : invalidTagData();
     }
     case "damage": {
       const dmgDice = fieldInt(root, ".tag-dmg-dice", Number.NaN);

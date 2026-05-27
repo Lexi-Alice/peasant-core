@@ -36,6 +36,7 @@ import {
   formatThresholdValue,
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
+import { formatOptionalIntegerInput, parseOptionalInteger } from "../helpers.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
@@ -77,9 +78,8 @@ export function prepareActorAttributeContext(data, actor) {
   }
 
   const reflexAoeSaveEnabled = !!actor.system.reflexAoeSaveEnabled;
-  const reflexAoeSaveTargetRaw = String(actor.system.reflexAoeSaveTarget ?? "").trim();
-  const reflexAoeParsed = Number.parseInt(reflexAoeSaveTargetRaw, 10);
-  const reflexAoeSaveTn = Number.isFinite(reflexAoeParsed) ? Math.max(2, reflexAoeParsed) : null;
+  const reflexAoeValue = parseOptionalInteger(actor.system.reflexAoeSaveTarget, { min: 1 });
+  const reflexAoeSaveTn = reflexAoeValue !== null ? Math.max(2, reflexAoeValue) : null;
 
   const isSummer = blessing.type === "summer" && blessing.target;
   const blessedValue = isSummer ? (attrVals[blessing.target] || 0) : 0;
@@ -111,7 +111,7 @@ export function prepareActorAttributeContext(data, actor) {
     socToHit: `${socToHitNum}+`
   };
   data.reflexAoeSaveEnabled = reflexAoeSaveEnabled;
-  data.reflexAoeSaveTarget = reflexAoeSaveTargetRaw;
+  data.reflexAoeSaveTarget = formatOptionalIntegerInput(reflexAoeValue);
   data.reflexAoeSaveTn = reflexAoeSaveEnabled && Number.isFinite(reflexAoeSaveTn) ? reflexAoeSaveTn : null;
   data.reflexAoeSaveDisplay = reflexAoeSaveEnabled && Number.isFinite(reflexAoeSaveTn) ? `${reflexAoeSaveTn}+` : "";
   data.blessing = blessing;

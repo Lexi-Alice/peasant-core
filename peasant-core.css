@@ -2839,16 +2839,78 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     width: 88px;
 }
 
+.window-app.pc-hp-grid-dialog,
+.application.pc-hp-grid-dialog {
+    aspect-ratio: var(--pc-hp-grid-dialog-aspect, 420 / 170);
+    box-sizing: border-box;
+    height: auto !important;
+    min-width: var(--pc-hp-grid-dialog-min-width, 420px);
+    min-height: var(--pc-hp-grid-dialog-min-height, 170px);
+    overflow: visible;
+}
+
+.window-app.pc-hp-grid-dialog .window-resize-handle,
+.application.pc-hp-grid-dialog .window-resize-handle,
+.pc-hp-grid-dialog .window-resize-handle {
+    cursor: nwse-resize;
+}
+
+.window-app.pc-hp-grid-dialog .window-content,
+.application.pc-hp-grid-dialog .window-content,
+.pc-hp-grid-dialog .dialog-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.window-app.pc-hp-grid-dialog .dialog-content,
+.application.pc-hp-grid-dialog .dialog-content,
+.pc-hp-grid-dialog .dialog-content {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 .pc-hp-grid-dialog-content {
+    box-sizing: border-box;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
     padding: 10px;
+    position: relative;
     color: #e8dec8;
 }
 
-.pc-hp-grid-popup-controls {
+.pc-hp-grid-dialog-body {
+    --pc-hp-cell-width: 32px;
+    --pc-hp-cell-height: 32px;
+    --pc-hp-grid-gap: 4px;
+    --pc-hp-grid-column-gap: var(--pc-hp-grid-gap);
+    --pc-hp-grid-row-gap: var(--pc-hp-grid-gap);
+    --pc-hp-grid-width: auto;
+    --pc-hp-label-width: 82px;
+    --pc-hp-label-font-size: 13px;
+    --pc-hp-help-font-size: 12px;
+    --pc-hp-help-height: 16px;
+    --pc-hp-unit-gap: 8px;
     display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: 100%;
+    gap: 6px;
+    min-height: 0;
+}
+
+.pc-hp-grid-popup-controls {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
     gap: 12px;
     align-items: center;
-    margin-bottom: 10px;
     padding: 8px;
     background: transparent;
     border: 1px solid rgba(159, 146, 117, 0.42);
@@ -2876,48 +2938,101 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     text-align: center;
 }
 
+.pc-hp-grid-popup-frame {
+    flex: 1 1 auto;
+    display: grid;
+    place-items: start stretch;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.pc-hp-grid-popup-unit {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    gap: var(--pc-hp-unit-gap);
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    min-width: 0;
+    min-height: 0;
+    justify-content: flex-start;
+}
+
 .pc-hp-grid-popup-grid {
     display: grid;
-    grid-template-columns: repeat(var(--hp-cols), minmax(0, 32px)) auto;
-    gap: 4px;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(var(--hp-cols), var(--pc-hp-cell-width)) var(--pc-hp-label-width);
+    grid-auto-rows: var(--pc-hp-cell-height);
+    column-gap: var(--pc-hp-grid-column-gap);
+    row-gap: var(--pc-hp-grid-row-gap);
     align-content: start;
     justify-content: start;
+    justify-self: start;
+    align-items: center;
+    width: var(--pc-hp-grid-width);
+    max-width: 100%;
+    overflow: visible;
 }
 
 .pc-hp-grid-popup-grid .hp-cell {
-    width: 32px;
-    height: 32px;
+    width: var(--pc-hp-cell-width);
+    height: var(--pc-hp-cell-height);
+    max-width: none;
+    min-width: 0;
+    border-radius: 3px;
 }
 
 .pc-hp-grid-popup-label {
-    min-width: 80px;
-    padding-left: 6px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    width: var(--pc-hp-label-width);
+    min-width: 0;
+    height: var(--pc-hp-cell-height);
+    padding-left: 4px;
     color: #ff0000;
+    font-size: var(--pc-hp-label-font-size);
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .pc-hp-grid-popup-label .hp-th {
+    flex: 0 0 auto;
     cursor: pointer;
-    margin-right: 6px;
     color: inherit;
+}
+
+.pc-hp-grid-popup-label .hp-tn-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .window-app.pc-hp-grid-dialog .dialog-buttons,
 .pc-hp-grid-dialog .dialog-buttons,
-.pc-hp-grid-dialog .dialog-buttons,
 .window-app.pc-hp-grid-dialog .form-footer,
 .pc-hp-grid-dialog .form-footer,
-.pc-hp-grid-dialog .form-footer,
 .window-app.pc-hp-grid-dialog footer,
-.pc-hp-grid-dialog footer,
 .pc-hp-grid-dialog footer {
     display: none !important;
 }
 
 .pc-hp-grid-popup-help,
 .pc-hp-grid-empty {
-    margin: 10px 0 0;
+    flex: 0 0 auto;
+    margin: 0;
     color: #b9ad93;
-    font-size: 12px;
+    font-size: var(--pc-hp-help-font-size);
+    line-height: 1.25;
+    min-height: var(--pc-hp-help-height);
+    text-align: left;
+    overflow: visible;
 }
 
 .pc-stress-grid-tabs {
@@ -5427,30 +5542,28 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
     border-radius: 4px !important;
     color: var(--button-text-color, #e0e0e0) !important;
-    margin-top: 10px !important;
-    padding: 16px 10px 10px !important;
+    box-sizing: border-box !important;
+    margin: 5px 0 0 !important;
+    min-inline-size: 0 !important;
+    padding: 0 10px 10px !important;
     overflow: visible !important;
 }
 
-#chat-log .message .skill-roll-card > div:first-child,
-.chat-message .skill-roll-card > div:first-child {
-    position: absolute !important;
-    top: 0 !important;
-    left: 10px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    max-width: calc(100% - 20px) !important;
-    min-height: 1.2em !important;
-    margin: 0 !important;
+#chat-log .message .skill-roll-card > legend:first-child,
+.chat-message .skill-roll-card > legend:first-child {
+    width: auto !important;
+    max-width: calc(100% - 12px) !important;
+    margin: 0 0 3px 4px !important;
     padding: 0 6px !important;
     border: 0 !important;
-    background: var(--color-cool-5, #0b0a13) !important;
+    background: transparent !important;
     color: var(--button-text-color, #e0e0e0) !important;
     font-size: 13px !important;
     font-weight: 700 !important;
     line-height: 1.2 !important;
+    white-space: normal !important;
+    overflow: visible !important;
     overflow-wrap: anywhere !important;
-    transform: translateY(-50%) !important;
 }
 
 /* Gold fieldset-style row containers (keep success/failure + value chips untouched) */
@@ -5482,7 +5595,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .chat-message .skill-roll-card.pc-heal-roll-card,
 .chat-message .skill-roll-card.pc-manifest-roll-card,
 .chat-message .skill-roll-card.pc-initiative-roll-card {
-    padding: 12px 10px 5px !important;
+    padding: 0 10px 5px !important;
 }
 
 #chat-log .message .skill-roll-card.pc-damage-roll-card > div:nth-child(2),

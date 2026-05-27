@@ -1,4 +1,5 @@
 import { getCombatCustomTags } from "../../../data/actor/combat-tags.mjs";
+import { getRangeRatePartInputValue } from "../../../data/actor/combat-tags.mjs";
 import { formatCombatDiceValue, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { escapeHtml } from "../../../utils/chat.mjs";
 import { renderResourceCostTagInputs } from "./notable-combat-resource-tag-inputs.mjs";
@@ -26,17 +27,16 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
       `);
       return true;
     case "rangeRate": {
-      const rangeRateParts = String(combatData.rangeRate || "").split("/");
       $area.html(`
         <div class="pc-tag-field-row" style="gap:4px;">
           <label class="pc-tag-field-label">Range-Rate:</label>
-          <input type="number" class="tag-rr-1 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[0] || ""}" placeholder="1st" ${PC_TAG_INTEGER_ATTRS}>
+          <input type="number" class="tag-rr-1 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${getRangeRatePartInputValue(combatData.rangeRate, 0)}" placeholder="1st" ${PC_TAG_INTEGER_ATTRS}>
           <span class="pc-tag-separator">/</span>
-          <input type="number" class="tag-rr-2 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[1] || ""}" placeholder="2nd" ${PC_TAG_INTEGER_ATTRS}>
+          <input type="number" class="tag-rr-2 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${getRangeRatePartInputValue(combatData.rangeRate, 1)}" placeholder="2nd" ${PC_TAG_INTEGER_ATTRS}>
           <span class="pc-tag-separator">/</span>
-          <input type="number" class="tag-rr-3 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[2] || ""}" placeholder="3rd" ${PC_TAG_INTEGER_ATTRS}>
+          <input type="number" class="tag-rr-3 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${getRangeRatePartInputValue(combatData.rangeRate, 2)}" placeholder="3rd" ${PC_TAG_INTEGER_ATTRS}>
           <span class="pc-tag-separator">/</span>
-          <input type="number" class="tag-rr-4 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${rangeRateParts[3] || ""}" placeholder="4th" ${PC_TAG_INTEGER_ATTRS}>
+          <input type="number" class="tag-rr-4 ${PC_TAG_INPUT_CLASS} pc-tag-input-xs" value="${getRangeRatePartInputValue(combatData.rangeRate, 3)}" placeholder="4th" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;

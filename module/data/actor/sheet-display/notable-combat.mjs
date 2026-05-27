@@ -36,6 +36,8 @@ import {
   formatThresholdValue,
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
+import { formatRangeRateValue, hasRangeRateValue } from "../combat-tags.mjs";
+import { formatOptionalIntegerInput, hasOptionalInteger, parseOptionalInteger } from "../helpers.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
@@ -50,8 +52,12 @@ export function prepareActorNotableCombatContext(data, actor) {
   const costModifiersByType = getCombatCostModifiers(combatMods);
 
   data.notableCombats = (sourceNotableCombats || []).map(combat => {
-    const baseAccuracy = parseInt(combat.accuracy) || 0;
-    const baseTohit = Number.isFinite(parseInt(combat.tohit)) ? parseInt(combat.tohit) : 7;
+    const tohitValue = parseOptionalInteger(combat.tohit, { min: 1 });
+    const accuracyValue = parseOptionalInteger(combat.accuracy, { allowSign: true });
+    const hasBaseTohit = hasOptionalInteger(tohitValue);
+    const hasBaseAccuracy = hasOptionalInteger(accuracyValue);
+    const baseAccuracy = accuracyValue ?? 0;
+    const baseTohit = hasBaseTohit ? tohitValue : 7;
     const combatCalc = applyToHitAccuracy(baseTohit, baseAccuracy, toHitMod, accuracyMod, 2);
     const accuracyNum = combatCalc.accuracy;
     const modifiedTohit = combatCalc.toHit;
@@ -69,7 +75,7 @@ export function prepareActorNotableCombatContext(data, actor) {
     const hasValidRank = isUntrainedRank || combat.rank === 0 || Number.isFinite(parseInt(combat.rank));
 
     if (isStandard) {
-      isDisplayable = combat.class && hasValidRank && combat.name && combat.tohit;
+      isDisplayable = combat.class && hasValidRank && combat.name && hasBaseTohit;
     } else {
       isDisplayable = combat.name;
     }
@@ -132,7 +138,8 @@ export function prepareActorNotableCombatContext(data, actor) {
     }
 
     const hasRange = combat.range > 0;
-    const hasRangeRate = !!combat.rangeRate && combat.rangeRate !== "///";
+    const hasRangeRate = hasRangeRateValue(combat.rangeRate);
+    const rangeRateDisplay = formatRangeRateValue(combat.rangeRate);
     const hasDamage = hasCombatDice(combat.damage);
     let damageDisplay = "";
     let modifiedDamageDice = 0;
@@ -232,7 +239,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       resourceCosts: { has: hasResourceCosts, label: "Cost", value: resourceCostsDisplay, costsList: resourceCostsList },
       speed: { has: hasSpeed, label: "Speed", value: speedDisplay, isSplitSecond, splitSecondCurrent: combat.speed?.splitSecondCurrent || 0, splitSecondMax: combat.speed?.splitSecondMax || 0 },
       range: { has: hasRange, label: "Range", value: combat.range },
-      rangeRate: { has: hasRangeRate, label: "Range-Rate", value: combat.rangeRate },
+      rangeRate: { has: hasRangeRate, label: "Range-Rate", value: rangeRateDisplay },
       damage: { has: hasDamage, label: "Damage", value: damageDisplay, rollable: true },
       heal: { has: hasHeal, label: "Heal", value: healDisplay, rollable: true },
       manifest: { has: hasManifest, label: "Manifest", value: manifestDisplay, rollable: true },
@@ -275,10 +282,11 @@ export function prepareActorNotableCombatContext(data, actor) {
       specialTypeDisplay,
       specialGrade,
       specialGradeInput: hasSpecialGrade ? specialGrade : "",
-      accuracy: combat.accuracy || "",
+      tohit: formatOptionalIntegerInput(tohitValue),
+      accuracy: formatOptionalIntegerInput(accuracyValue, { showPlus: true }),
       accuracyNum,
-      hasToHit: allowToHitAcc && !!combat.tohit,
-      hasAccuracy: allowToHitAcc && (accuracyNum !== 0 || baseAccuracy !== 0),
+      hasToHit: allowToHitAcc && hasBaseTohit,
+      hasAccuracy: allowToHitAcc && (accuracyNum !== 0 || hasBaseAccuracy),
       accuracySign: accuracyNum >= 0 ? "+" : "",
       modifiedTohit,
       hasToHitMod: toHitMod !== 0,
@@ -303,6 +311,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       hasAttunementCost,
       hasRange,
       hasRangeRate,
+      rangeRate: rangeRateDisplay,
       hasDamage,
       damageDisplay,
       hasHeal,

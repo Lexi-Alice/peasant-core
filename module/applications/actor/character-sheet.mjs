@@ -1,5 +1,6 @@
 ﻿import { PeasantCharacterModel, PC_ACTOR_SETTING_DEFINITIONS, PC_ART_PANEL_COLLAPSED_FLAG, PC_SIMPLIFIED_HP_FLAG, isPeasantCharacterType, sanitizePeasantCoreSettingNumber } from "../../data/actor/_module.mjs";
 import { PC_CUSTOM_SIR_LOCATION_VALUES_FLAG } from "../../data/actor/identity-options.mjs";
+import { formatOptionalIntegerInput, parseOptionalInteger, sanitizeOptionalIntegerInputValue } from "../../data/actor/helpers.mjs";
 import { PeasantActor } from "../../documents/_module.mjs";
 import { setupBlessingControls } from "./controls/blessing-controls.mjs";
 import { setupCombatModifierControls } from "./controls/combat-modifier-controls.mjs";
@@ -178,7 +179,8 @@ export class PeasantActorSheet extends ActorSheetBase {
       "_skillsSaveQueue",
       "_combatSaveQueue",
       "_advantageSaveQueue",
-      "_edgeResourceSaveQueue"
+      "_edgeResourceSaveQueue",
+      "_portraitLozengeSaveQueue"
     ];
 
     for (const key of queueKeys) {
@@ -299,7 +301,18 @@ export class PeasantActorSheet extends ActorSheetBase {
     target.dataset.tooltip = label;
     target.setAttribute("aria-label", label);
     target.title = label;
-    this._mode = target.checked ? MODES.EDIT : MODES.PLAY;
+    const nextMode = target.checked ? MODES.EDIT : MODES.PLAY;
+
+    if (this.isEditMode && nextMode !== this._mode) {
+      if (typeof this._flushPendingEditAutosaves === "function") {
+        await this._flushPendingEditAutosaves({ triggerChanges: true });
+      }
+      if (typeof this._flushQueuedSaves === "function") {
+        await this._flushQueuedSaves();
+      }
+    }
+
+    this._mode = nextMode;
 
     if (typeof this.submit === "function") await this.submit();
     this.render();
@@ -824,6 +837,9 @@ export class PeasantActorSheet extends ActorSheetBase {
         };
       }
       prepareActorSheetBaseContext(data, this.actor, { isEditable: this.isEditable, isEditMode: this.isEditMode });
+      if (this.isEditMode && this._initiativeInputDraft !== undefined) {
+        data.initiativeInput = this._initiativeInputDraft;
+      }
       prepareActorIdentityContext(data, this.actor, { isEditMode: this.isEditMode });
       prepareActorEdgeContext(data, this.actor);
       prepareActorAttributeContext(data, this.actor);
@@ -943,6 +959,7 @@ export class PeasantActorSheet extends ActorSheetBase {
     const sheetBody = sheetDocument?.body ?? document.body;
     initializeSheetSaveQueues(this);
     teardownPortraitBindings(this);
+    const enqueueSheetUpdate = createSheetUpdateQueue(this);
 
     html.find(".pc-art-panel-toggle").off("click.peasantCoreArtPanel").on("click.peasantCoreArtPanel", async (event) => {
       event.preventDefault();
@@ -968,6 +985,17 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     html.find(".pc-portrait-lozenge-input[data-field]").off("input.peasantPortraitLozenge change.peasantPortraitLozenge").on("input.peasantPortraitLozenge", (event) => {
       const input = event.currentTarget;
+      if (input?.dataset?.field === "system.initiative") {
+        event.stopPropagation();
+        sanitizeOptionalIntegerInputElement(input, { allowSign: true });
+        this._initiativeInputDraft = input.value;
+        const value = parseOptionalInteger(input.value, { allowSign: true });
+        void enqueueSheetUpdate("_portraitLozengeSaveQueue", "Portrait lozenge", async () => {
+          await this.actor.setPeasantInitiative?.(value, { render: false });
+        });
+        return;
+      }
+      event.stopPropagation();
       if (input?.dataset?.field !== "system.movement") return;
       const value = Number.parseInt(input.value, 10);
       if (Number.isFinite(value) && value < 0) input.value = "0";
@@ -975,15 +1003,23 @@ export class PeasantActorSheet extends ActorSheetBase {
       const input = event.currentTarget;
       const field = input?.dataset?.field;
       if (!["system.movement", "system.initiative"].includes(field)) return;
-      const value = field === "system.movement"
-        ? Math.max(0, Number.parseInt(input.value, 10) || 0)
-        : String(input.value ?? "").trim();
-      input.value = String(value);
-      if (field === "system.movement") await this.actor.setPeasantMovement?.(value);
-      else await this.actor.setPeasantInitiative?.(value);
+      if (field === "system.initiative") {
+        const value = parseOptionalInteger(input.value, { allowSign: true });
+        input.value = formatOptionalIntegerInput(value, { showPlus: true });
+        this._initiativeInputDraft = undefined;
+        return;
+      }
+      event.stopPropagation();
+      if (field === "system.movement") {
+        const value = Math.max(0, Number.parseInt(input.value, 10) || 0);
+        input.value = String(value);
+        await enqueueSheetUpdate("_portraitLozengeSaveQueue", "Portrait lozenge", async () => {
+          await this.actor.setPeasantMovement?.(value);
+        });
+        return;
+      }
     });
 
-    const enqueueSheetUpdate = createSheetUpdateQueue(this);
     const collectAdvantagesFromDOM = () => collectAdvantagesFromSheet(this);
     const blurActiveEditableInSheet = () => blurActiveEditableInSheetHelper(this);
     const runQueuedInputUpdate = (input, queueKey, label, task) => runQueuedInputUpdateHelper(this, input, queueKey, label, task, { enqueueSheetUpdate });
@@ -1023,6 +1059,19 @@ export class PeasantActorSheet extends ActorSheetBase {
 
   }
 
+}
+
+function sanitizeOptionalIntegerInputElement(input, options = {}) {
+  if (!input) return;
+  const before = String(input.value ?? "");
+  const normalized = sanitizeOptionalIntegerInputValue(before, options);
+  if (normalized === before) return;
+
+  const pos = input.selectionStart ?? before.length;
+  const normalizedBeforeCursor = sanitizeOptionalIntegerInputValue(before.slice(0, pos), options);
+  input.value = normalized;
+  const nextPos = Math.max(0, Math.min(normalized.length, normalizedBeforeCursor.length));
+  try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
 }
 configurePeasantActorSheetHooks({
   sheetClass: PeasantActorSheet,

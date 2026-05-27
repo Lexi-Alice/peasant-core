@@ -1,7 +1,9 @@
 import { getCombatCostModifiers } from "../../data/actor/combat-modifiers.mjs";
 import { applyDefensePenaltiesToRollResult } from "../../data/actor/defense-penalties.mjs";
 import { getFailureLabelFromDefensePromptResult } from "../../data/actor/defense-results.mjs";
+import { hasRangeRateValue } from "../../data/actor/combat-tags.mjs";
 import { normalizeAppliedDamageType } from "../../data/actor/targeted-damage.mjs";
+import { hasCombatDice } from "../../dice/combat-dice.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { getActiveNotableCombatTargets, getPreferredActorToken } from "./actor-targets.mjs";
 import { emitDefensePromptRequestsForAttack } from "./defense-prompt-requests.mjs";
@@ -10,6 +12,7 @@ import { isChainCancelledResult, showFlexibleDamageTypePrompt } from "./prompt-d
 import { showRangeRatePrompt } from "./range-rate-dialog.mjs";
 import { updateSkillRollChatCardFromResult } from "./roll-chat-updates.mjs";
 import { resolveSuccessfulAttackDamageForTarget } from "./successful-attack-damage.mjs";
+import { resolveSuccessfulHealForTarget } from "./successful-heal.mjs";
 
 export async function performNotableCombatRoll({
   actor,
@@ -21,7 +24,8 @@ export async function performNotableCombatRoll({
   rollOverrides = null,
   targetLabel = "",
   selectedDamageType = null,
-  cardClass = ""
+  cardClass = "",
+  rollMode = ""
 } = {}) {
   try {
     if (!actor) return false;
@@ -39,8 +43,12 @@ export async function performNotableCombatRoll({
     const attackerToken = getPreferredActorToken(actor);
     const activeTargets = promptForTargets ? getActiveNotableCombatTargets() : [];
     const shouldRollPerTarget = activeTargets.length > 1;
+    const hasHealRoll = hasCombatDice(combat?.heal);
+    const hasDamageRoll = hasCombatDice(combat?.damage);
+    const requestedHealRoll = String(rollMode || "").trim().toLowerCase() === "heal";
+    const isHealRoll = hasHealRoll && (requestedHealRoll || !hasDamageRoll);
     let resolvedDamageType = normalizeAppliedDamageType(selectedDamageType, "");
-    if (!resolvedDamageType) {
+    if (!isHealRoll && !resolvedDamageType) {
       const combatDamageType = normalizeAppliedDamageType(combat?.damage?.type, "");
       if (combatDamageType === "flexible" && activeTargets.length > 0) {
         const damageTypePrompt = await showFlexibleDamageTypePrompt({
@@ -61,7 +69,7 @@ export async function performNotableCombatRoll({
     }
 
     let defensePromptSummary = { totalAccuracyPenalty: 0, promptResults: [] };
-    if (promptForTargets) {
+    if (promptForTargets && !isHealRoll) {
       defensePromptSummary = await emitDefensePromptRequestsForAttack({
         actor,
         combat,
@@ -156,28 +164,40 @@ export async function performNotableCombatRoll({
             defensePromptSummary
           };
         }
-        const incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
-          actor,
-          attackerToken,
-          combat,
-          target,
-          attackRoll: targetRoll,
-          defensePromptResult: promptEntry?.result || null,
-          appliedDamageType: resolvedDamageType || null
-        });
-        if (isChainCancelledResult(incomingHitResolution)) {
-          await consumeNotableCombatRollUse(actor, combatIndex, sheet);
-          return {
-            rolled: true,
-            actorId: actor.id,
-            combatIndex,
-            combatName: combat.name || "Combat",
-            multiTarget: true,
-            targetRolls,
-            chainCancelled: true,
-            defensePromptSummary,
-            cancelledAfterRoll: true
-          };
+        let incomingHitResolution = null;
+        let incomingHealResolution = null;
+        if (isHealRoll) {
+          incomingHealResolution = await resolveSuccessfulHealForTarget({
+            actor,
+            attackerToken,
+            combat,
+            target,
+            attackRoll: targetRoll
+          });
+        } else {
+          incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
+            actor,
+            attackerToken,
+            combat,
+            target,
+            attackRoll: targetRoll,
+            defensePromptResult: promptEntry?.result || null,
+            appliedDamageType: resolvedDamageType || null
+          });
+          if (isChainCancelledResult(incomingHitResolution)) {
+            await consumeNotableCombatRollUse(actor, combatIndex, sheet);
+            return {
+              rolled: true,
+              actorId: actor.id,
+              combatIndex,
+              combatName: combat.name || "Combat",
+              multiTarget: true,
+              targetRolls,
+              chainCancelled: true,
+              defensePromptSummary,
+              cancelledAfterRoll: true
+            };
+          }
         }
         targetRolls.push({
           ...targetRoll,
@@ -185,7 +205,8 @@ export async function performNotableCombatRoll({
           targetActorId: target.actorId,
           targetName: target.targetName,
           defensePromptResult: promptEntry?.result || null,
-          incomingHitResolution
+          incomingHitResolution,
+          incomingHealResolution
         });
       }
 
@@ -252,27 +273,39 @@ export async function performNotableCombatRoll({
           }
         }
       }
-      const incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
-        actor,
-        attackerToken,
-        combat,
-        target,
-        attackRoll: singleRoll,
-        defensePromptResult: defensePromptSummary?.promptResults?.[0]?.result || null,
-        appliedDamageType: resolvedDamageType || null
-      });
-      if (isChainCancelledResult(incomingHitResolution)) {
-        await consumeNotableCombatRollUse(actor, combatIndex, sheet);
-        return {
-          ...singleRoll,
-          multiTarget: false,
-          defensePromptSummary,
-          targetTokenId: target?.tokenId || null,
-          targetActorId: target?.actorId || null,
-          targetName: target?.targetName || null,
-          incomingHitResolution,
-          chainCancelled: true
-        };
+      let incomingHitResolution = null;
+      let incomingHealResolution = null;
+      if (isHealRoll) {
+        incomingHealResolution = await resolveSuccessfulHealForTarget({
+          actor,
+          attackerToken,
+          combat,
+          target,
+          attackRoll: singleRoll
+        });
+      } else {
+        incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
+          actor,
+          attackerToken,
+          combat,
+          target,
+          attackRoll: singleRoll,
+          defensePromptResult: defensePromptSummary?.promptResults?.[0]?.result || null,
+          appliedDamageType: resolvedDamageType || null
+        });
+        if (isChainCancelledResult(incomingHitResolution)) {
+          await consumeNotableCombatRollUse(actor, combatIndex, sheet);
+          return {
+            ...singleRoll,
+            multiTarget: false,
+            defensePromptSummary,
+            targetTokenId: target?.tokenId || null,
+            targetActorId: target?.actorId || null,
+            targetName: target?.targetName || null,
+            incomingHitResolution,
+            chainCancelled: true
+          };
+        }
       }
       rollOutcome = {
         ...singleRoll,
@@ -281,7 +314,8 @@ export async function performNotableCombatRoll({
         targetTokenId: target?.tokenId || null,
         targetActorId: target?.actorId || null,
         targetName: target?.targetName || null,
-        incomingHitResolution
+        incomingHitResolution,
+        incomingHealResolution
       };
     }
 
@@ -302,7 +336,8 @@ export async function startNotableCombatRoll({
   rollOverrides = null,
   targetLabel = "",
   selectedDamageType = null,
-  cardClass = ""
+  cardClass = "",
+  rollMode = ""
 } = {}) {
   if (!actor) return false;
 
@@ -310,9 +345,9 @@ export async function startNotableCombatRoll({
   const combat = combats[combatIndex] || null;
   if (!combat) return false;
 
-  const hasRangeRate = !!combat.rangeRate && combat.rangeRate !== "///";
+  const hasRangeRate = hasRangeRateValue(combat.rangeRate);
   if (!hasRangeRate) {
-    return await performNotableCombatRoll({ actor, combatIndex, sheet, promptForTargets, rollOverrides, targetLabel, selectedDamageType, cardClass });
+    return await performNotableCombatRoll({ actor, combatIndex, sheet, promptForTargets, rollOverrides, targetLabel, selectedDamageType, cardClass, rollMode });
   }
 
   return showRangeRatePrompt({
@@ -325,6 +360,7 @@ export async function startNotableCombatRoll({
     targetLabel,
     selectedDamageType,
     cardClass,
+    rollMode,
     rollNotableCombat: performNotableCombatRoll
   });
 }

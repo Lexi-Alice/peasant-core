@@ -1,4 +1,5 @@
 import { showReadonlyDescriptionDialog } from "../controls/description-dialogs.mjs";
+import { formatOptionalIntegerInput, parseOptionalInteger, sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
 import { delegate, qs, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
@@ -114,6 +115,16 @@ export function setupNotableCombatControls(sheet, html, {
     }
   });
 
+  delegate(root, "input", ".combat-tohit", (ev, input) => {
+    if (!sheet.isEditMode) return;
+    sanitizeOptionalIntegerInputElement(input);
+  });
+
+  delegate(root, "input", ".combat-accuracy", (ev, input) => {
+    if (!sheet.isEditMode) return;
+    sanitizeOptionalIntegerInputElement(input, { allowSign: true });
+  });
+
   delegate(root, "change", ".combat-class, .combat-rank, .combat-name, .combat-tohit, .combat-accuracy, .combat-special-grade", async (ev, input) => {
     if (!sheet.isEditMode) return;
 
@@ -138,7 +149,10 @@ export function setupNotableCombatControls(sheet, html, {
         if (accuracyEl) fields.accuracy = accuracyEl.value;
         if (specialGradeEl) fields.specialGrade = specialGradeEl.value;
 
-        await sheet.actor.setPeasantNotableCombatMainFields?.(index, fields, { render: false });
+        const result = await sheet.actor.setPeasantNotableCombatMainFields?.(index, fields, { render: false });
+        const savedCombat = result?.combats?.[index] || {};
+        if (tohitEl) tohitEl.value = formatOptionalIntegerInput(savedCombat.tohit ?? parseOptionalInteger(fields.tohit, { min: 1 }));
+        if (accuracyEl) accuracyEl.value = formatOptionalIntegerInput(savedCombat.accuracy ?? parseOptionalInteger(fields.accuracy, { allowSign: true }), { showPlus: true });
       });
     } catch (err) {
       console.warn("Failed to persist combat field change:", err);
@@ -260,6 +274,19 @@ function resolveItemIndex(source, { dataKey = "index", rowSelector = null, rowAt
     }
   }
   return Number.isNaN(index) ? -1 : index;
+}
+
+function sanitizeOptionalIntegerInputElement(input, options = {}) {
+  if (!input) return;
+  const before = String(input.value ?? "");
+  const normalized = sanitizeOptionalIntegerInputValue(before, options);
+  if (normalized === before) return;
+
+  const pos = input.selectionStart ?? before.length;
+  const normalizedBeforeCursor = sanitizeOptionalIntegerInputValue(before.slice(0, pos), options);
+  input.value = normalized;
+  const nextPos = Math.max(0, Math.min(normalized.length, normalizedBeforeCursor.length));
+  try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
 }
 
 function resolveCombatTagInputIndex(input) {

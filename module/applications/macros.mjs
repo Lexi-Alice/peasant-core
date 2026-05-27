@@ -95,8 +95,8 @@ async function _syncPeasantSystemMacros() {
     { name: "Skill Roll", path: "macros/skill-roll.js" },
     { name: "Untrained Skill Roll", path: "macros/untrained-skill-roll.js" },
     { name: "Saving Roll", path: "macros/saving-roll.js" },
-    { name: "Consciousness Check", path: "macros/consciousness-check.js" },
-    { name: "Notable Combats to Chat", path: "macros/notable-combats-chat.js" }
+    { name: "Location Table", path: "macros/location-table.js" },
+    { name: "Consciousness Check", path: "macros/consciousness-check.js" }
   ];
 
   const normalize = (text) => String(text ?? "").replace(/\r\n/g, "\n").trim();

@@ -83,10 +83,40 @@ export function toSimplifiedHpDamageFromCounts(counts, hardLocation = false) {
   return (counts.blunt || 0) + ((counts.lethal || 0) * 2) + ((counts.critical || 0) * 4);
 }
 
+export function toSimplifiedHpDamageFromCountsWithResistance(counts, actor, hardLocation = false) {
+  counts = {
+    blunt: Math.max(0, Math.floor(Number(counts?.blunt) || 0)),
+    lethal: Math.max(0, Math.floor(Number(counts?.lethal) || 0)),
+    critical: Math.max(0, Math.floor(Number(counts?.critical) || 0))
+  };
+  if (hardLocation && counts.lethal > 0) {
+    const convertedToBlunt = Math.floor(counts.lethal / 2);
+    counts.lethal -= convertedToBlunt;
+    counts.blunt += convertedToBlunt;
+  }
+
+  const multipliers = getDamageResistanceMultipliers(actor);
+  const damage =
+    (counts.blunt * multipliers.blunt) +
+    (counts.lethal * 2 * multipliers.lethal) +
+    (counts.critical * 4 * multipliers.critical);
+  return Math.max(0, Math.floor(damage));
+}
+
 export function toSimplifiedHpDamage(amount, type, hardLocation = false) {
   const raw = Math.max(0, Number(amount) || 0);
   if (raw <= 0) return 0;
   return toSimplifiedHpDamageFromCounts(splitDamageCounts(raw, String(type || "").toLowerCase()), hardLocation);
+}
+
+export function toSimplifiedHpDamageWithResistance(amount, type, actor, hardLocation = false) {
+  const raw = Math.max(0, Number(amount) || 0);
+  if (raw <= 0) return 0;
+  return toSimplifiedHpDamageFromCountsWithResistance(
+    splitDamageCounts(raw, String(type || "").toLowerCase()),
+    actor,
+    hardLocation
+  );
 }
 
 export function sumDamageCounts(counts) {

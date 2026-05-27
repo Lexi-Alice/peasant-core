@@ -42,6 +42,7 @@ import {
   formatThresholdValue,
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
+import { formatOptionalIntegerInput, hasOptionalInteger } from "../helpers.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
@@ -64,8 +65,8 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
 
   if (data?.actor?.system) {
     data.actor.system.bolsteredHp = bolsteredHpSafe;
-    data.actor.system.haltValues = normalizeHaltSlashValue(data.actor.system.haltValues || "0/0/0/0");
-    data.actor.system.naturalHaltValues = normalizeHaltSlashValue(data.actor.system.naturalHaltValues || "0/0/0/0");
+    data.haltValuesInput = normalizeHaltSlashValue(data.actor.system.haltValues || [0, 0, 0, 0]);
+    data.naturalHaltValuesInput = normalizeHaltSlashValue(data.actor.system.naturalHaltValues || [0, 0, 0, 0]);
     const rawCombatMods = data.actor.system.combatMods || {};
     const haltBuffs = sanitizeCombatHaltBuffs(rawCombatMods.haltBuffs);
     data.actor.system.combatMods = {
@@ -83,13 +84,11 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
   data.sprintMultiplier = sprintMultiplier;
 
   const portraitMovement = Math.max(0, Number(data?.actor?.system?.movement) || 0);
-  const initiativeRaw = String(data?.actor?.system?.initiative ?? "").trim();
-  const initiativeNumeric = Number(initiativeRaw);
-  const initiativeDisplay = initiativeRaw === ""
-    ? "+0"
-    : Number.isFinite(initiativeNumeric)
-      ? `${initiativeNumeric >= 0 ? "+" : ""}${initiativeNumeric}`
-      : initiativeRaw;
+  const initiative = data?.actor?.system?.initiative;
+  const initiativeDisplay = hasOptionalInteger(initiative)
+    ? formatOptionalIntegerInput(initiative, { showPlus: true })
+    : "+0";
+  data.initiativeInput = formatOptionalIntegerInput(initiative, { showPlus: true });
   data.portraitStats = {
     movement: portraitMovement,
     run: portraitMovement * runMultiplier,

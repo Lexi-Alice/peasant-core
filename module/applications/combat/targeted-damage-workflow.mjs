@@ -15,10 +15,10 @@ function buildDamageTakenChatCard({
   const haltLine = haltUsed > 0 ? `-${haltUsed}` : "0";
   const hpGridText = `${damageToGrid} (${normalizedType}${isHybrid ? " - Hybrid" : ""})`;
 
-  return `<div class="skill-roll-card pc-damage-taken-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+  return `<fieldset class="skill-roll-card pc-damage-taken-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+    <legend>
       ${escapeHtml(headline)}
-    </div>
+    </legend>
     <div class="roll-details" style="display: block; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 12px; line-height: 1.55;">
       <div>Damage: ${damageAmount}</div>
       <div>Location: ${escapeHtml(locationDisplay)}</div>
@@ -27,7 +27,7 @@ function buildDamageTakenChatCard({
       ${tempHpUsed > 0 ? `<div>Temporary HP Absorbed: ${tempHpUsed}</div>` : ""}
       ${bolsteredHpUsed > 0 ? `<div>Bolstered HP Absorbed: ${bolsteredHpUsed}</div>` : ""}
     </div>
-  </div>`;
+  </fieldset>`;
 }
 
 export async function applyTargetedDamageWorkflow(actor, {

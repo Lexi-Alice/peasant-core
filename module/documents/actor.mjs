@@ -1,4 +1,4 @@
-import { absorbBolsteredFromCounts, absorbTempHpFromCounts, applyDamageResistanceToCounts, splitDamageCounts, sumDamageCounts, toSimplifiedHpDamage, toSimplifiedHpDamageFromCounts } from "../data/actor/damage.mjs";
+import { absorbBolsteredFromCounts, absorbTempHpFromCounts, applyDamageResistanceToCounts, splitDamageCounts, sumDamageCounts, toSimplifiedHpDamageFromCountsWithResistance, toSimplifiedHpDamageWithResistance } from "../data/actor/damage.mjs";
 import {
   COMBAT_HALT_BUFF_TYPE_COST,
   COMBAT_HALT_BUFF_TYPE_CUSTOM,
@@ -6,16 +6,16 @@ import {
   COMBAT_HALT_BUFF_TYPE_HALT,
   COMBAT_HALT_BUFF_TYPE_NATURAL,
   getCombatHaltBuffTotals,
-  normalizeHaltSlashValue,
+  normalizeHaltValues,
   parseHaltSlashValues,
   sanitizeCombatCostResourceType,
   sanitizeCombatHaltBuffs,
   sanitizeCombatHaltBuffType
 } from "../data/actor/combat-modifiers.mjs";
 import { createDefaultCombatDefense, normalizeCombatDefense } from "../data/actor/combat-defense.mjs";
-import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
+import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, normalizeRangeRateValue, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
 import { getDefaultEdgeLabelMode, normalizeEdgeResourceEntry, sanitizeEdgeLabelMode } from "../data/actor/edge-resources.mjs";
-import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor } from "../data/actor/helpers.mjs";
+import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor, parseOptionalInteger } from "../data/actor/helpers.mjs";
 import { parseHpValueCommand } from "../data/actor/hp-commands.mjs";
 import { applyCombatStressDamageForActor } from "../data/actor/stress.mjs";
 import { TARGETED_DAMAGE_HALT_INDEX_MAP, TARGETED_DAMAGE_HARD_FLAG_MAP, getArmorChargeMultiplier, getTargetedDamageConditionKey, getTargetedDamageLocationDisplay, getWoundThresholdMultipliers, normalizeAppliedDamageType } from "../data/actor/targeted-damage.mjs";
@@ -126,7 +126,7 @@ export class PeasantActor extends Actor {
     if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Damage amount must be positive." };
 
     if (isSimplifiedHpActor(this)) {
-      const scaledDamage = toSimplifiedHpDamage(amount, dmgType, hardLocation);
+      const scaledDamage = toSimplifiedHpDamageWithResistance(amount, dmgType, this, hardLocation);
       return this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
     }
 
@@ -224,11 +224,10 @@ export class PeasantActor extends Actor {
       isHard = !!this.system?.[flags.hard] || !!this.system?.[flags.naturalHard];
     }
 
-    const resistedCounts = applyDamageResistanceToCounts(splitDamageCounts(netDamage, normalizedType), this);
-    const resistedNetDamage = sumDamageCounts(resistedCounts);
+    const rawCounts = splitDamageCounts(netDamage, normalizedType);
 
     if (isSimplifiedHpActor(this)) {
-      const scaledDamage = toSimplifiedHpDamageFromCounts(resistedCounts, isHard);
+      const scaledDamage = toSimplifiedHpDamageFromCountsWithResistance(rawCounts, this, isHard);
       const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
       return {
         ...result,
@@ -245,6 +244,9 @@ export class PeasantActor extends Actor {
         ignoreHaltReduction
       };
     }
+
+    const resistedCounts = applyDamageResistanceToCounts(rawCounts, this);
+    const resistedNetDamage = sumDamageCounts(resistedCounts);
 
     let tempHp = this.system?.temporaryHp?.value || 0;
     let bolsteredHp = this.system?.bolsteredHp || 0;
@@ -392,11 +394,10 @@ export class PeasantActor extends Actor {
       return { ok: false, message: "Damage amount must be positive." };
     }
 
-    const resistedCounts = applyDamageResistanceToCounts(splitDamageCounts(damageAmount, normalizedType), this);
-    const resistedDamage = sumDamageCounts(resistedCounts);
+    const rawCounts = splitDamageCounts(damageAmount, normalizedType);
 
     if (isSimplifiedHpActor(this)) {
-      const scaledDamage = toSimplifiedHpDamageFromCounts(resistedCounts, false);
+      const scaledDamage = toSimplifiedHpDamageFromCountsWithResistance(rawCounts, this, false);
       const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
       return {
         ...result,
@@ -412,6 +413,9 @@ export class PeasantActor extends Actor {
         ignoreHaltReduction: true
       };
     }
+
+    const resistedCounts = applyDamageResistanceToCounts(rawCounts, this);
+    const resistedDamage = sumDamageCounts(resistedCounts);
 
     let tempHp = this.system?.temporaryHp?.value || 0;
     let bolsteredHp = this.system?.bolsteredHp || 0;
@@ -773,8 +777,8 @@ export class PeasantActor extends Actor {
       rank: "0",
       sig: false,
       name: "",
-      tohit: "",
-      accuracy: "",
+      tohit: null,
+      accuracy: null,
       usesMax: 0,
       usesCurrent: 0,
       indent: 0,
@@ -782,7 +786,7 @@ export class PeasantActor extends Actor {
       staminaCost: 0,
       attunementCost: 0,
       range: 0,
-      rangeRate: "",
+      rangeRate: [null, null, null, null],
       resourceCosts: [],
       speed: { type: "", splitSecondCurrent: 0, splitSecondMax: 0 },
       damage: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
@@ -816,6 +820,9 @@ export class PeasantActor extends Actor {
     merged.aoe = { ...defaults.aoe, ...(existing.aoe || {}) };
     merged.defense = normalizeCombatDefense(existing.defense);
     merged.tagOrder = Array.isArray(existing.tagOrder) ? existing.tagOrder : [];
+    merged.tohit = parseOptionalInteger(merged.tohit, { min: 1 });
+    merged.accuracy = parseOptionalInteger(merged.accuracy, { allowSign: true });
+    merged.rangeRate = normalizeRangeRateValue(merged.rangeRate);
     syncCombatCustomTags(merged);
     if (!merged.stability) merged.strengthen = false;
     return merged;
@@ -923,8 +930,8 @@ export class PeasantActor extends Actor {
       patch.rank = rankRaw.toLowerCase() === "u" ? rankRaw : (Number.parseInt(rankRaw, 10) || 0);
     }
     if ("name" in fields) patch.name = String(fields.name ?? "");
-    if ("tohit" in fields) patch.tohit = String(fields.tohit ?? "");
-    if ("accuracy" in fields) patch.accuracy = String(fields.accuracy ?? "");
+    if ("tohit" in fields) patch.tohit = parseOptionalInteger(fields.tohit, { min: 1 });
+    if ("accuracy" in fields) patch.accuracy = parseOptionalInteger(fields.accuracy, { allowSign: true });
     if ("specialGrade" in fields) patch.specialGrade = Math.max(0, Number.parseInt(fields.specialGrade, 10) || 0);
     return this.updatePeasantNotableCombat(index, patch, options);
   }
@@ -1054,7 +1061,7 @@ export class PeasantActor extends Actor {
         combat.range = 0;
         break;
       case "rangeRate":
-        combat.rangeRate = "";
+        combat.rangeRate = [null, null, null, null];
         break;
       case "damage":
         combat.damage = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
@@ -1146,7 +1153,7 @@ export class PeasantActor extends Actor {
         combat.range = Number.parseInt(data.range, 10) || 0;
         break;
       case "rangeRate":
-        combat.rangeRate = String(data.rangeRate ?? "");
+        combat.rangeRate = normalizeRangeRateValue(data.rangeRate);
         break;
       case "damage":
         combat.damage = {
@@ -1761,13 +1768,13 @@ export class PeasantActor extends Actor {
     return this.setPeasantToHitPenaltyTarget(current === target ? "" : target);
   }
 
-  async setPeasantReflexAoeSave(enabled, rawTarget = "") {
+  async setPeasantReflexAoeSave(enabled, rawTarget = "", options = {}) {
     const isEnabled = !!enabled;
-    const target = isEnabled ? String(rawTarget ?? "").trim() : "";
+    const target = isEnabled ? parseOptionalInteger(rawTarget, { min: 1 }) : null;
     await this.update({
       "system.reflexAoeSaveEnabled": isEnabled,
       "system.reflexAoeSaveTarget": target
-    });
+    }, options);
     return { ok: true, changed: true, enabled: isEnabled, target };
   }
 
@@ -1789,10 +1796,17 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, movement };
   }
 
-  async setPeasantInitiative(rawValue) {
-    const initiative = String(rawValue ?? "").trim();
-    await this.update({ "system.initiative": initiative });
+  async setPeasantInitiative(rawValue, options = {}) {
+    const initiative = parseOptionalInteger(rawValue, { allowSign: true });
+    await this.update({ "system.initiative": initiative }, options);
     return { ok: true, changed: true, initiative };
+  }
+
+  async setPeasantHaltValues(rawValues, { natural = false, render = false } = {}) {
+    const field = natural ? "naturalHaltValues" : "haltValues";
+    const values = normalizeHaltValues(rawValues);
+    await this.update({ [`system.${field}`]: values }, { render });
+    return { ok: true, changed: true, field, values };
   }
 
   async applyPeasantSimplifiedHpDefaults() {
@@ -1894,7 +1908,7 @@ export class PeasantActor extends Actor {
   }
 
   async setPeasantCombatHaltBuffValues(index, rawValues, options = { render: false }) {
-    return this.updatePeasantCombatHaltBuff(index, { values: normalizeHaltSlashValue(rawValues) }, options);
+    return this.updatePeasantCombatHaltBuff(index, { values: normalizeHaltValues(rawValues) }, options);
   }
 
   async setPeasantCombatHaltBuffValue(index, rawValue, options = { render: false }) {
@@ -1934,23 +1948,29 @@ export class PeasantActor extends Actor {
   }
 
   static createDefaultPeasantSkillEntry(entry = {}) {
-    return {
+    const existing = (entry && typeof entry === "object") ? entry : {};
+    const merged = {
       type: "standard",
       specialGrade: 0,
       class: 1,
       rank: "0",
       sig: false,
       name: "",
-      tohit: "",
-      accuracy: "",
-      ap: "",
-      sp: "",
+      tohit: null,
+      accuracy: null,
+      ap: null,
+      sp: null,
       usesMax: 0,
       usesCurrent: 0,
       indent: 0,
       description: "",
-      ...(entry && typeof entry === "object" ? entry : {})
+      ...existing
     };
+    merged.tohit = parseOptionalInteger(merged.tohit, { min: 1 });
+    merged.accuracy = parseOptionalInteger(merged.accuracy, { allowSign: true });
+    merged.ap = parseOptionalInteger(merged.ap, { min: 0 });
+    merged.sp = parseOptionalInteger(merged.sp, { min: 0 });
+    return merged;
   }
 
   getPeasantSkillsForUpdate() {
@@ -2071,8 +2091,8 @@ export class PeasantActor extends Actor {
 
   async setPeasantSkillToHitAccuracy(index, { tohit = "", accuracy = "" } = {}, options = { render: false }) {
     return this.updatePeasantSkill(index, {
-      tohit: tohit || "",
-      accuracy: accuracy === "" || accuracy === null ? "" : String(accuracy)
+      tohit: parseOptionalInteger(tohit, { min: 1 }),
+      accuracy: parseOptionalInteger(accuracy, { allowSign: true })
     }, options);
   }
 
@@ -2084,8 +2104,8 @@ export class PeasantActor extends Actor {
       patch.rank = rankRaw.toLowerCase() === "u" ? rankRaw : (Number.parseInt(rankRaw, 10) || 0);
     }
     if ("name" in fields) patch.name = String(fields.name ?? "");
-    if ("ap" in fields) patch.ap = String(fields.ap ?? "");
-    if ("sp" in fields) patch.sp = String(fields.sp ?? "");
+    if ("ap" in fields) patch.ap = parseOptionalInteger(fields.ap, { min: 0 });
+    if ("sp" in fields) patch.sp = parseOptionalInteger(fields.sp, { min: 0 });
     if ("specialGrade" in fields) patch.specialGrade = Math.max(0, Number.parseInt(fields.specialGrade, 10) || 0);
     return this.updatePeasantSkill(index, patch, options);
   }

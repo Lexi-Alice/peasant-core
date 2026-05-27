@@ -5,6 +5,7 @@ export function initializeSheetSaveQueues(sheet) {
   if (sheet._combatSaveQueue === undefined) sheet._combatSaveQueue = Promise.resolve();
   if (sheet._advantageSaveQueue === undefined) sheet._advantageSaveQueue = Promise.resolve();
   if (sheet._edgeResourceSaveQueue === undefined) sheet._edgeResourceSaveQueue = Promise.resolve();
+  if (sheet._portraitLozengeSaveQueue === undefined) sheet._portraitLozengeSaveQueue = Promise.resolve();
 }
 
 export function createSheetUpdateQueue(sheet) {

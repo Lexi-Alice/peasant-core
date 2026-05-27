@@ -1,4 +1,5 @@
 import { showReadonlyDescriptionDialog } from "../controls/description-dialogs.mjs";
+import { formatOptionalIntegerInput, parseOptionalInteger, sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
 import { delegate, qs, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
@@ -153,6 +154,16 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     }
   });
 
+  delegate(root, "input", ".skill-tohit, .skill-ap, .skill-sp", (ev, input) => {
+    if (!sheet.isEditMode) return;
+    sanitizeOptionalIntegerInputElement(input);
+  });
+
+  delegate(root, "input", ".skill-accuracy", (ev, input) => {
+    if (!sheet.isEditMode) return;
+    sanitizeOptionalIntegerInputElement(input, { allowSign: true });
+  });
+
   delegate(root, "change", ".skill-tohit, .skill-accuracy", async (ev, input) => {
     if (!sheet.isEditMode) return;
 
@@ -171,6 +182,9 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
 
         pcLog.debug("Persisting skill tohit/accuracy (index):", index, { tohit: tohitVal, accuracy: accVal });
         const result = await sheet.actor.setPeasantSkillToHitAccuracy?.(index, { tohit: tohitVal, accuracy: accVal }, { render: false });
+        const savedSkill = result?.skills?.[index] || {};
+        if (tohitEl) tohitEl.value = formatOptionalIntegerInput(savedSkill.tohit ?? parseOptionalInteger(tohitVal, { min: 1 }));
+        if (accEl) accEl.value = formatOptionalIntegerInput(savedSkill.accuracy ?? parseOptionalInteger(accVal, { allowSign: true }), { showPlus: true });
         if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
       });
     } catch (err) {
@@ -220,6 +234,9 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
 
         pcLog.debug("Persisting skill class/rank/name/ap/sp (index):", index, fields);
         const result = await sheet.actor.setPeasantSkillMainFields?.(index, fields, { render: false });
+        const savedSkill = result?.skills?.[index] || {};
+        if (apEl) apEl.value = formatOptionalIntegerInput(savedSkill.ap ?? parseOptionalInteger(fields.ap, { min: 0 }));
+        if (spEl) spEl.value = formatOptionalIntegerInput(savedSkill.sp ?? parseOptionalInteger(fields.sp, { min: 0 }));
         if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
       });
     } catch (err) {
@@ -309,6 +326,19 @@ function setupRankInputControls(html) {
 function normalizeRankValue(raw) {
   const match = String(raw || "").match(/[1234uU]/);
   return match ? match[0] : "";
+}
+
+function sanitizeOptionalIntegerInputElement(input, options = {}) {
+  if (!input) return;
+  const before = String(input.value ?? "");
+  const normalized = sanitizeOptionalIntegerInputValue(before, options);
+  if (normalized === before) return;
+
+  const pos = input.selectionStart ?? before.length;
+  const normalizedBeforeCursor = sanitizeOptionalIntegerInputValue(before.slice(0, pos), options);
+  input.value = normalized;
+  const nextPos = Math.max(0, Math.min(normalized.length, normalizedBeforeCursor.length));
+  try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
 }
 
 function collectSkillsFromDOMForSig(sheet) {

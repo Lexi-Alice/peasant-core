@@ -44,10 +44,10 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
   const rollTitle = targetLabel ? `${combatName} vs ${targetLabel}` : combatName;
   const rollId = `automated-damage-roll-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  const chatHtml = `<div class="skill-roll-card pc-damage-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #555; color: #ffffff;">
+  const chatHtml = `<fieldset class="skill-roll-card pc-damage-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
+    <legend>
       ${escapeHtml(rollTitle)}
-    </div>
+    </legend>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; gap: 6px;">
         <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
@@ -65,7 +65,7 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
         <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}
       </div>
     </div>
-  </div>`;
+  </fieldset>`;
 
   await ChatMessage.create(applyMessageMode({
     user: game.user.id,
