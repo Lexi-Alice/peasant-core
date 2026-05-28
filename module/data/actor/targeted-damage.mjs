@@ -1,4 +1,4 @@
-import { COMBAT_HALT_BUFF_TYPE_HALT, getCombatHaltBuffTotals, parseHaltSlashValues } from "./combat-modifiers.mjs";
+import { COMBAT_HALT_BUFF_TYPE_HALT, COMBAT_HALT_BUFF_TYPE_NATURAL, getCombatHaltBuffTotals, parseHaltSlashValues } from "./combat-modifiers.mjs";
 
 export const PC_ARMOR_CHARGE_MULTIPLIER_FLAG = "armorChargeMultiplier";
 export const PC_DEFAULT_ARMOR_CHARGE_MULTIPLIER = 2;
@@ -99,20 +99,49 @@ export function getLowestHaltDamageLocation(actor) {
   if (!actor) return "Torso";
 
   const haltParts = parseHaltSlashValues(actor.system?.haltValues || "0/0/0/0");
+  const naturalHaltParts = parseHaltSlashValues(actor.system?.naturalHaltValues || "0/0/0/0");
   const combatHaltTotals = getCombatHaltBuffTotals(actor.system?.combatMods?.haltBuffs);
   const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];
+  const naturalHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_NATURAL] || [0, 0, 0, 0];
 
   let bestLocation = "Torso";
   let bestValue = Number.POSITIVE_INFINITY;
   for (const location of LOWEST_HALT_LOCATION_PRIORITY) {
-    const haltIndex = TARGETED_DAMAGE_HALT_INDEX_MAP[location] ?? 0;
-    const haltValue = (Number.parseInt(haltParts[haltIndex], 10) || 0) + (armorHaltBuffs[haltIndex] || 0);
+    const haltValue = getHaltValueForLocation(location, haltParts, armorHaltBuffs, naturalHaltParts, naturalHaltBuffs);
     if (haltValue < bestValue) {
       bestValue = haltValue;
       bestLocation = location;
     }
   }
   return bestLocation;
+}
+
+export function getHighestHaltDamageLocation(actor) {
+  if (!actor) return "Torso";
+
+  const haltParts = parseHaltSlashValues(actor.system?.haltValues || "0/0/0/0");
+  const naturalHaltParts = parseHaltSlashValues(actor.system?.naturalHaltValues || "0/0/0/0");
+  const combatHaltTotals = getCombatHaltBuffTotals(actor.system?.combatMods?.haltBuffs);
+  const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];
+  const naturalHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_NATURAL] || [0, 0, 0, 0];
+
+  let bestLocation = "Torso";
+  let bestValue = Number.NEGATIVE_INFINITY;
+  for (const location of LOWEST_HALT_LOCATION_PRIORITY) {
+    const haltValue = getHaltValueForLocation(location, haltParts, armorHaltBuffs, naturalHaltParts, naturalHaltBuffs);
+    if (haltValue > bestValue) {
+      bestValue = haltValue;
+      bestLocation = location;
+    }
+  }
+  return bestLocation;
+}
+
+function getHaltValueForLocation(location, haltParts, armorHaltBuffs, naturalHaltParts, naturalHaltBuffs) {
+  const haltIndex = TARGETED_DAMAGE_HALT_INDEX_MAP[location] ?? 0;
+  const armorHalt = (Number.parseInt(haltParts[haltIndex], 10) || 0) + (armorHaltBuffs[haltIndex] || 0);
+  const naturalHalt = (Number.parseInt(naturalHaltParts[haltIndex], 10) || 0) + (naturalHaltBuffs[haltIndex] || 0);
+  return armorHalt + naturalHalt;
 }
 
 export function normalizeAppliedDamageType(rawType, fallback = "blunt") {

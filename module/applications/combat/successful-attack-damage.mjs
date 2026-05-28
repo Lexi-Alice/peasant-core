@@ -1,11 +1,20 @@
 import { getCombatDefenseResponseKey, normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
 import { getAutomatedCombatDamagePreview, getAutomatedCombatDamageTypeLabel } from "../../data/actor/combat-damage.mjs";
-import { getCombatMagnetismGrade } from "../../data/actor/combat-tags.mjs";
-import { isMageDefenseDamageRedirect, isShieldDefenseDamageBlock, isWeaponDefenseDamageBlock } from "../../data/actor/defense-results.mjs";
+import { getCombatMagnetismGrade, getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
 import {
+  doesPromptResultCountAsActiveDefense,
+  isMageDefenseDamageRedirect,
+  isNarrowSuccessAttack,
+  isShieldDefenseDamageBlock,
+  isWeaponDefenseDamageBlock
+} from "../../data/actor/defense-results.mjs";
+import {
+  getHighestHaltDamageLocation,
+  getLowestHaltDamageLocation,
   getTargetedDamageLocationDisplay,
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
+import { rollAoeReflexSaveForTarget } from "./aoe-reflex-save.mjs";
 import { resolveAttackLocationForTarget } from "./attack-locations.mjs";
 import { rollAutomatedCombatDamage } from "./automated-damage-rolls.mjs";
 import { requestIncomingHitApplicationForTarget, requestIncomingHitResolutionForTarget } from "./incoming-hit.mjs";
@@ -14,7 +23,7 @@ import { isChainCancelledResult } from "./prompt-dialogs.mjs";
 function getWeaponMasteryMagnetismGrade(combat, defensePromptResult, { requireMelee = false } = {}) {
   const baseGrade = getCombatMagnetismGrade(combat);
   const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
-  const isMelee = getCombatDefenseResponseKey(combat?.targetingType) === "melee";
+  const isMelee = getCombatDefenseResponseKey(getCombatTargetingType(combat)) === "melee";
   const defensePassed = !!defensePromptResult?.defenseRoll?.rollResult?.isSuccess;
   const masteryApplies = !!(
     defensePromptResult?.selection === "defense"
@@ -37,6 +46,26 @@ function createWeaponBlockLocationRoll() {
   };
 }
 
+function createAreaDamageLocationRoll(targetingType, location = "Torso") {
+  const label = String(targetingType || "AoE").trim() || "AoE";
+  return {
+    rawText: label,
+    location,
+    locationDisplay: label,
+    isAP: false,
+    byAoe: true
+  };
+}
+
+function isAreaDamageTargetingKey(targetingKey) {
+  return ["aoe", "areaBlast", "tileBlast"].includes(targetingKey);
+}
+
+function getAreaDamageHaltLocation(targetActor, targetingKey) {
+  if (targetingKey === "areaBlast") return getLowestHaltDamageLocation(targetActor);
+  return getHighestHaltDamageLocation(targetActor);
+}
+
 export async function resolveSuccessfulAttackDamageForTarget({
   actor = null,
   attackerToken = null,
@@ -50,14 +79,22 @@ export async function resolveSuccessfulAttackDamageForTarget({
     return null;
   }
 
-  const targetingKey = getCombatDefenseResponseKey(combat?.targetingType);
-  if (targetingKey === "aoe") return null;
+  const targetingType = getCombatTargetingType(combat);
+  const targetingKey = getCombatDefenseResponseKey(targetingType);
   if (!combat?.damage) return null;
 
   const mageBlockFailure = isMageDefenseDamageRedirect(attackRoll, defensePromptResult);
   const shieldBlockFailure = isShieldDefenseDamageBlock(attackRoll, defensePromptResult);
   const weaponBlockFailure = isWeaponDefenseDamageBlock(attackRoll, defensePromptResult);
-  if (!attackRoll?.rollResult?.isSuccess && !mageBlockFailure && !shieldBlockFailure && !weaponBlockFailure) {
+  const narrowSuccessWithoutDefense = isNarrowSuccessAttack(attackRoll)
+    && !doesPromptResultCountAsActiveDefense(defensePromptResult);
+  if (
+    !attackRoll?.rollResult?.isSuccess
+    && !narrowSuccessWithoutDefense
+    && !mageBlockFailure
+    && !shieldBlockFailure
+    && !weaponBlockFailure
+  ) {
     return null;
   }
 
@@ -131,7 +168,6 @@ export async function resolveSuccessfulAttackDamageForTarget({
     let locationRoll = createWeaponBlockLocationRoll();
 
     if (weaponOverflowDamage > 0) {
-      const preDefenseMoS = Number(attackRoll?.rollResult?.preDefenseTotalMoS);
       locationRoll = await resolveAttackLocationForTarget({
         actor,
         attackerToken,
@@ -139,8 +175,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
         target,
         attackRoll,
         defensePromptResult,
-        magnetismGrade: getWeaponMasteryMagnetismGrade(combat, defensePromptResult),
-        locationMoS: Number.isFinite(preDefenseMoS) ? preDefenseMoS : null
+        magnetismGrade: getWeaponMasteryMagnetismGrade(combat, defensePromptResult)
       });
       if (isChainCancelledResult(locationRoll)) {
         return { handled: false, chainCancelled: true, reason: "locationPromptClosed", damageRoll };
@@ -239,6 +274,70 @@ export async function resolveSuccessfulAttackDamageForTarget({
       damageRoll,
       absorbedByMage,
       redirectedDamage,
+      application
+    };
+  }
+
+  if (isAreaDamageTargetingKey(targetingKey)) {
+    const areaDamageLocation = getAreaDamageHaltLocation(target?.actor || null, targetingKey);
+    const locationRoll = createAreaDamageLocationRoll(targetingType, areaDamageLocation);
+    const resolvedDamageType = normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt");
+    const reflexSaveResult = targetingKey === "aoe"
+      ? (defensePromptResult?.selection === "reflexSave" ? defensePromptResult.reflexSaveResult : null)
+      : await rollAoeReflexSaveForTarget({ target, targetingType });
+    const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+      targetLabel,
+      attackerToken,
+      appliedDamageType: resolvedDamageType,
+      aoeReflexSaveResult: reflexSaveResult
+    });
+    if (!damageRoll || !Number.isFinite(Number(damageRoll.total)) || Number(damageRoll.total) <= 0) {
+      return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, reflexSaveResult, aoe: true };
+    }
+
+    const baseDamageAmount = Number(damageRoll.total) || 0;
+    const resolvedDamageAmount = reflexSaveResult?.passed
+      ? Math.floor(baseDamageAmount / 2)
+      : baseDamageAmount;
+    if (resolvedDamageAmount <= 0) {
+      return {
+        handled: true,
+        aoe: true,
+        locationRoll,
+        damageRoll,
+        reflexSaveResult,
+        baseDamageAmount,
+        resolvedDamageAmount,
+        application: { handled: true, applied: false, reason: "reflexSaveReducedDamageToZero" }
+      };
+    }
+
+    const application = await requestIncomingHitApplicationForTarget({
+      target,
+      attackerActor: actor,
+      attackerToken,
+      combat,
+      damageRoll,
+      locationRoll,
+      incomingHitResolution: {
+        useArmorCharge: false,
+        appliedDamageType: resolvedDamageType
+      },
+      damageAmountOverride: resolvedDamageAmount,
+      ignoreHaltReduction: false,
+      locationlessDamage: false,
+      woundLocation: "Torso",
+      suppressLocationBreaks: true
+    });
+
+    return {
+      handled: true,
+      aoe: true,
+      locationRoll,
+      damageRoll,
+      reflexSaveResult,
+      baseDamageAmount,
+      resolvedDamageAmount,
       application
     };
   }

@@ -3,7 +3,9 @@ export const COMBAT_DEFENSE_RESPONSE_OPTIONS = Object.freeze([
   { key: "projectile", label: "Projectile" },
   { key: "normal", label: "Normal" },
   { key: "smite", label: "Smite" },
-  { key: "aoe", label: "AoE" }
+  { key: "aoe", label: "AoE" },
+  { key: "areaBlast", label: "Area Blast" },
+  { key: "tileBlast", label: "Tile Blast" }
 ]);
 
 export const COMBAT_DEFENSE_BLOCK_TYPES = Object.freeze([
@@ -20,6 +22,15 @@ export const COMBAT_DEFENSE_SHIELD_ARM_OPTIONS = Object.freeze([
 export function getCombatDefenseResponseOption(value) {
   const normalized = String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
   if (!normalized) return null;
+  if (["aoe", "area"].includes(normalized)) {
+    return COMBAT_DEFENSE_RESPONSE_OPTIONS.find((option) => option.key === "aoe") || null;
+  }
+  if (["blast", "areablast"].includes(normalized)) {
+    return COMBAT_DEFENSE_RESPONSE_OPTIONS.find((option) => option.key === "areaBlast") || null;
+  }
+  if (["tile", "tileblast"].includes(normalized)) {
+    return COMBAT_DEFENSE_RESPONSE_OPTIONS.find((option) => option.key === "tileBlast") || null;
+  }
   return COMBAT_DEFENSE_RESPONSE_OPTIONS.find((option) => {
     if (option.key === normalized) return true;
     if (option.label.toLowerCase().replace(/[\s_-]+/g, "") === normalized) return true;
@@ -56,7 +67,9 @@ export function createDefaultCombatDefense() {
       projectile: createDefaultCombatDefenseEffectivenessEntry(),
       normal: createDefaultCombatDefenseEffectivenessEntry(),
       smite: createDefaultCombatDefenseEffectivenessEntry(),
-      aoe: createDefaultCombatDefenseEffectivenessEntry()
+      aoe: createDefaultCombatDefenseEffectivenessEntry(),
+      areaBlast: createDefaultCombatDefenseEffectivenessEntry(),
+      tileBlast: createDefaultCombatDefenseEffectivenessEntry()
     },
     block: false,
     blockType: "Shield",

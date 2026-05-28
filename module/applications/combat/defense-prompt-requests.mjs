@@ -1,10 +1,11 @@
 import { PC_SOCKET_NAMESPACE, PC_SOCKET_PROMPT_DEFENSE } from "../../socket/remote-prompts.mjs";
+import { getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { getActiveNotableCombatTargets, getPreferredActorToken, getPreferredDefensePromptRecipientUser } from "./actor-targets.mjs";
 import { isChainCancelledResult, withWaitingForDefenderResponse } from "./prompt-dialogs.mjs";
 
 export async function emitDefensePromptRequestsForAttack({ actor, combat, combatIndex, attackerToken = null } = {}) {
-  const targetingType = String(combat?.targetingType || "").trim();
+  const targetingType = getCombatTargetingType(combat);
   if (!targetingType) {
     pcLog.debug("Peasant Core | Defense prompt skipped: no targeting type", {
       actor: actor?.name,
@@ -13,7 +14,6 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
     });
     return { totalAccuracyPenalty: 0, promptResults: [] };
   }
-
   const targets = getActiveNotableCombatTargets();
   if (!targets.length) {
     pcLog.debug("Peasant Core | Defense prompt skipped: no targeted tokens", {

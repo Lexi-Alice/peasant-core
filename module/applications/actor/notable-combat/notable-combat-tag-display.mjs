@@ -1,11 +1,13 @@
 import { getCombatDefenseSummary } from "../../../data/actor/combat-defense.mjs";
-import { COMBAT_EDITOR_TAG_TYPES, formatRangeRateValue, getCombatCustomTags, hasRangeRateValue } from "../../../data/actor/combat-tags.mjs";
+import { COMBAT_EDITOR_TAG_TYPES, formatRangeRateValue, getCombatCustomTags, getCombatTargetingType, hasRangeRateValue } from "../../../data/actor/combat-tags.mjs";
 import { formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 
 export function getActiveNotableCombatEditorTags(combatData) {
   const rawTagOrder = Array.isArray(combatData?.tagOrder) ? combatData.tagOrder : [];
   const hasCustomOrder = rawTagOrder.length > 0;
-  const tagOrder = hasCustomOrder ? [...rawTagOrder] : [...COMBAT_EDITOR_TAG_TYPES];
+  const tagOrder = hasCustomOrder
+    ? rawTagOrder.filter((tagType) => COMBAT_EDITOR_TAG_TYPES.includes(tagType))
+    : [...COMBAT_EDITOR_TAG_TYPES];
 
   for (const tagType of COMBAT_EDITOR_TAG_TYPES) {
     if (!tagOrder.includes(tagType)) tagOrder.push(tagType);
@@ -91,15 +93,8 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
         return `Sections: ${combatData.sections.current}/${combatData.sections.max}`;
       }
       return null;
-    case "aoe":
-      if (combatData.aoe && combatData.aoe.value > 0) {
-        let str = `AoE: ${combatData.aoe.value}`;
-        if (combatData.aoe.type && combatData.aoe.type !== "Area") str += ` ${combatData.aoe.type}`;
-        return str;
-      }
-      return null;
     case "targetingType":
-      return combatData.targetingType ? `${combatData.targetingType}` : null;
+      return getCombatTargetingType(combatData) || null;
     case "defense": {
       const summary = getCombatDefenseSummary(combatData.defense);
       return summary ? `Defense: ${summary}` : null;

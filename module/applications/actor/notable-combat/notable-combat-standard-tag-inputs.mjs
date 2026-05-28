@@ -1,4 +1,4 @@
-import { getCombatCustomTags } from "../../../data/actor/combat-tags.mjs";
+import { COMBAT_TARGETING_TYPE_OPTIONS, getCombatCustomTags, getCombatTargetingType } from "../../../data/actor/combat-tags.mjs";
 import { getRangeRatePartInputValue } from "../../../data/actor/combat-tags.mjs";
 import { formatCombatDiceValue, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { escapeHtml } from "../../../utils/chat.mjs";
@@ -122,35 +122,22 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
         </div>
       `);
       return true;
-    case "aoe": {
-      const currentAoe = combatData.aoe || {};
-      $area.html(`
-        <div class="pc-tag-field-row">
-          <label class="pc-tag-field-label">AoE Value:</label>
-          <input type="number" class="tag-aoe-value ${PC_TAG_INPUT_CLASS}" value="${currentAoe.value || ""}" min="1" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
-          <select class="tag-aoe-type ${PC_TAG_SELECT_CLASS}">
-            <option value="Area" ${currentAoe.type === "Area" || !currentAoe.type ? "selected" : ""}>Area</option>
-            <option value="Blast" ${currentAoe.type === "Blast" ? "selected" : ""}>Blast</option>
-            <option value="Tile" ${currentAoe.type === "Tile" ? "selected" : ""}>Tile</option>
-          </select>
-        </div>
-      `);
-      return true;
-    }
-    case "targetingType":
+    case "targetingType": {
+      const currentTargetingType = getCombatTargetingType(combatData);
+      const targetingOptions = COMBAT_TARGETING_TYPE_OPTIONS.map((option) => (
+        `<option value="${escapeHtml(option)}" ${currentTargetingType === option ? "selected" : ""}>${escapeHtml(option)}</option>`
+      )).join("");
       $area.html(`
         <div class="pc-tag-field-row">
           <label class="pc-tag-field-label">Targeting Type:</label>
           <select class="tag-targeting-type ${PC_TAG_SELECT_CLASS}">
             <option value="">-- Select --</option>
-            <option value="Melee" ${combatData.targetingType === "Melee" ? "selected" : ""}>Melee</option>
-            <option value="Projectile" ${combatData.targetingType === "Projectile" ? "selected" : ""}>Projectile</option>
-            <option value="Normal Targeting" ${combatData.targetingType === "Normal Targeting" ? "selected" : ""}>Normal Targeting</option>
-            <option value="Smite" ${combatData.targetingType === "Smite" ? "selected" : ""}>Smite</option>
+            ${targetingOptions}
           </select>
         </div>
       `);
       return true;
+    }
     case "reach":
       $area.html(`
         <div class="pc-tag-field-row">

@@ -12,7 +12,6 @@ export const COMBAT_VIEW_TAG_TYPES = Object.freeze([
   "manifest",
   "tagUses",
   "sections",
-  "aoe",
   "targetingType",
   "defense",
   "reach",
@@ -35,7 +34,6 @@ export const COMBAT_EDITOR_TAG_TYPES = Object.freeze([
   "manifest",
   "tagUses",
   "sections",
-  "aoe",
   "targetingType",
   "defense",
   "reach",
@@ -60,7 +58,6 @@ export const COMBAT_FULL_TAG_ORDER = Object.freeze([
   "manifest",
   "tagUses",
   "sections",
-  "aoe",
   "targetingType",
   "defense",
   "reach",
@@ -69,6 +66,59 @@ export const COMBAT_FULL_TAG_ORDER = Object.freeze([
   "custom",
   "self"
 ]);
+
+export const COMBAT_TARGETING_TYPE_OPTIONS = Object.freeze([
+  "Melee",
+  "Projectile",
+  "Normal Targeting",
+  "Smite",
+  "AoE",
+  "Area Blast",
+  "Tile Blast"
+]);
+
+export function normalizeCombatTargetingType(rawType) {
+  const normalized = String(rawType ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  switch (normalized) {
+    case "melee":
+      return "Melee";
+    case "projectile":
+      return "Projectile";
+    case "normal":
+    case "normaltargeting":
+      return "Normal Targeting";
+    case "smite":
+      return "Smite";
+    case "aoe":
+    case "area":
+      return "AoE";
+    case "blast":
+    case "areablast":
+      return "Area Blast";
+    case "tile":
+    case "tileblast":
+      return "Tile Blast";
+    default:
+      return "";
+  }
+}
+
+export function getLegacyAoeTargetingType(combatData) {
+  const value = Number.parseInt(combatData?.aoe?.value, 10) || 0;
+  if (value <= 0) return "";
+
+  const type = String(combatData?.aoe?.type ?? "").trim().toLowerCase();
+  if (type === "blast") return "Area Blast";
+  if (type === "tile") return "Tile Blast";
+  return "AoE";
+}
+
+export function getCombatTargetingType(combatData) {
+  const rawTargetingType = String(combatData?.targetingType ?? "").trim();
+  return normalizeCombatTargetingType(rawTargetingType)
+    || getLegacyAoeTargetingType(combatData)
+    || rawTargetingType;
+}
 
 export function normalizeCombatMagnetism(rawMagnetism) {
   const source = (rawMagnetism && typeof rawMagnetism === "object") ? rawMagnetism.grade : rawMagnetism;

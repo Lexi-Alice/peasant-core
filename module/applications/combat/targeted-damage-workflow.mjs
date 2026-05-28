@@ -37,12 +37,14 @@ export async function applyTargetedDamageWorkflow(actor, {
   isAP = false,
   useArmorCharge = false,
   ignoreHaltReduction = false,
+  woundLocation = null,
+  suppressLocationBreaks = false,
   chatSpeaker = null
 } = {}) {
   if (!actor) return { ok: false, message: "Actor not found." };
 
   const result = typeof actor.applyPeasantTargetedDamage === "function"
-    ? await actor.applyPeasantTargetedDamage({ amount, type, location, isAP, useArmorCharge, ignoreHaltReduction })
+    ? await actor.applyPeasantTargetedDamage({ amount, type, location, isAP, useArmorCharge, ignoreHaltReduction, woundLocation, suppressLocationBreaks })
     : { ok: false, message: "Peasant Core targeted damage workflow is not available for this actor." };
 
   if (result?.damageToGrid > 0 && result?.events?.length > 0) {

@@ -2,7 +2,12 @@ import { buildAutomatedCombatDamageData } from "../../data/actor/combat-damage.m
 import { applyMessageMode, escapeHtml } from "../../utils/chat.mjs";
 import { getActorRollSpeaker } from "./actor-targets.mjs";
 
-export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "", attackerToken = null, appliedDamageType = null } = {}) {
+export async function rollAutomatedCombatDamage(actor, combat, {
+  targetLabel = "",
+  attackerToken = null,
+  appliedDamageType = null,
+  aoeReflexSaveResult = null
+} = {}) {
   if (!actor || !combat?.damage) return null;
 
   const damageData = buildAutomatedCombatDamageData(actor, combat, { appliedDamageType });
@@ -39,6 +44,16 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
   }
 
   const total = adjustedDiceTotal + flat;
+  const reflexSaveResult = (aoeReflexSaveResult && typeof aoeReflexSaveResult === "object")
+    ? aoeReflexSaveResult
+    : null;
+  const reflexSavePassed = !!reflexSaveResult?.passed;
+  const displayTotal = reflexSaveResult && reflexSavePassed
+    ? Math.floor(total / 2)
+    : total;
+  const damageDetailsHtml = `${diceDetailLine}${flat !== 0 ? `
+        <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}${reflexSavePassed ? `
+        <div>Damage Halved Enemy Passed AoE Reflex Save</div>` : ''}`;
   const speaker = getActorRollSpeaker(actor, attackerToken);
   const typeDisplay = typeLabel ? `<span style="color: #aaa; font-size: 11px; margin-left: 6px;">${escapeHtml(typeLabel)}</span>` : "";
   const rollTitle = targetLabel ? `${combatName} vs ${targetLabel}` : combatName;
@@ -54,15 +69,14 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">Damage:</span>
           <div style="display: flex; align-items: center; gap: 6px;">
             <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #4ade80; border: 2px solid #22c55e;">
-              ${total}
+              ${displayTotal}
             </button>${typeDisplay}
           </div>
         </div>
       </div>
       <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
         <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
-        ${diceDetailLine}${flat !== 0 ? `
-        <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}
+        ${damageDetailsHtml}
       </div>
     </div>
   </fieldset>`;
@@ -83,6 +97,7 @@ export async function rollAutomatedCombatDamage(actor, combat, { targetLabel = "
     normalizedType,
     roll,
     allDice,
-    adjustedDiceTotal
+    adjustedDiceTotal,
+    displayTotal
   };
 }

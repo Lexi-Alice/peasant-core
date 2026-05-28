@@ -2,7 +2,7 @@ import {
   getCombatDefenseSummary,
   normalizeCombatDefense
 } from "../combat-defense.mjs";
-import { COMBAT_VIEW_TAG_TYPES, getCombatCustomTags, getCombatMagnetismGrade } from "../combat-tags.mjs";
+import { COMBAT_VIEW_TAG_TYPES, getCombatCustomTags, getCombatMagnetismGrade, getCombatTargetingType } from "../combat-tags.mjs";
 import {
   COMBAT_HALT_BUFF_TYPE_COST,
   COMBAT_HALT_BUFF_TYPE_CUSTOM,
@@ -201,16 +201,8 @@ export function prepareActorNotableCombatContext(data, actor) {
 
     const hasTagUses = combat.tagUses && combat.tagUses.max > 0;
     const hasSections = combat.sections && combat.sections.max > 0;
-    const hasAoe = combat.aoe && combat.aoe.value > 0;
-    let aoeDisplay = "";
-    if (hasAoe) {
-      aoeDisplay = `${combat.aoe.value}`;
-      if (combat.aoe.type && combat.aoe.type !== "Area") {
-        aoeDisplay += ` ${combat.aoe.type}`;
-      }
-    }
-
-    const hasTargetingType = !!combat.targetingType;
+    const targetingTypeDisplay = getCombatTargetingType(combat);
+    const hasTargetingType = !!targetingTypeDisplay;
     const defenseData = normalizeCombatDefense(combat.defense);
     const defenseSummary = getCombatDefenseSummary(defenseData);
     const hasDefense = defenseData.responses.length > 0;
@@ -245,8 +237,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       manifest: { has: hasManifest, label: "Manifest", value: manifestDisplay, rollable: true },
       tagUses: { has: hasTagUses, label: "Uses", current: combat.tagUses?.current || 0, max: combat.tagUses?.max || 0, isUses: true },
       sections: { has: hasSections, label: "Sections", current: combat.sections?.current || 0, max: combat.sections?.max || 0, isSections: true },
-      aoe: { has: hasAoe, label: "AoE", value: aoeDisplay },
-      targetingType: { has: hasTargetingType, label: "", value: combat.targetingType },
+      targetingType: { has: hasTargetingType, label: "", value: targetingTypeDisplay },
       defense: { has: hasDefense, label: "Defense", value: defenseSummary },
       reach: { has: hasReach, label: "Reach", value: combat.reach },
       stability: { has: hasStability, label: "Stability", value: "" },
@@ -320,8 +311,8 @@ export function prepareActorNotableCombatContext(data, actor) {
       manifestDisplay,
       hasTagUses,
       hasSections,
-      hasAoe,
-      aoeDisplay,
+      hasAoe: false,
+      aoeDisplay: "",
       hasTargetingType,
       hasDefense,
       defenseData,
@@ -340,7 +331,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       activeTags,
       customTags,
       tagOrder: combat.tagOrder || [],
-      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasTagUses || hasSections || hasAoe || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
+      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasTagUses || hasSections || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
     };
   });
 }

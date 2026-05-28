@@ -1,5 +1,6 @@
 import { getAutomatedCombatDamageTypeLabel } from "../../data/actor/combat-damage.mjs";
 import { normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
+import { getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
 import {
   getTargetedDamageLocationDisplay,
   isArmorPenLocationLike,
@@ -157,6 +158,8 @@ async function applyIncomingWeaponBlock(defenderActor, payload = {}) {
       isAP: armorPenHit,
       useArmorCharge: !!payload.useArmorCharge,
       ignoreHaltReduction: !!payload.ignoreHaltReduction,
+      woundLocation: payload.woundLocation || null,
+      suppressLocationBreaks: !!payload.suppressLocationBreaks,
       chatSpeaker: ChatMessage.getSpeaker({ actor: defenderActor })
     });
   }
@@ -223,6 +226,8 @@ export async function applyIncomingHit(payload = {}) {
       isAP: armorPenHit,
       useArmorCharge: !!payload.useArmorCharge,
       ignoreHaltReduction: !!payload.ignoreHaltReduction,
+      woundLocation: payload.woundLocation || null,
+      suppressLocationBreaks: !!payload.suppressLocationBreaks,
       chatSpeaker: ChatMessage.getSpeaker({ actor: defenderActor })
     });
   } catch (error) {
@@ -298,7 +303,7 @@ export async function requestIncomingHitResolutionForTarget({
     attackerTokenName: attackerName,
     attackCombatIndex: null,
     attackCombatName: String(combat?.name || "Attack").trim() || "Attack",
-    attackTargetingType: String(combat?.targetingType || "").trim(),
+    attackTargetingType: getCombatTargetingType(combat),
     targetSceneId: targetTokenDocument?.parent?.id || targetTokenDocument?.scene?.id || null,
     targetTokenId: targetTokenDocument?.id || null,
     targetTokenUuid: targetTokenDocument?.uuid || null,
@@ -348,7 +353,9 @@ export async function requestIncomingHitApplicationForTarget({
   ignoreHaltReduction = false,
   shieldBlock = null,
   weaponBlock = null,
-  locationlessDamage = false
+  locationlessDamage = false,
+  woundLocation = null,
+  suppressLocationBreaks = false
 } = {}) {
   const targetActor = target?.actor || null;
   const targetTokenDocument = target?.tokenDocument || target?.token?.document || target?.token || null;
@@ -401,7 +408,7 @@ export async function requestIncomingHitApplicationForTarget({
     attackerTokenName: attackerName,
     attackCombatIndex: null,
     attackCombatName: String(combat?.name || "Attack").trim() || "Attack",
-    attackTargetingType: String(combat?.targetingType || "").trim(),
+    attackTargetingType: getCombatTargetingType(combat),
     targetSceneId: targetTokenDocument?.parent?.id || targetTokenDocument?.scene?.id || null,
     targetTokenId: targetTokenDocument?.id || null,
     targetTokenUuid: targetTokenDocument?.uuid || null,
@@ -419,7 +426,9 @@ export async function requestIncomingHitApplicationForTarget({
     ignoreHaltReduction: !!ignoreHaltReduction,
     shieldBlock: (shieldBlock && typeof shieldBlock === "object") ? shieldBlock : null,
     weaponBlock: (weaponBlock && typeof weaponBlock === "object") ? weaponBlock : null,
-    locationlessDamage: !!locationlessDamage
+    locationlessDamage: !!locationlessDamage,
+    woundLocation: woundLocation || null,
+    suppressLocationBreaks: !!suppressLocationBreaks
   };
 
   let canApplyLocally = false;

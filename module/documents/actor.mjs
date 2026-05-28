@@ -13,7 +13,7 @@ import {
   sanitizeCombatHaltBuffType
 } from "../data/actor/combat-modifiers.mjs";
 import { createDefaultCombatDefense, normalizeCombatDefense } from "../data/actor/combat-defense.mjs";
-import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, normalizeRangeRateValue, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
+import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, normalizeCombatTargetingType, normalizeRangeRateValue, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
 import { getDefaultEdgeLabelMode, normalizeEdgeResourceEntry, sanitizeEdgeLabelMode } from "../data/actor/edge-resources.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor, parseOptionalInteger } from "../data/actor/helpers.mjs";
 import { parseHpValueCommand } from "../data/actor/hp-commands.mjs";
@@ -180,7 +180,9 @@ export class PeasantActor extends Actor {
     location = "Torso",
     isAP = false,
     useArmorCharge = false,
-    ignoreHaltReduction = false
+    ignoreHaltReduction = false,
+    woundLocation = null,
+    suppressLocationBreaks = false
   } = {}) {
     const normalizedType = normalizeAppliedDamageType(type);
     if (normalizedType === "flexible") {
@@ -193,6 +195,8 @@ export class PeasantActor extends Actor {
     }
 
     const locKey = getTargetedDamageConditionKey(location);
+    const woundLoc = woundLocation || location;
+    const woundLocKey = getTargetedDamageConditionKey(woundLoc);
     const locationDisplay = getTargetedDamageLocationDisplay(location);
     const haltIndex = TARGETED_DAMAGE_HALT_INDEX_MAP[location] ?? 0;
     const isHybrid = normalizedType === "hybrid";
@@ -275,13 +279,13 @@ export class PeasantActor extends Actor {
     const hpCols = hp.cols || 7;
     const woundMult = getWoundThresholdMultipliers(this);
     let woundMultiplier = woundMult.head;
-    if (location === "Torso") woundMultiplier = woundMult.torso;
-    else if (location === "RightArm" || location === "LeftArm") woundMultiplier = woundMult.arms;
-    else if (location === "RightLeg" || location === "LeftLeg") woundMultiplier = woundMult.legs;
+    if (woundLoc === "Torso") woundMultiplier = woundMult.torso;
+    else if (woundLoc === "RightArm" || woundLoc === "LeftArm") woundMultiplier = woundMult.arms;
+    else if (woundLoc === "RightLeg" || woundLoc === "LeftLeg") woundMultiplier = woundMult.legs;
     const woundThreshold = hpCols * woundMultiplier;
 
     const isAlreadyWounded = this.system?.conditions?.wounded;
-    const currentLocStatus = this.system?.conditions?.[locKey];
+    const currentLocStatus = this.system?.conditions?.[suppressLocationBreaks ? woundLocKey : locKey];
 
     const disabledMult = isAlreadyWounded ? 1 : 2;
     const crippledMult = isAlreadyWounded ? 2 : 3;
@@ -300,14 +304,14 @@ export class PeasantActor extends Actor {
         events.push("Became Wounded!");
       }
 
-      if (damageToGrid >= crippledThreshold || (damageToGrid >= disabledThreshold && currentLocStatus === "disabled")) {
+      if (!suppressLocationBreaks && (damageToGrid >= crippledThreshold || (damageToGrid >= disabledThreshold && currentLocStatus === "disabled"))) {
         if (newLocStatus !== "crippled") {
           newLocStatus = "crippled";
           breakOccurred = true;
           breakType = "Crippled";
           events.push(`${breakType} ${locationDisplay}!`);
         }
-      } else if (damageToGrid >= disabledThreshold) {
+      } else if (!suppressLocationBreaks && damageToGrid >= disabledThreshold) {
         if (newLocStatus !== "disabled" && newLocStatus !== "crippled") {
           newLocStatus = "disabled";
           breakOccurred = true;
@@ -319,7 +323,7 @@ export class PeasantActor extends Actor {
 
     const conditionUpdates = {};
     if (newWoundedState !== isAlreadyWounded) conditionUpdates["system.conditions.wounded"] = newWoundedState;
-    if (newLocStatus !== currentLocStatus) conditionUpdates[`system.conditions.${locKey}`] = newLocStatus;
+    if (!suppressLocationBreaks && newLocStatus !== currentLocStatus) conditionUpdates[`system.conditions.${locKey}`] = newLocStatus;
     if (Object.keys(conditionUpdates).length > 0) await this.update(conditionUpdates);
 
     const gridDamageType = isHybrid ? "lethal" : normalizedType;
@@ -819,7 +823,10 @@ export class PeasantActor extends Actor {
     merged.sections = { ...defaults.sections, ...(existing.sections || {}) };
     merged.aoe = { ...defaults.aoe, ...(existing.aoe || {}) };
     merged.defense = normalizeCombatDefense(existing.defense);
-    merged.tagOrder = Array.isArray(existing.tagOrder) ? existing.tagOrder : [];
+    merged.targetingType = normalizeCombatTargetingType(merged.targetingType) || String(merged.targetingType ?? "");
+    merged.tagOrder = Array.isArray(existing.tagOrder)
+      ? existing.tagOrder.filter((tagType) => COMBAT_FULL_TAG_ORDER.includes(tagType))
+      : [];
     merged.tohit = parseOptionalInteger(merged.tohit, { min: 1 });
     merged.accuracy = parseOptionalInteger(merged.accuracy, { allowSign: true });
     merged.rangeRate = normalizeRangeRateValue(merged.rangeRate);
@@ -1089,6 +1096,7 @@ export class PeasantActor extends Actor {
         break;
       case "targetingType":
         combat.targetingType = "";
+        combat.aoe = { value: 0, type: "" };
         break;
       case "defense":
         combat.defense = createDefaultCombatDefense();
@@ -1209,7 +1217,8 @@ export class PeasantActor extends Actor {
         };
         break;
       case "targetingType":
-        combat.targetingType = String(data.targetingType ?? "");
+        combat.targetingType = normalizeCombatTargetingType(data.targetingType) || String(data.targetingType ?? "");
+        combat.aoe = { value: 0, type: "" };
         break;
       case "defense":
         combat.defense = normalizeCombatDefense(data.defense);

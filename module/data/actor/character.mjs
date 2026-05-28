@@ -371,7 +371,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         }),
         aoe: new fields.SchemaField({
           value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          type: new fields.StringField({ initial: "" }) // Area, Blast, Tile
+          type: new fields.StringField({ initial: "" }) // Legacy: Area, Blast, Tile
         }),
         customTag: new fields.SchemaField({
           name: new fields.StringField({ initial: "" }),
@@ -381,7 +381,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
           name: new fields.StringField({ initial: "" }),
           value: new fields.StringField({ initial: "" })
         }), { initial: [] }),
-        targetingType: new fields.StringField({ initial: "" }), // Melee, Projectile, Normal Targeting, Smite
+        targetingType: new fields.StringField({ initial: "" }), // Melee, Projectile, Normal Targeting, Smite, AoE, Area Blast, Tile Blast
         defense: new fields.SchemaField({
           responses: new fields.ArrayField(new fields.StringField(), { initial: [] }),
           effectiveness: new fields.SchemaField({
@@ -402,6 +402,14 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
               accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
             }),
             aoe: new fields.SchemaField({
+              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
+              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
+            }),
+            areaBlast: new fields.SchemaField({
+              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
+              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
+            }),
+            tileBlast: new fields.SchemaField({
               mosPer: new fields.NumberField({ min: 0, initial: 0 }),
               accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
             })

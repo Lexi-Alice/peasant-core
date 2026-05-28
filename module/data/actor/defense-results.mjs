@@ -35,7 +35,8 @@ export function getActorPrimalEvasionValue(actor) {
 }
 
 export function canApplyPrimalEvasion(actor, targetingType) {
-  if (getCombatDefenseResponseKey(targetingType) === "smite") return false;
+  const responseKey = getCombatDefenseResponseKey(targetingType);
+  if (["smite", "aoe", "areaBlast", "tileBlast"].includes(responseKey)) return false;
   return getActorPrimalEvasionValue(actor) >= 1;
 }
 
@@ -76,11 +77,35 @@ export function getFailureLabelFromDefensePromptResult(defensePromptResult) {
   return "Failure due to Defense";
 }
 
+export function isNarrowSuccessAttack(attackRoll) {
+  const rollResult = attackRoll?.rollResult;
+  if (!rollResult || typeof rollResult !== "object") return false;
+  if (String(rollResult.resultText || "").trim() === "Narrow Success") return true;
+
+  const baseMoS = Number(rollResult.baseMoS);
+  const totalMoS = Number(rollResult.totalMoS);
+  return !!(
+    !rollResult.isSuccess
+    && !String(rollResult.criticalType || "").trim()
+    && Number.isFinite(baseMoS)
+    && Number.isFinite(totalMoS)
+    && baseMoS >= 0
+    && totalMoS < 0
+  );
+}
+
+function doesAttackDamageReachBlock(attackRoll) {
+  return !!(
+    attackRoll?.rollResult?.failureDueToDefense
+    || isNarrowSuccessAttack(attackRoll)
+  );
+}
+
 export function isMageDefenseDamageRedirect(attackRoll, defensePromptResult) {
   const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
   return !!(
     defensePromptResult?.selection === "defense"
-    && attackRoll?.rollResult?.failureDueToDefense
+    && doesAttackDamageReachBlock(attackRoll)
     && defense.block
     && defense.blockType === "Mage"
   );
@@ -90,7 +115,7 @@ export function isShieldDefenseDamageBlock(attackRoll, defensePromptResult) {
   const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
   return !!(
     defensePromptResult?.selection === "defense"
-    && attackRoll?.rollResult?.failureDueToDefense
+    && doesAttackDamageReachBlock(attackRoll)
     && defense.block
     && defense.blockType === "Shield"
   );
@@ -100,7 +125,7 @@ export function isWeaponDefenseDamageBlock(attackRoll, defensePromptResult) {
   const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
   return !!(
     defensePromptResult?.selection === "defense"
-    && attackRoll?.rollResult?.failureDueToDefense
+    && doesAttackDamageReachBlock(attackRoll)
     && defense.block
     && defense.blockType === "Weapon"
   );

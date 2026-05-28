@@ -6,7 +6,7 @@ import {
   normalizeCombatDefenseShieldArm,
   parseCombatDefenseMosPer
 } from "../../../data/actor/combat-defense.mjs";
-import { hasRangeRateValue, normalizeRangeRateValue } from "../../../data/actor/combat-tags.mjs";
+import { hasRangeRateValue, normalizeCombatTargetingType, normalizeRangeRateValue } from "../../../data/actor/combat-tags.mjs";
 import { parseCombatDiceValue } from "../../../dice/combat-dice.mjs";
 import { qs, qsa, toElement } from "../../dom.mjs";
 
@@ -109,12 +109,8 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
       const maxSections = fieldInt(root, ".tag-sections-max");
       return maxSections > 0 ? validTagData({ sections: { current: maxSections, max: maxSections } }) : invalidTagData();
     }
-    case "aoe": {
-      const aoeVal = fieldInt(root, ".tag-aoe-value");
-      return aoeVal > 0 ? validTagData({ aoe: { value: aoeVal, type: fieldValue(root, ".tag-aoe-type", "Area") } }) : invalidTagData();
-    }
     case "targetingType": {
-      const targetType = fieldValue(root, ".tag-targeting-type");
+      const targetType = normalizeCombatTargetingType(fieldValue(root, ".tag-targeting-type"));
       return targetType ? validTagData({ targetingType: targetType }) : invalidTagData();
     }
     case "defense": {

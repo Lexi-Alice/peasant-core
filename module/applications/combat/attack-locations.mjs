@@ -31,15 +31,11 @@ export async function resolveAttackLocationForTarget({
   target = null,
   attackRoll = null,
   defensePromptResult = null,
-  magnetismGrade = 0,
-  locationMoS = null
+  magnetismGrade = 0
 } = {}) {
   const targetLabel = target?.targetName || target?.actor?.name || "";
   const defendedByReflex = doesPromptResultCountAsActiveDefense(defensePromptResult);
-  const selectableMoSOverride = Number(locationMoS);
-  const selectableMoS = Number.isFinite(selectableMoSOverride)
-    ? selectableMoSOverride
-    : (Number(attackRoll?.rollResult?.totalMoS) || 0);
+  const selectableMoS = Number(attackRoll?.rollResult?.totalMoS) || 0;
   const resolvedMagnetismGrade = normalizeMagnetismGrade(magnetismGrade);
 
   if (selectableMoS >= 1) {

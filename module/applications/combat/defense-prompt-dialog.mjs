@@ -1,4 +1,4 @@
-import { normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
+import { getCombatDefenseResponseKey, normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
 import { getNotableCombatRollPreview } from "../../data/actor/combat-roll-preview.mjs";
 import {
   createPrimalEvasionDefenseResult,
@@ -14,6 +14,7 @@ import {
 import { escapeHtml } from "../../utils/chat.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { renderDialogV2 } from "../dialogs.mjs";
+import { rollAoeReflexSaveForTarget } from "./aoe-reflex-save.mjs";
 import { resolveDefensePromptActor } from "./actor-targets.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
 import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remote-prompt-registry.mjs";
@@ -35,6 +36,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
   const promptId = String(payload.promptId || "").trim();
 
   const targetingType = String(payload.attackTargetingType || "").trim();
+  const targetingKey = getCombatDefenseResponseKey(targetingType);
+  const hasReflexSaveOption = targetingKey === "aoe";
   const isOverkillAttack = !!payload.attackOverkill;
   const isBracedBlockingDefenseMatch = (defenseMatch) => {
     const defense = normalizeCombatDefense(defenseMatch?.defense);
@@ -45,7 +48,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     ? allMatchingDefenses.filter(isBracedBlockingDefenseMatch)
     : allMatchingDefenses;
   const primalEvasionResult = createPrimalEvasionDefenseResult(defenderActor, targetingType);
-  if (!matchingDefenses.length) {
+  if (!matchingDefenses.length && !hasReflexSaveOption) {
     if (!isOverkillAttack && primalEvasionResult.activeDefense) {
       pcLog.debug("Peasant Core | Defense prompt auto-resolved with Primal Evasion", {
         defender: defenderActor.name,
@@ -79,14 +82,15 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     defender: defenderActor.name,
     targetingType,
     attack: payload.attackCombatName,
-    defenses: matchingDefenses.map(({ combat, index }) => ({ index, name: combat?.name }))
+    defenses: matchingDefenses.map(({ combat, index }) => ({ index, name: combat?.name })),
+    reflexSaveOption: hasReflexSaveOption
   });
   const previewByIndex = new Map(
     matchingDefenses.map(({ combat, index }) => [String(index), getNotableCombatRollPreview(defenderActor, combat)])
   );
   const preferredDefenseMatch = getPreferredDefenseMatch(defenderActor, targetingType, matchingDefenses);
   const preferredDefenseValue = preferredDefenseMatch ? String(preferredDefenseMatch.index) : "";
-  const defaultDefenseValue = preferredDefenseValue || "__none__";
+  const defaultDefenseValue = preferredDefenseValue || (hasReflexSaveOption ? "__reflex_save__" : "__none__");
   const isShieldBlockDefenseMatch = (defenseMatch) => {
     const defense = normalizeCombatDefense(defenseMatch?.defense);
     return !!(defense.block && defense.blockType === "Shield");
@@ -96,6 +100,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
       const label = String(combat?.name || `Defense ${index + 1}`).trim() || `Defense ${index + 1}`;
       return `<option value="${index}">${escapeHtml(label)}</option>`;
     }),
+    ...(hasReflexSaveOption ? [`<option value="__reflex_save__">Reflex Save</option>`] : []),
     `<option value="__none__">None</option>`
   ].join("");
 
@@ -192,6 +197,27 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
           label: "Roll",
           callback: async (html) => {
             const selectedValue = String(html.find('[name="defenseCombatIndex"]').val() || "");
+            if (selectedValue === "__reflex_save__") {
+              const reflexSaveResult = await rollAoeReflexSaveForTarget({
+                targetActor: defenderActor,
+                targetingType
+              });
+              if (!reflexSaveResult) {
+                ui.notifications?.warn?.("Reflex Save workflow is unavailable.");
+                return false;
+              }
+
+              finalize({
+                selection: "reflexSave",
+                reflexSaveResult,
+                appliedAccuracyPenalty: 0,
+                appliedToHitPenalty: 0,
+                activeDefense: true,
+                primalEvasionPenalty: 0
+              });
+              return true;
+            }
+
             if (selectedValue === "__none__") {
               finalize(isOverkillAttack ? {} : createPrimalEvasionDefenseResult(defenderActor, targetingType));
               return true;
@@ -359,7 +385,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
 
         const updatePreview = () => {
           const selectedValue = String($select.val() || "");
-          if (selectedValue === "__none__") {
+          if (selectedValue === "__none__" || selectedValue === "__reflex_save__") {
             $toHit.val("");
             $accuracy.val("");
             $favorite.prop("checked", false);
