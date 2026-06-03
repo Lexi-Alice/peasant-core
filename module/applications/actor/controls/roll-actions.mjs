@@ -1,4 +1,5 @@
 import { computeBaseAttrToHits, computeBaseSaves } from "../../../data/actor/attributes.mjs";
+import { getCombatDesperateDieRateModifier } from "../../../data/actor/combat-damage.mjs";
 import { getCombatFlatDamageModifier } from "../../../data/actor/combat-modifiers.mjs";
 import { hasOptionalInteger, parseOptionalInteger } from "../../../data/actor/helpers.mjs";
 import { PC_CONSCIOUSNESS_SAVE_FLAG, PC_SAVE_MODIFIER_FLAG } from "../../../data/actor/sheet-settings.mjs";
@@ -166,6 +167,7 @@ export async function rollCombatTagFromElement(sheet, event, target) {
     const combatMods = sheet.actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
     const diceRateMod = parseInt(combatMods.diceRate) || 0;
     const flatDamageMod = getCombatFlatDamageModifier(combatMods);
+    const desperateDieRateMod = getCombatDesperateDieRateModifier(sheet.actor, combat).modifier;
 
     let diceCount = 0;
     let diceValue = 0;
@@ -178,7 +180,7 @@ export async function rollCombatTagFromElement(sheet, event, target) {
         combat.damage.diceCount || 0,
         combat.damage.diceValue || 0,
         combat.damage.flat || 0,
-        diceRateMod,
+        diceRateMod + desperateDieRateMod,
         combat.damage.diceBonus || 0
       );
       diceCount = result.diceCount;
@@ -306,8 +308,6 @@ export async function rollSkillFromElement(sheet, event, target) {
       try {
         const result = await sheet.actor.consumePeasantSkillUse?.(idx);
         if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
-        if (!result?.changed) return;
-        sheet.render(false);
       } catch (err) {
         console.warn("Failed to consume SIG use after autoroll:", err);
       }

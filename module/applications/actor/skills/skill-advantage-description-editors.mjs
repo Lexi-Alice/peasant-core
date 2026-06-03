@@ -37,7 +37,6 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html) {
           pcLog.debug("Actor update complete");
 
           if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
-          sheet.render(false);
         }
       });
     } catch (e) {
@@ -84,7 +83,6 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html) {
           if (result?.flexibleAdvantageDescriptions) {
             sheet._lastFlexibleAdvantageDescriptionsSnapshot = JSON.parse(JSON.stringify(result.flexibleAdvantageDescriptions));
           }
-          sheet.render(false);
         }
       });
     } catch (e) {

@@ -72,6 +72,12 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
         }
       });
     }
+    case "desperate": {
+      const value = fieldInt(root, ".tag-desperate", Number.NaN);
+      return Number.isFinite(value) && value !== 0
+        ? validTagData({ desperate: value })
+        : invalidTagData("Desperate requires a nonzero positive or negative integer.");
+    }
     case "heal": {
       const healDice = fieldInt(root, ".tag-heal-dice", Number.NaN);
       const healValueData = fieldCombatDiceValue(root, ".tag-heal-value");
@@ -145,10 +151,10 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
       }
 
       if (isBlock) {
-        if (defense.blockType === "Shield") {
+        if (defense.blockType === "Shield" || defense.blockType === "Weapon") {
           defense.hardness = Math.max(0, fieldInt(root, ".tag-defense-hardness"));
         }
-        defense.hp = Math.max(0, fieldInt(root, ".tag-defense-hp"));
+        defense.hp = defense.blockType === "Weapon" ? 0 : Math.max(0, fieldInt(root, ".tag-defense-hp"));
         defense.masteryBonus = defense.blockType === "Weapon" && fieldChecked(root, ".tag-defense-mastery-bonus");
       }
 

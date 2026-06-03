@@ -22,10 +22,47 @@ export function getAutomatedCombatDamageTypeLabel(rawType) {
   }
 }
 
+export function countFilledHpDamageRows(actor) {
+  const hp = actor?.system?.hp;
+  const rows = Math.max(0, Number.parseInt(hp?.rows, 10) || 0);
+  const cols = Math.max(0, Number.parseInt(hp?.cols, 10) || 0);
+  const grid = Array.isArray(hp?.grid) ? hp.grid : [];
+  if (rows <= 0 || cols <= 0 || grid.length === 0) return 0;
+
+  let filledRows = 0;
+  for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+    const row = Array.isArray(grid[rowIndex]) ? grid[rowIndex] : [];
+    let filled = row.length >= cols;
+    for (let colIndex = 0; colIndex < cols; colIndex++) {
+      if ((Number.parseInt(row[colIndex], 10) || 0) <= 0) {
+        filled = false;
+        break;
+      }
+    }
+    if (filled) filledRows += 1;
+  }
+
+  return filledRows;
+}
+
+export function getCombatDesperateDieRateModifier(actor, combat) {
+  const value = Number.parseInt(combat?.desperate, 10) || 0;
+  if (value === 0) return { value, filledRows: 0, modifier: 0 };
+
+  const filledRows = countFilledHpDamageRows(actor);
+  return {
+    value,
+    filledRows,
+    modifier: value * filledRows
+  };
+}
+
 export function buildAutomatedCombatDamageData(actor, combat, { appliedDamageType = null } = {}) {
   const combatName = combat.name || "Combat";
   const combatMods = actor.system?.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
-  const diceRateMod = Number.parseInt(combatMods.diceRate, 10) || 0;
+  const baseDiceRateMod = Number.parseInt(combatMods.diceRate, 10) || 0;
+  const desperate = getCombatDesperateDieRateModifier(actor, combat);
+  const diceRateMod = baseDiceRateMod + desperate.modifier;
   const flatDamageMod = getCombatFlatDamageModifier(combatMods);
 
   const result = applyDieRate(
@@ -62,6 +99,10 @@ export function buildAutomatedCombatDamageData(actor, combat, { appliedDamageTyp
   return {
     combatName,
     combatMods,
+    baseDiceRateMod,
+    desperateValue: desperate.value,
+    desperateFilledRows: desperate.filledRows,
+    desperateDieRateMod: desperate.modifier,
     diceRateMod,
     flatDamageMod,
     diceCount,

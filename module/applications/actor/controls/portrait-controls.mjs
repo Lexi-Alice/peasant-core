@@ -21,7 +21,7 @@ export function teardownPortraitBindings(sheet) {
   sheet._portraitMouseupDocument = null;
 }
 
-export function setupPortraitControls(sheet, html) {
+export function setupPortraitControls(sheet, html, { readOnly = !!sheet?.isReadOnlyObserver } = {}) {
   const sheetRoot = toElement(html);
   const sheetDocument = sheet._getElementDocument?.(sheetRoot) ?? document;
   const portraitEl = qs(sheetRoot, ".character-portrait");
@@ -31,7 +31,7 @@ export function setupPortraitControls(sheet, html) {
   sheet._portraitEventController = eventController;
 
   if (portraitEl) {
-    const debouncedSave = foundry.utils.debounce(() => savePortraitFromDOM(sheet), 400);
+    const debouncedSave = readOnly ? () => {} : foundry.utils.debounce(() => savePortraitFromDOM(sheet), 400);
     const portraitImg = qs(portraitEl, "img");
     const portraitState = {
       offsetX: sheet.actor.system.portraitOffsetX || 0,
@@ -160,8 +160,10 @@ export function setupPortraitControls(sheet, html) {
       pcLog.debug("ResizeObserver not available for portrait autosave", err);
     }
 
-    sheet._portraitMouseupDocument = sheetDocument;
-    sheetDocument.addEventListener("mouseup", () => debouncedSave(), { signal });
+    if (!readOnly) {
+      sheet._portraitMouseupDocument = sheetDocument;
+      sheetDocument.addEventListener("mouseup", () => debouncedSave(), { signal });
+    }
 
     if (portraitImg) {
       try { portraitImg.setAttribute("draggable", "false"); } catch (e) {}
@@ -175,7 +177,7 @@ export function setupPortraitControls(sheet, html) {
       }
 
       portraitImg.addEventListener("wheel", (ev) => {
-        if (!sheet.isEditMode) return;
+        if (readOnly || !sheet.isEditMode) return;
         ev.preventDefault();
         const delta = ev.deltaY ?? 0;
         const step = delta > 0 ? -0.1 : 0.1;
@@ -206,7 +208,7 @@ export function setupPortraitControls(sheet, html) {
       };
 
       portraitImg.addEventListener("pointerdown", (ev) => {
-        if (!sheet.isEditMode) return;
+        if (readOnly || !sheet.isEditMode) return;
         if (ev.button !== 0 && ev.pointerType !== "touch") return;
         if (portraitState.scale <= PAN_MIN_SCALE) return;
         ev.preventDefault();
@@ -247,7 +249,7 @@ export function setupPortraitControls(sheet, html) {
   try {
     portraitEl?.addEventListener("click", (ev) => {
       if (!ev.target?.closest?.("img")) return;
-      if (sheet.isEditMode) return;
+      if (!readOnly && sheet.isEditMode) return;
       const img = ev.target.closest("img");
       const src = img.getAttribute && (img.getAttribute("src") || img.dataset?.src) || img.src;
       if (!src) return;
@@ -273,7 +275,7 @@ export function setupPortraitControls(sheet, html) {
   try {
     portraitEl?.addEventListener("contextmenu", async (ev) => {
       if (!ev.target?.closest?.("img")) return;
-      if (!sheet.isEditMode) return;
+      if (readOnly || !sheet.isEditMode) return;
       ev.preventDefault();
       ev.stopPropagation();
 
@@ -289,7 +291,6 @@ export function setupPortraitControls(sheet, html) {
       if (!defaultImg || sheet.actor.img === defaultImg) return;
       try {
         await sheet.actor.update({ img: defaultImg });
-        sheet.render(true);
       } catch (err) {
         console.warn("Failed to reset actor image:", err);
       }
@@ -331,7 +332,6 @@ export function setupPortraitControls(sheet, html) {
         callback: async (path) => {
           try {
             await sheet.actor.update({ img: path });
-            sheet.render(true);
           } catch (err) {
             console.warn("Failed to update actor image:", err);
           }
@@ -350,6 +350,7 @@ export function setupPortraitControls(sheet, html) {
 
 export async function savePortraitFromDOM(sheet) {
   try {
+    if (sheet?.canModifyActor === false) return;
     const sheetRoot = toElement(sheet.element) ?? sheet._getSheetJQ?.()?.[0] ?? null;
     const portrait = qs(sheetRoot, ".character-portrait");
     const img = qs(portrait, "img");

@@ -432,6 +432,15 @@ function installPeasantCombatMethods() {
   PeasantCombat.prototype.nextTurn = async function(options = {}) {
     // Prevent infinite recursion
     const depth = options._recursionDepth || 0;
+    if (!game.user?.isGM && !options._pcRemoteTurnAdvance) {
+      const requestEndTurnFromGM = game.peasantCore?.requestEndTurnFromGM;
+      if (typeof requestEndTurnFromGM === "function") {
+        await requestEndTurnFromGM(this);
+      } else {
+        ui.notifications?.error?.("A GM must advance this combat turn.");
+      }
+      return this;
+    }
     const historyStartState = options._historyStartState || (depth === 0 ? getCombatState(this) : null);
     const finalize = async (result = this) => {
       if (depth === 0) {

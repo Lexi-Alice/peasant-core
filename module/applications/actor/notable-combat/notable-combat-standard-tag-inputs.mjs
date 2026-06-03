@@ -68,6 +68,14 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
       `);
       return true;
     }
+    case "desperate":
+      $area.html(`
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Die-Rate per filled HP row:</label>
+          <input type="number" class="tag-desperate ${PC_TAG_INPUT_CLASS}" value="${signedIntegerInputValue(combatData.desperate)}" step="1" placeholder="+1" ${PC_TAG_INTEGER_ATTRS}>
+        </div>
+      `);
+      return true;
     case "heal": {
       const currentHeal = combatData.heal || {};
       const hasCurrentHeal = hasCombatDice(currentHeal);
@@ -211,4 +219,10 @@ function combatDiceIntegerInputValue(rollData, field, hasRollData) {
   if (!hasRollData) return "";
   const value = Number.parseInt(rollData?.[field], 10);
   return Number.isFinite(value) ? String(value) : "0";
+}
+
+function signedIntegerInputValue(rawValue) {
+  const value = Number.parseInt(rawValue, 10) || 0;
+  if (value === 0) return "";
+  return String(value);
 }

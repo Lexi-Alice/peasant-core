@@ -20,7 +20,6 @@ export async function openNotableCombatDescriptionEditor(sheet, index, { onSaveC
       save: async (newContent) => {
         await sheet.actor.setPeasantNotableCombatDescription?.(index, newContent);
         if (typeof onSaveCallback === "function") onSaveCallback();
-        sheet.render(false);
       }
     });
   } catch (e) {

@@ -8,15 +8,22 @@ import { pcLog } from "../utils/logging.mjs";
 export const PC_SOCKET_NAMESPACE = "system.peasant-core";
 const PC_SOCKET_REQUEST_SEIZE_TURN = "requestSeizeTurn";
 const PC_SOCKET_RESPONSE_SEIZE_TURN = "responseSeizeTurn";
+const PC_SOCKET_REQUEST_END_TURN = "requestEndTurn";
+const PC_SOCKET_RESPONSE_END_TURN = "responseEndTurn";
 export const PC_SOCKET_PROMPT_DEFENSE = "promptDefense";
 export const PC_SOCKET_PROMPT_INCOMING_HIT = "promptIncomingHit";
 const PC_SOCKET_APPLY_INCOMING_HIT = "applyIncomingHit";
+const PC_SOCKET_APPLY_INCOMING_HEAL = "applyIncomingHeal";
 const PC_SOCKET_CANCEL_REMOTE_PROMPT = "cancelRemotePrompt";
 const PC_SOCKETLIB_HANDLER_PROMPT_DEFENSE = "promptDefense";
 const PC_SOCKETLIB_HANDLER_PROMPT_INCOMING_HIT = "promptIncomingHit";
 const PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HIT = "applyIncomingHit";
+const PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HEAL = "applyIncomingHeal";
 const PC_SOCKETLIB_HANDLER_CANCEL_REMOTE_PROMPT = "cancelRemotePrompt";
+const PC_SOCKETLIB_HANDLER_REQUEST_SEIZE_TURN = "requestSeizeTurn";
+const PC_SOCKETLIB_HANDLER_REQUEST_END_TURN = "requestEndTurn";
 const _pcPendingSeizeRequests = new Map();
+const _pcPendingEndTurnRequests = new Map();
 let _pcSocketlib = null;
 let _pcSocketlibInitializationQueued = false;
 
@@ -72,6 +79,17 @@ function _initializePeasantSocketlib() {
         if (typeof handler === "function") return await handler(payload);
         return false;
       });
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HEAL, async (payload = {}) => {
+        pcLog.debug("Peasant Core | socketlib incoming heal apply received", {
+          recipient: game.user?.name,
+          attack: payload.attackCombatName,
+          target: payload.targetTokenName || payload.targetActorId,
+          healAmount: payload.healAmount
+        });
+        const handler = _getPeasantCoreApiFunction("applyIncomingHeal");
+        if (typeof handler === "function") return await handler(payload);
+        return false;
+      });
       _pcSocketlib.register(PC_SOCKETLIB_HANDLER_CANCEL_REMOTE_PROMPT, async (payload = {}) => {
         pcLog.debug("Peasant Core | socketlib remote prompt cancel received", {
           recipient: game.user?.name,
@@ -85,6 +103,24 @@ function _initializePeasantSocketlib() {
           });
         }
         return false;
+      });
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_REQUEST_SEIZE_TURN, async (payload = {}) => {
+        pcLog.debug("Peasant Core | socketlib seize request received", {
+          gm: game.user?.name,
+          requester: payload.userId,
+          combatId: payload.combatId,
+          combatantId: payload.combatantId,
+          phase: payload.phase
+        });
+        return _handleSeizeTurnRequest(payload);
+      });
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_REQUEST_END_TURN, async (payload = {}) => {
+        pcLog.debug("Peasant Core | socketlib end-turn request received", {
+          gm: game.user?.name,
+          requester: payload.userId,
+          combatId: payload.combatId
+        });
+        return _handleEndTurnRequest(payload);
       });
       pcLog.debug("Peasant Core | socketlib defense prompt handler registered.");
     } catch (err) {
@@ -223,6 +259,41 @@ async function _applyIncomingHitForUser(userId, payload = {}) {
   return false;
 }
 
+async function _applyIncomingHealForUser(userId, payload = {}) {
+  if (!userId) return false;
+
+  if (userId === game.user?.id) {
+    const handler = _getPeasantCoreApiFunction("applyIncomingHeal");
+    if (typeof handler === "function") return await handler(payload);
+    return false;
+  }
+
+  if (_pcSocketlib?.executeAsUser) {
+    try {
+      const result = await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HEAL, userId, payload);
+      pcLog.debug("Peasant Core | socketlib incoming heal apply sent", {
+        recipientUserId: userId,
+        attack: payload.attackCombatName,
+        target: payload.targetTokenName || payload.targetActorId
+      });
+      return result;
+    } catch (err) {
+      console.warn("Peasant Core | socketlib incoming heal apply failed, falling back to raw socket", err);
+    }
+  }
+
+  if (game?.socket) {
+    game.socket.emit(PC_SOCKET_NAMESPACE, {
+      ...payload,
+      type: PC_SOCKET_APPLY_INCOMING_HEAL,
+      recipientUserId: userId
+    });
+    return { handled: false, deferred: true, applied: false };
+  }
+
+  return false;
+}
+
 async function _cancelRemotePromptForUser(userId, payload = {}) {
   if (!userId || !payload?.promptId) return false;
 
@@ -267,6 +338,8 @@ export function initializePeasantSockets() {
     requestDefensePromptForUser: _requestDefensePromptForUser,
     requestIncomingHitForUser: _requestIncomingHitForUser,
     applyIncomingHitForUser: _applyIncomingHitForUser,
+    applyIncomingHealForUser: _applyIncomingHealForUser,
+    requestEndTurnFromGM,
     cancelPromptForUser: _cancelRemotePromptForUser
   });
 
@@ -286,6 +359,7 @@ function _userOwnsCombatant(user, combatant) {
 
   const ownerLevel = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
   const actor = combatant.actor || combatant.token?.actor || null;
+  const tokenDocument = combatant.token?.document || combatant.token || null;
 
   try {
     if (typeof actor?.testUserPermission === "function" && actor.testUserPermission(user, ownerLevel)) {
@@ -304,12 +378,26 @@ function _userOwnsCombatant(user, combatant) {
   }
 
   try {
+    if (typeof tokenDocument?.testUserPermission === "function" && tokenDocument.testUserPermission(user, ownerLevel)) {
+      return true;
+    }
+  } catch (e) {
+    pcLog.debug("Peasant Core | Combatant token permission check failed", e);
+  }
+
+  try {
     if (typeof actor?.canUserModify === "function" && actor.canUserModify(user, "update")) {
       return true;
     }
   } catch (e) {
     pcLog.debug("Peasant Core | Actor modify check failed", e);
   }
+
+  try {
+    if (user?.character?.id && actor?.id && user.character.id === actor.id) {
+      return true;
+    }
+  } catch (e) {}
 
   return false;
 }
@@ -463,6 +551,72 @@ function _canUseSeizeButton(combat, combatantId, phase) {
   return { ok: true, targetCombatant };
 }
 
+async function _handleSeizeTurnRequest(payload = {}) {
+  if (!game.user?.isGM) {
+    return { ok: false, error: "Only an active GM can process seize actions." };
+  }
+
+  const requester = game.users?.get(payload.userId);
+  const combat = game.combats?.get(payload.combatId) || null;
+  if (!requester) {
+    return { ok: false, error: "Requesting user was not found." };
+  }
+  if (!combat) {
+    return { ok: false, error: "Combat no longer exists." };
+  }
+
+  const combatantId = String(payload.combatantId || "");
+  const phase = Number(payload.phase);
+  const seizeCheck = _canUseSeizeButton(combat, combatantId, phase);
+  if (!seizeCheck.ok) {
+    return { ok: false, error: seizeCheck.reason };
+  }
+
+  if (!_userOwnsCombatant(requester, seizeCheck.targetCombatant)) {
+    return { ok: false, error: "You do not own that combatant." };
+  }
+
+  pcLog.debug(`Peasant Core | GM ${game.user.name} handling seize request ${payload.requestId || ""} from ${requester.name}`);
+  await combat.seizeTurn(combatantId, phase);
+  return {
+    ok: true,
+    combatantName: seizeCheck.targetCombatant?.name || "Combatant",
+    phase
+  };
+}
+
+async function _handleEndTurnRequest(payload = {}) {
+  if (!game.user?.isGM) {
+    return { ok: false, error: "Only an active GM can process end-turn actions." };
+  }
+
+  const requester = game.users?.get(payload.userId);
+  const combat = game.combats?.get(payload.combatId) || null;
+  if (!requester) {
+    return { ok: false, error: "Requesting user was not found." };
+  }
+  if (!combat) {
+    return { ok: false, error: "Combat no longer exists." };
+  }
+  if (!combat.round || !combat.combatant) {
+    return { ok: false, error: "Combat is not currently on an active turn." };
+  }
+
+  const currentCombatant = combat.combatant;
+  if (!_userOwnsCombatant(requester, currentCombatant)) {
+    return { ok: false, error: "You do not own the active combatant." };
+  }
+
+  pcLog.debug(`Peasant Core | GM ${game.user.name} handling end-turn request ${payload.requestId || ""} from ${requester.name}`);
+  await combat.nextTurn({ _pcRemoteTurnAdvance: true });
+  return {
+    ok: true,
+    previousCombatantName: currentCombatant?.name || "Combatant",
+    combatantName: combat.combatant?.name || null,
+    phase: Number(combat.getFlag("peasant-core", "combatPhase") || 0)
+  };
+}
+
 export async function requestSeizeTurnFromGM(combat, combatantId, phase) {
   const gm = _getPreferredActiveGM();
   if (!combat?.id) {
@@ -475,6 +629,48 @@ export async function requestSeizeTurnFromGM(combat, combatantId, phase) {
   }
 
   const requestId = foundry.utils.randomID();
+  const payload = {
+    type: PC_SOCKET_REQUEST_SEIZE_TURN,
+    requestId,
+    userId: game.user.id,
+    combatId: combat.id,
+    combatantId,
+    phase: Number(phase)
+  };
+
+  const handleResult = (result) => {
+    if (result?.ok) {
+      if (result.combatantName) {
+        const phaseName = Number(result.phase) === 0 ? "Movement" : "Standard";
+        ui.notifications?.warn?.(`${result.combatantName} SEIZED THE TURN! (${phaseName})`);
+      }
+      return true;
+    }
+    throw new Error(result?.error || "Seize request was rejected.");
+  };
+
+  if (_pcSocketlib?.executeAsGM || _pcSocketlib?.executeAsUser) {
+    try {
+      const result = _pcSocketlib.executeAsGM
+        ? await _pcSocketlib.executeAsGM(PC_SOCKETLIB_HANDLER_REQUEST_SEIZE_TURN, payload)
+        : await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_REQUEST_SEIZE_TURN, gm.id, payload);
+      if (result && typeof result === "object" && "ok" in result) {
+        try {
+          return handleResult(result);
+        } catch (err) {
+          console.warn("Peasant Core | Seize request rejected", err);
+          ui.notifications?.error?.(err?.message || "Failed to process seize action.");
+          return false;
+        }
+      }
+      if (result !== false && result != null) {
+        return handleResult(result);
+      }
+      console.warn("Peasant Core | socketlib seize request was not handled, falling back to raw socket");
+    } catch (err) {
+      console.warn("Peasant Core | socketlib seize request failed, falling back to raw socket", err);
+    }
+  }
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -484,17 +680,73 @@ export async function requestSeizeTurnFromGM(combat, combatantId, phase) {
 
     _pcPendingSeizeRequests.set(requestId, { resolve, reject, timeout });
     pcLog.debug(`Peasant Core | Sending seize request ${requestId} for combat ${combat.id} combatant ${combatantId} phase ${phase}`);
-    game.socket.emit(PC_SOCKET_NAMESPACE, {
-      type: PC_SOCKET_REQUEST_SEIZE_TURN,
-      requestId,
-      userId: game.user.id,
-      combatId: combat.id,
-      combatantId,
-      phase: Number(phase)
-    });
+    game.socket.emit(PC_SOCKET_NAMESPACE, payload);
   }).catch(err => {
     console.warn("Peasant Core | Seize request failed", err);
     ui.notifications?.error?.(err?.message || "Failed to process seize action.");
+    return false;
+  });
+}
+
+export async function requestEndTurnFromGM(combat) {
+  const gm = _getPreferredActiveGM();
+  if (!combat?.id) {
+    ui.notifications?.error?.("Combat is not available.");
+    return false;
+  }
+  if (!gm) {
+    ui.notifications?.error?.("A GM must be online to advance turns.");
+    return false;
+  }
+
+  const requestId = foundry.utils.randomID();
+  const payload = {
+    type: PC_SOCKET_REQUEST_END_TURN,
+    requestId,
+    userId: game.user.id,
+    combatId: combat.id
+  };
+
+  const handleResult = (result) => {
+    if (result?.ok) return true;
+    throw new Error(result?.error || "End-turn request was rejected.");
+  };
+
+  if (_pcSocketlib?.executeAsGM || _pcSocketlib?.executeAsUser) {
+    try {
+      const result = _pcSocketlib.executeAsGM
+        ? await _pcSocketlib.executeAsGM(PC_SOCKETLIB_HANDLER_REQUEST_END_TURN, payload)
+        : await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_REQUEST_END_TURN, gm.id, payload);
+      if (result && typeof result === "object" && "ok" in result) {
+        try {
+          return handleResult(result);
+        } catch (err) {
+          console.warn("Peasant Core | End-turn request rejected", err);
+          ui.notifications?.error?.(err?.message || "Failed to advance turn.");
+          return false;
+        }
+      }
+      if (result !== false && result != null) {
+        return handleResult(result);
+      }
+      console.warn("Peasant Core | socketlib end-turn request was not handled, falling back to raw socket");
+    } catch (err) {
+      console.warn("Peasant Core | socketlib end-turn request failed, falling back to raw socket", err);
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      _pcPendingEndTurnRequests.delete(requestId);
+      reject(new Error("Timed out waiting for GM end-turn response."));
+    }, 10000);
+
+    _pcPendingEndTurnRequests.set(requestId, { resolve, reject, timeout });
+    pcLog.debug(`Peasant Core | Sending end-turn request ${requestId} for combat ${combat.id}`);
+    game.socket.emit(PC_SOCKET_NAMESPACE, payload);
+  }).catch(err => {
+    console.warn("Peasant Core | End-turn request failed", err);
+    ui.notifications?.error?.(err?.message || "Failed to advance turn.");
     return false;
   });
 }
@@ -608,6 +860,37 @@ export function registerPeasantSocketHandler() {
         return;
       }
 
+      if (payload.type === PC_SOCKET_APPLY_INCOMING_HEAL) {
+        if (payload.recipientUserId && payload.recipientUserId !== game.user?.id) return;
+
+        const { tokenDocument, actor } = await _resolveDefensePromptTarget(payload);
+        if (!actor) return;
+
+        const recipient = payload.recipientUserId
+          ? game.users?.get(payload.recipientUserId) || null
+          : _getPreferredDefensePromptRecipient(actor, tokenDocument);
+        if (!recipient || recipient.id !== game.user?.id) return;
+
+        pcLog.debug("Peasant Core | Received incoming heal apply", {
+          recipient: game.user?.name,
+          target: tokenDocument?.name || actor?.name,
+          attack: payload.attackCombatName,
+          healAmount: payload.healAmount
+        });
+
+        const handler = _getPeasantCoreApiFunction("applyIncomingHeal");
+        if (typeof handler === "function") {
+          await handler({
+            ...payload,
+            targetActorId: actor.id,
+            targetActorUuid: actor.uuid,
+            targetTokenUuid: tokenDocument?.uuid || payload.targetTokenUuid || null,
+            targetTokenName: tokenDocument?.name || payload.targetTokenName || actor.name || "Target"
+          });
+        }
+        return;
+      }
+
       if (payload.type === PC_SOCKET_CANCEL_REMOTE_PROMPT) {
         if (payload.recipientUserId && payload.recipientUserId !== game.user?.id) return;
 
@@ -653,7 +936,24 @@ export function registerPeasantSocketHandler() {
         return;
       }
 
-      if (payload.type !== PC_SOCKET_REQUEST_SEIZE_TURN) return;
+      if (payload.type === PC_SOCKET_RESPONSE_END_TURN) {
+        if (payload.userId !== game.user?.id) return;
+
+        const pending = _pcPendingEndTurnRequests.get(payload.requestId);
+        if (!pending) return;
+
+        clearTimeout(pending.timeout);
+        _pcPendingEndTurnRequests.delete(payload.requestId);
+
+        if (payload.ok) {
+          pending.resolve(true);
+        } else {
+          pending.reject(new Error(payload.error || "End-turn request was rejected."));
+        }
+        return;
+      }
+
+      if (payload.type !== PC_SOCKET_REQUEST_SEIZE_TURN && payload.type !== PC_SOCKET_REQUEST_END_TURN) return;
       if (!game.user?.isGM) return;
 
       const preferredGM = _getPreferredActiveGM();
@@ -661,53 +961,27 @@ export function registerPeasantSocketHandler() {
 
       const respond = response => {
         game.socket.emit(PC_SOCKET_NAMESPACE, {
-          type: PC_SOCKET_RESPONSE_SEIZE_TURN,
+          type: payload.type === PC_SOCKET_REQUEST_END_TURN ? PC_SOCKET_RESPONSE_END_TURN : PC_SOCKET_RESPONSE_SEIZE_TURN,
           requestId: payload.requestId,
           userId: payload.userId,
           ...response
         });
       };
 
-      const requester = game.users?.get(payload.userId);
-      const combat = game.combats?.get(payload.combatId) || null;
-      if (!requester) {
-        respond({ ok: false, error: "Requesting user was not found." });
-        return;
-      }
-      if (!combat) {
-        respond({ ok: false, error: "Combat no longer exists." });
-        return;
-      }
-
-      const combatantId = String(payload.combatantId || "");
-      const phase = Number(payload.phase);
-      const seizeCheck = _canUseSeizeButton(combat, combatantId, phase);
-      if (!seizeCheck.ok) {
-        respond({ ok: false, error: seizeCheck.reason });
-        return;
-      }
-
-      if (!_userOwnsCombatant(requester, seizeCheck.targetCombatant)) {
-        respond({ ok: false, error: "You do not own that combatant." });
-        return;
-      }
-
-      pcLog.debug(`Peasant Core | GM ${game.user.name} handling seize request ${payload.requestId} from ${requester.name}`);
-      await combat.seizeTurn(combatantId, phase);
-      respond({
-        ok: true,
-        combatantName: seizeCheck.targetCombatant?.name || "Combatant",
-        phase
-      });
+      respond(await (payload.type === PC_SOCKET_REQUEST_END_TURN
+        ? _handleEndTurnRequest(payload)
+        : _handleSeizeTurnRequest(payload)));
     } catch (err) {
       console.error("Peasant Core | Socket handler error", err);
-      if (payload.type === PC_SOCKET_REQUEST_SEIZE_TURN && game.user?.isGM) {
+      if ((payload.type === PC_SOCKET_REQUEST_SEIZE_TURN || payload.type === PC_SOCKET_REQUEST_END_TURN) && game.user?.isGM) {
         game.socket.emit(PC_SOCKET_NAMESPACE, {
-          type: PC_SOCKET_RESPONSE_SEIZE_TURN,
+          type: payload.type === PC_SOCKET_REQUEST_END_TURN ? PC_SOCKET_RESPONSE_END_TURN : PC_SOCKET_RESPONSE_SEIZE_TURN,
           requestId: payload.requestId,
           userId: payload.userId,
           ok: false,
-          error: err?.message || "GM failed to process seize request."
+          error: err?.message || (payload.type === PC_SOCKET_REQUEST_END_TURN
+            ? "GM failed to process end-turn request."
+            : "GM failed to process seize request.")
         });
       }
     }

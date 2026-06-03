@@ -1,4 +1,5 @@
 import {
+  getArmorChargeValue,
   getTargetedDamageLocationDisplay,
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
@@ -8,7 +9,9 @@ import { resolveDefensePromptActor } from "./actor-targets.mjs";
 import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remote-prompt-registry.mjs";
 
 export {
+  applyIncomingHeal,
   applyIncomingHit,
+  requestIncomingHealApplicationForTarget,
   requestIncomingHitApplicationForTarget,
   requestIncomingHitResolutionForTarget
 } from "./incoming-hit-requests.mjs";
@@ -25,6 +28,19 @@ export async function showIncomingHitPrompt(payload = {}) {
   const isAP = !!payload.isAP;
   const normalizedDamageType = normalizeAppliedDamageType(payload.damageType);
   const title = `${attackerName} hits you in the ${locationText}!`;
+  if (getArmorChargeValue(defenderActor) <= 0) {
+    let appliedType = normalizedDamageType;
+    if (appliedType === "flexible") appliedType = "blunt";
+    return {
+      handled: true,
+      useArmorCharge: false,
+      appliedDamageType: appliedType,
+      location,
+      isAP,
+      chainCancelled: false,
+      armorChargeUnavailable: true
+    };
+  }
 
   const content = `
     <form class="pc-incoming-hit-form">

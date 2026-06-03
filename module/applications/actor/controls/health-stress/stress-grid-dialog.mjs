@@ -1,6 +1,20 @@
 import { qs, qsa, toElement } from "../../../dom.mjs";
 
 const stressGridControllers = new WeakMap();
+const openStressGridDialogs = new Set();
+
+function canModifySheetActor(sheet) {
+  return !!(sheet?.canModifyActor ?? (game.user?.isGM || sheet?.actor?.isOwner));
+}
+
+function isSameDialogActor(sheet, actor) {
+  const sheetActor = sheet?.actor;
+  return !!sheetActor && (
+    sheetActor === actor
+    || sheetActor.uuid === actor?.uuid
+    || (!!sheetActor.id && sheetActor.id === actor?.id)
+  );
+}
 
 export function openStressGridDialog(sheet, activeType = "physical", trigger = null) {
   const active = normalizeStressType(activeType);
@@ -20,7 +34,39 @@ export function openStressGridDialog(sheet, activeType = "physical", trigger = n
     position: sheet._getDialogPositionNearTrigger(trigger, 430, 260)
   });
   sheet._stressGridDialog = dialog;
+  const registration = { sheet, dialog };
+  openStressGridDialogs.add(registration);
+  if (typeof dialog?.close === "function") {
+    const closeDialog = dialog.close.bind(dialog);
+    dialog.close = (...args) => {
+      openStressGridDialogs.delete(registration);
+      const root = toElement(dialog);
+      if (root) {
+        stressGridControllers.get(root)?.abort?.();
+        stressGridControllers.delete(root);
+      }
+      if (sheet._stressGridDialog === dialog) delete sheet._stressGridDialog;
+      return closeDialog(...args);
+    };
+  }
   return dialog;
+}
+
+export function refreshOpenStressGridDialogsForActor(actor) {
+  if (!actor) return;
+  for (const registration of Array.from(openStressGridDialogs)) {
+    const { sheet, dialog } = registration;
+    if (!isSameDialogActor(sheet, actor)) continue;
+
+    const root = toElement(dialog);
+    if (!root?.isConnected) {
+      openStressGridDialogs.delete(registration);
+      if (sheet._stressGridDialog === dialog) delete sheet._stressGridDialog;
+      continue;
+    }
+
+    refreshStressGridDialog(sheet, root);
+  }
 }
 
 export async function setStressGridSize(sheet, stressType, count = 0) {
@@ -59,7 +105,8 @@ function getStressGridStates(sheet, stressType) {
 
 function renderStressGridDialogBody(sheet, activeType = "physical") {
   const active = normalizeStressType(activeType);
-  const editMode = !!sheet.isEditMode;
+  const canModify = canModifySheetActor(sheet);
+  const editMode = canModify && !!sheet.isEditMode;
   const types = getStressGridTypes();
   const stateClass = (cell) => cell === 1 ? "blunt" : cell === 2 ? "lethal" : cell === 3 ? "critical" : "regular";
 
@@ -72,7 +119,7 @@ function renderStressGridDialogBody(sheet, activeType = "physical") {
   const panes = types.map(type => {
     const states = getStressGridStates(sheet, type.key);
     const cells = states.map((cell, index) => `
-      <div class="hp-cell stress-cell ${stateClass(cell)}" data-stress-type="${type.key}" data-index="${index}"></div>
+      <div class="hp-cell stress-cell ${stateClass(cell)}" data-stress-type="${type.key}" data-index="${index}"${canModify ? "" : ` tabindex="0" aria-label="${sheet._escapeHtml(type.label)} stress box ${index + 1}, ${stateClass(cell)}"`}></div>
     `).join("");
     const controls = editMode ? `
       <div class="pc-hp-grid-popup-stepper pc-stress-grid-popup-stepper">
@@ -81,11 +128,11 @@ function renderStressGridDialogBody(sheet, activeType = "physical") {
         <span>${states.length}</span>
         <button type="button" class="stress-add sheet-stepper-btn" data-stress-type="${type.key}" title="Add ${sheet._escapeHtml(type.label)} stress box">+</button>
       </div>
-    ` : `
+    ` : canModify ? `
       <button type="button" class="pc-portrait-hp-action pc-stress-grid-refresh" data-stress-type="${type.key}" title="Reset ${sheet._escapeHtml(type.label)} Stress" aria-label="Reset ${sheet._escapeHtml(type.label)} Stress">
         <i class="fas fa-sync-alt" aria-hidden="true"></i>
       </button>
-    `;
+    ` : "";
 
     return `
       <section class="pc-stress-grid-pane${type.key === active ? " active" : ""}" data-stress-pane="${type.key}" role="tabpanel">
@@ -105,7 +152,7 @@ function renderStressGridDialogBody(sheet, activeType = "physical") {
   return `
     <div class="pc-stress-grid-tabs" role="tablist">${tabs}</div>
     <div class="pc-stress-grid-panes">${panes}</div>
-    <p class="pc-hp-grid-popup-help">Left-click cycles stress damage. Right-click clears a cell.</p>
+    ${canModify ? `<p class="pc-hp-grid-popup-help">Left-click cycles stress damage. Right-click clears a cell.</p>` : ""}
   `;
 }
 
@@ -153,11 +200,6 @@ function bindStressGridDialog(sheet, root) {
     }
   };
 
-  const refresh = async (stressType) => {
-    await sheet.render(false);
-    refreshStressGridDialog(sheet, rootElement, stressType);
-  };
-
   for (const tab of qsa(rootElement, ".pc-stress-grid-tab")) {
     tab.addEventListener("click", (ev) => {
       ev.preventDefault();
@@ -165,12 +207,13 @@ function bindStressGridDialog(sheet, root) {
     }, { signal });
   }
 
+  if (!canModifySheetActor(sheet)) return;
+
   for (const button of qsa(rootElement, ".stress-add")) {
     button.addEventListener("click", async (ev) => {
       ev.preventDefault();
       const stressType = button.dataset.stressType;
       await changeStressGridSize(sheet, stressType, 1);
-      await refresh(stressType);
     }, { signal });
   }
 
@@ -179,7 +222,6 @@ function bindStressGridDialog(sheet, root) {
       ev.preventDefault();
       const stressType = button.dataset.stressType;
       await changeStressGridSize(sheet, stressType, -1);
-      await refresh(stressType);
     }, { signal });
   }
 
@@ -191,7 +233,6 @@ function bindStressGridDialog(sheet, root) {
       if (!stressType || Number.isNaN(index)) return;
       const currentState = Number(sheet.actor?.system?.[`${stressType}${index}`]) || 0;
       await setStressGridCell(sheet, stressType, index, (currentState + 1) % 4);
-      await refresh(stressType);
     }, { signal });
 
     cell.addEventListener("contextmenu", async (ev) => {
@@ -200,7 +241,6 @@ function bindStressGridDialog(sheet, root) {
       const index = Number.parseInt(cell.dataset.index, 10);
       if (!stressType || Number.isNaN(index)) return;
       await setStressGridCell(sheet, stressType, index, 0);
-      await refresh(stressType);
     }, { signal });
   }
 
@@ -209,7 +249,6 @@ function bindStressGridDialog(sheet, root) {
       ev.preventDefault();
       const stressType = normalizeStressType(button.dataset.stressType);
       await sheet.actor.refreshPeasantStressTrack?.(stressType);
-      await refresh(stressType);
     }, { signal });
   }
 }

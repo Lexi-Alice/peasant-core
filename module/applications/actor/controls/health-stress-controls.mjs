@@ -17,7 +17,12 @@ function parseDataInteger(element, key) {
   return Number.isFinite(value) ? value : NaN;
 }
 
-export function setupHealthStressControls(sheet, html) {
+export function setupHealthStressControls(sheet, html, { readOnly = !!sheet?.isReadOnlyObserver } = {}) {
+  if (readOnly) {
+    setupHealthStressViewControls(sheet, html);
+    return;
+  }
+
   for (const input of qsa(html, "input[name='system.bolsteredHp']")) {
     input.addEventListener("change", async () => {
       let newValue = parseInputInteger(input, 0);
@@ -55,6 +60,76 @@ export function setupHealthStressControls(sheet, html) {
     });
   }
 
+  for (const input of qsa(html, ".pc-portrait-hp-max-input")) {
+    input.addEventListener("change", async () => {
+      if (!isSimplifiedHpActor(sheet.actor)) return;
+      let newMax = parseInputInteger(input, 1);
+      newMax = Math.max(1, newMax);
+      input.value = String(newMax);
+      await sheet.actor.setPeasantSimplifiedHealthMax?.(newMax);
+    });
+
+    input.addEventListener("blur", (ev) => {
+      const bar = ev.currentTarget.closest(".pc-portrait-hp-main");
+      if (bar) togglePortraitHpMaxInput(bar, false);
+    });
+
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      ev.preventDefault();
+      ev.currentTarget.blur();
+    });
+  }
+
+  for (const input of qsa(html, ".pc-portrait-hp-command-input")) {
+    input.addEventListener("change", async () => {
+      if (!sheet.actor?.isOwner) return;
+      const raw = String(input.value ?? "").trim();
+      if (!raw) {
+        resetPortraitHpCommandInput(sheet, input);
+        return;
+      }
+
+      const result = await sheet.actor.applyPeasantHpValueCommand?.(raw);
+      if (!result?.ok) ui.notifications?.warn?.(result?.message || "Invalid HP command.");
+      resetPortraitHpCommandInput(sheet, input);
+    });
+
+    input.addEventListener("blur", (ev) => {
+      const bar = ev.currentTarget.closest(".pc-portrait-hp-main");
+      setTimeout(() => {
+        if (bar) togglePortraitHpCommandInput(sheet, bar, false);
+      }, 0);
+    });
+
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        resetPortraitHpCommandInput(sheet, ev.currentTarget);
+        ev.currentTarget.blur();
+        return;
+      }
+      if (ev.key !== "Enter") return;
+      ev.preventDefault();
+      ev.currentTarget.blur();
+    });
+  }
+
+  for (const bar of qsa(html, ".pc-portrait-hp-main")) {
+    bar.addEventListener("click", (ev) => {
+      if (ev.target?.closest?.("input, button, select, textarea, a")) return;
+
+      if (sheet.isEditMode) {
+        if (!isSimplifiedHpActor(sheet.actor)) return;
+        togglePortraitHpMaxInput(bar, true);
+        return;
+      }
+
+      if (!sheet.actor?.isOwner) return;
+      togglePortraitHpCommandInput(sheet, bar, true);
+    });
+  }
+
   for (const button of qsa(html, ".pc-hp-grid-open")) {
     button.addEventListener("click", (ev) => {
       ev.preventDefault();
@@ -76,7 +151,6 @@ export function setupHealthStressControls(sheet, html) {
       const newCount = Math.max(0, parseInputInteger(input, 0));
       input.value = String(newCount);
       await setStressGridSize(sheet, stressType, newCount);
-      sheet.render(false);
     });
   }
 
@@ -131,7 +205,6 @@ export function setupHealthStressControls(sheet, html) {
       const col = parseDataInteger(cell, "col");
       if (Number.isNaN(row) || Number.isNaN(col)) return;
       await sheet.actor.cyclePeasantHpGridCell?.(row, col);
-      sheet.render(false);
     });
   }
 
@@ -142,7 +215,6 @@ export function setupHealthStressControls(sheet, html) {
       const col = parseDataInteger(cell, "col");
       if (Number.isNaN(row) || Number.isNaN(col)) return;
       await sheet.actor.setPeasantHpGridCell?.(row, col, 0);
-      sheet.render(false);
     });
   }
 
@@ -184,7 +256,6 @@ export function setupHealthStressControls(sheet, html) {
       const stressType = section.dataset.stressType;
       if (!stressType) return;
       await applyStressDamage(sheet, stressType, 1);
-      sheet.render(false);
     });
   }
 
@@ -194,7 +265,6 @@ export function setupHealthStressControls(sheet, html) {
       const stressType = section.dataset.stressType;
       if (!stressType) return;
       await applyStressHeal(sheet, stressType, 1);
-      sheet.render(false);
     });
   }
 
@@ -224,6 +294,54 @@ export function setupHealthStressControls(sheet, html) {
     });
   }
 
+}
+
+function setupHealthStressViewControls(sheet, html) {
+  for (const button of qsa(html, ".pc-hp-grid-open")) {
+    button.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      openHpGridDialog(sheet, ev.currentTarget);
+    });
+  }
+
+  for (const button of qsa(html, ".pc-stress-grid-open")) {
+    button.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openStressGridDialog(sheet, ev.currentTarget?.dataset?.stressType, ev.currentTarget);
+    });
+  }
+}
+
+function togglePortraitHpMaxInput(bar, edit) {
+  const label = bar.querySelector(":scope > .pc-portrait-hp-label");
+  const input = bar.querySelector(":scope > .pc-portrait-hp-max-input");
+  if (!label || !input) return;
+  label.hidden = edit;
+  input.hidden = !edit;
+  if (edit) {
+    input.focus();
+    input.select?.();
+  }
+}
+
+function togglePortraitHpCommandInput(sheet, bar, edit) {
+  const label = bar.querySelector(":scope > .pc-portrait-hp-label");
+  const input = bar.querySelector(":scope > .pc-portrait-hp-command-input");
+  if (!label || !input) return;
+  if (!edit) resetPortraitHpCommandInput(sheet, input);
+  label.hidden = edit;
+  input.hidden = !edit;
+  if (edit) {
+    input.value = String(sheet.actor?.system?.health?.value ?? "");
+    input.focus();
+    input.select?.();
+  }
+}
+
+function resetPortraitHpCommandInput(sheet, input) {
+  if (!input) return;
+  input.value = String(sheet.actor?.system?.health?.value ?? "");
 }
 
 function openStressAmountDialog(sheet, stressType, mode, trigger) {
@@ -256,7 +374,6 @@ function openStressAmountDialog(sheet, stressType, mode, trigger) {
           if (isHeal) await applyStressHeal(sheet, stressType, amount);
           else await applyStressDamage(sheet, stressType, amount);
 
-          sheet.render(false);
           return true;
         }
       }

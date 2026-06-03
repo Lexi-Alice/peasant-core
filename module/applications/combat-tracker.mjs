@@ -32,6 +32,37 @@ function lockSeizeButtonSize(el) {
   el.style.setProperty("box-sizing", "border-box", "important");
 }
 
+function userOwnsCombatantForSeize(user, combatant) {
+  if (!user || !combatant) return false;
+  if (user.isGM) return true;
+
+  const ownerLevel = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+  const actor = combatant.actor || combatant.token?.actor || null;
+  const tokenDocument = combatant.token?.document || combatant.token || null;
+
+  try {
+    if (typeof actor?.testUserPermission === "function" && actor.testUserPermission(user, ownerLevel)) return true;
+  } catch (e) {}
+
+  try {
+    if (typeof combatant?.testUserPermission === "function" && combatant.testUserPermission(user, ownerLevel)) return true;
+  } catch (e) {}
+
+  try {
+    if (typeof tokenDocument?.testUserPermission === "function" && tokenDocument.testUserPermission(user, ownerLevel)) return true;
+  } catch (e) {}
+
+  try {
+    if (typeof actor?.canUserModify === "function" && actor.canUserModify(user, "update")) return true;
+  } catch (e) {}
+
+  try {
+    if (user?.character?.id && actor?.id && user.character.id === actor.id) return true;
+  } catch (e) {}
+
+  return false;
+}
+
 async function handleSeizeClick(event, combat, combatantId, phase) {
   event.preventDefault();
   event.stopPropagation();
@@ -67,6 +98,7 @@ export function configureCombatTracker() {
       const combatant = combat.combatants.get(id);
 
       if (!combatant || combatant.id === currentCombatant.id) continue;
+      if (!userOwnsCombatantForSeize(game.user, combatant)) continue;
 
       const myIdx = combat.turns.findIndex(c => c.id === id);
       if (myIdx <= currentIdx) continue;

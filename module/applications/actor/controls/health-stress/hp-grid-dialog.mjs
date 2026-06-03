@@ -4,13 +4,30 @@ import { qs, qsa, toElement } from "../../../dom.mjs";
 
 const PC_CONSCIOUSNESS_SAVE_FLAG = "rollConsciousnessAsSaves";
 const hpGridControllers = new WeakMap();
+const openHpGridDialogs = new Set();
 const HP_GRID_SIMPLIFIED_DIALOG_WIDTH = 420;
 const HP_GRID_DIALOG_MIN_CONTENT_WIDTH = 300;
 const HP_GRID_DIALOG_MIN_RESIZE_WIDTH = 280;
+const HP_GRID_DIALOG_MAX_INITIAL_WIDTH = 640;
+const HP_GRID_DIALOG_MAX_INITIAL_HEIGHT = 280;
+const HP_GRID_DIALOG_MIN_INITIAL_HEIGHT = 120;
 const HP_GRID_TARGET_CELL_SIZE = 32;
 const HP_GRID_TARGET_LABEL_WIDTH = 82;
 const HP_GRID_MIN_READABLE_CELL_SIZE = 16;
 const HP_GRID_MIN_READABLE_LABEL_WIDTH = 86;
+
+function canModifySheetActor(sheet) {
+  return !!(sheet?.canModifyActor ?? (game.user?.isGM || sheet?.actor?.isOwner));
+}
+
+function isSameDialogActor(sheet, actor) {
+  const sheetActor = sheet?.actor;
+  return !!sheetActor && (
+    sheetActor === actor
+    || sheetActor.uuid === actor?.uuid
+    || (!!sheetActor.id && sheetActor.id === actor?.id)
+  );
+}
 
 export function openHpGridDialog(sheet, trigger = null) {
   const size = getHpGridDialogSize(sheet);
@@ -24,7 +41,7 @@ export function openHpGridDialog(sheet, trigger = null) {
     render: (html) => {
       const root = toElement(html);
       root?.classList.add("pc-hp-grid-dialog-window");
-      applyHpGridDialogAspect(sheet, root);
+      applyHpGridDialogSizing(sheet, root);
       for (const element of qsa(root, ".dialog-buttons, .form-footer, footer")) element.style.display = "none";
       bindHpGridDialog(sheet, root);
     }
@@ -36,15 +53,35 @@ export function openHpGridDialog(sheet, trigger = null) {
     }
   });
   sheet._hpGridDialog = dialog;
+  const registration = { sheet, dialog };
+  openHpGridDialogs.add(registration);
   if (typeof dialog?.close === "function") {
     const closeDialog = dialog.close.bind(dialog);
     dialog.close = (...args) => {
+      openHpGridDialogs.delete(registration);
       clearHpGridBindings(toElement(dialog));
       if (sheet._hpGridDialog === dialog) delete sheet._hpGridDialog;
       return closeDialog(...args);
     };
   }
   return dialog;
+}
+
+export function refreshOpenHpGridDialogsForActor(actor) {
+  if (!actor) return;
+  for (const registration of Array.from(openHpGridDialogs)) {
+    const { sheet, dialog } = registration;
+    if (!isSameDialogActor(sheet, actor)) continue;
+
+    const root = toElement(dialog);
+    if (!root?.isConnected) {
+      openHpGridDialogs.delete(registration);
+      if (sheet._hpGridDialog === dialog) delete sheet._hpGridDialog;
+      continue;
+    }
+
+    refreshHpGridDialog(sheet, root);
+  }
 }
 
 function getHpGridDialogSize(sheet) {
@@ -61,12 +98,24 @@ function getHpGridDialogSize(sheet) {
   const gridContentWidth = (cols * HP_GRID_TARGET_CELL_SIZE) + (cols * gap) + labelWidth;
   const gridHeight = (rows * HP_GRID_TARGET_CELL_SIZE) + (Math.max(0, rows - 1) * gap);
   const unitHeight = gridHeight + 24;
-  const width = Math.max(HP_GRID_DIALOG_MIN_CONTENT_WIDTH, gridContentWidth + 42);
-  const height = Math.max(170, controlsHeight + unitHeight + 56);
+  const naturalWidth = Math.max(HP_GRID_DIALOG_MIN_CONTENT_WIDTH, gridContentWidth + 42);
+  const naturalHeight = Math.max(170, controlsHeight + unitHeight + 56);
+  const width = Math.min(naturalWidth, HP_GRID_DIALOG_MAX_INITIAL_WIDTH);
+  const scaledHeight = getHpGridDialogScaledHeight(rows, cols, width, controlsHeight);
+  const height = Math.min(Math.min(naturalHeight, HP_GRID_DIALOG_MAX_INITIAL_HEIGHT), scaledHeight);
   return { width, height };
 }
 
-function applyHpGridDialogAspect(sheet, root) {
+function getHpGridDialogScaledHeight(rows, cols, width, controlsHeight = 0) {
+  const { cellSize, columnGap, rowHeight } = getHpGridScaleMetrics(rows, cols, width);
+  const gridHeight = (rows * rowHeight) + (Math.max(0, rows - 1) * columnGap);
+  const controlsGap = controlsHeight ? 6 : 0;
+  const helpHeight = 15;
+  const unitGap = 6;
+  return Math.max(HP_GRID_DIALOG_MIN_INITIAL_HEIGHT, Math.ceil(controlsHeight + controlsGap + gridHeight + helpHeight + unitGap + 56));
+}
+
+function applyHpGridDialogSizing(sheet, root) {
   const rootElement = toElement(root);
   if (!rootElement) return;
   const { width, height } = getHpGridDialogSize(sheet);
@@ -76,13 +125,24 @@ function applyHpGridDialogAspect(sheet, root) {
   const cols = simplified ? 1 : Math.max(1, Number(hp.cols) || 1);
   const minReadableWidth = (cols * HP_GRID_MIN_READABLE_CELL_SIZE) + (cols * 2) + HP_GRID_MIN_READABLE_LABEL_WIDTH + 42;
   const minWidth = Math.min(width, Math.max(HP_GRID_DIALOG_MIN_RESIZE_WIDTH, minReadableWidth));
-  const minReadableGridHeight = (rows * HP_GRID_MIN_READABLE_CELL_SIZE) + (Math.max(0, rows - 1) * 2);
   const minReadableControlsHeight = sheet.isEditMode ? 64 : 0;
-  const minReadableHeight = minReadableControlsHeight + minReadableGridHeight + 70;
-  const minHeight = Math.max(minWidth / (width / Math.max(height, 1)), minReadableHeight);
-  rootElement.style.setProperty("--pc-hp-grid-dialog-aspect", `${width} / ${Math.max(height, 1)}`);
+  const minHeight = simplified
+    ? height
+    : getHpGridDialogScaledHeight(rows, cols, minWidth, minReadableControlsHeight);
   rootElement.style.setProperty("--pc-hp-grid-dialog-min-width", `${minWidth}px`);
   rootElement.style.setProperty("--pc-hp-grid-dialog-min-height", `${minHeight.toFixed(2)}px`);
+}
+
+function getHpGridScaleMetrics(rows, cols, width) {
+  const padding = 20;
+  const availableWidth = Math.max(1, width - padding);
+  const labelWidth = Math.max(80, Math.min(HP_GRID_TARGET_LABEL_WIDTH, availableWidth * 0.15));
+  const columnGap = Math.max(1, Math.min(5, availableWidth / Math.max(cols * 8, 1)));
+  const maxCellFromWidth = (availableWidth - labelWidth - (columnGap * cols)) / cols;
+  const cellSize = Math.max(4, maxCellFromWidth);
+  const labelFontSize = Math.max(9, Math.min(15, cellSize * 0.42));
+  const rowHeight = Math.max(cellSize, labelFontSize * 1.2);
+  return { availableWidth, cellSize, columnGap, labelFontSize, labelWidth, rowHeight };
 }
 
 function getHpLabelRows() {
@@ -105,7 +165,8 @@ function renderHpGridDialogBody(sheet) {
   const cols = Math.max(0, Number(hp.cols) || 0);
   const grid = Array.isArray(hp.grid) ? hp.grid : [];
   const labels = getHpLabelRows();
-  const editMode = !!sheet.isEditMode;
+  const canModify = canModifySheetActor(sheet);
+  const editMode = canModify && !!sheet.isEditMode;
 
   const controls = editMode ? `
     <div class="pc-hp-grid-popup-controls">
@@ -128,11 +189,12 @@ function renderHpGridDialogBody(sheet) {
     const cells = Array.from({ length: cols }, (_, colIndex) => {
       const cell = Number(row[colIndex]) || 0;
       const stateClass = cell === 1 ? "blunt" : cell === 2 ? "lethal" : cell === 3 ? "critical" : "regular";
-      return `<div class="hp-cell ${stateClass}" data-row="${rowIndex}" data-col="${colIndex}"></div>`;
+      const focusAttrs = canModify ? "" : ` tabindex="0" aria-label="HP row ${rowIndex + 1}, column ${colIndex + 1}, ${stateClass}"`;
+      return `<div class="hp-cell ${stateClass}" data-row="${rowIndex}" data-col="${colIndex}"${focusAttrs}></div>`;
     }).join("");
     const label = labels[rowIndex] ?? { value: null, text: "" };
     const labelHtml = label.value
-      ? `<span class="hp-th hp-tn-clickable" data-action="rollConsciousness" data-th="${label.value}" tabindex="0">${label.value}+</span><span class="hp-tn-text">${sheet._escapeHtml(label.text)}</span>`
+      ? `${canModify ? `<span class="hp-th hp-tn-clickable" data-action="rollConsciousness" data-th="${label.value}" tabindex="0">${label.value}+</span>` : `<span class="hp-th">${label.value}+</span>`}<span class="hp-tn-text">${sheet._escapeHtml(label.text)}</span>`
       : `<span>${sheet._escapeHtml(label.text)}</span>`;
     return `${cells}<div class="hp-label pc-hp-grid-popup-label">${labelHtml}</div>`;
   }).join("");
@@ -144,7 +206,7 @@ function renderHpGridDialogBody(sheet) {
         <div class="pc-hp-grid-popup-grid" data-rows="${rows}" data-cols="${cols}" style="--hp-cols: ${Math.max(cols, 1)};">
           ${rowHtml}
         </div>
-        <p class="pc-hp-grid-popup-help">Left-click cycles damage. Right-click clears a cell.</p>
+        ${canModify ? `<p class="pc-hp-grid-popup-help">Left-click cycles damage. Right-click clears a cell.</p>` : ""}
       </div>
     </div>
   `;
@@ -196,37 +258,25 @@ function syncHpGridDialogScale(root) {
   const frame = qs(rootElement, ".pc-hp-grid-popup-frame");
   const unit = qs(rootElement, ".pc-hp-grid-popup-unit");
   const rootRect = rootElement.getBoundingClientRect?.();
-  const headerRect = qs(rootElement, ".window-header")?.getBoundingClientRect?.();
   const contentRect = content?.getBoundingClientRect?.();
   const fallbackWidth = rootRect?.width || 0;
-  const fallbackHeight = Math.max(0, (rootRect?.height || 0) - (headerRect?.height || 0));
   const width = content?.clientWidth || contentRect?.width || fallbackWidth || frame?.clientWidth || grid.clientWidth || 0;
-  const height = content?.clientHeight || contentRect?.height || fallbackHeight || frame?.clientHeight || grid.clientHeight || 0;
-  if (!width || !height) return;
+  if (!width) return;
 
-  const padding = 20;
   const controls = qs(rootElement, ".pc-hp-grid-popup-controls");
   const controlsHeight = controls?.getBoundingClientRect?.().height || 0;
-  const controlsGap = controls ? 6 : 0;
-  const availableWidth = Math.max(1, width - padding);
-  const labelWidth = Math.max(80, Math.min(HP_GRID_TARGET_LABEL_WIDTH, availableWidth * 0.15));
-  const columnGap = Math.max(1, Math.min(5, availableWidth / Math.max(cols * 8, 1)));
-  const maxCellFromWidth = (availableWidth - labelWidth - (columnGap * cols)) / cols;
-  const availableHeight = Math.max(1, height - padding - controlsHeight - controlsGap);
-  const unitGap = Math.max(4, Math.min(10, availableHeight * 0.04));
-  const helpFontSize = Math.max(9, Math.min(14, availableHeight * 0.055));
+  const { cellSize, columnGap, labelFontSize, labelWidth, rowHeight } = getHpGridScaleMetrics(rows, cols, width);
+  const unitGap = controlsHeight ? 6 : 5;
+  const helpFontSize = Math.max(9, Math.min(12, rowHeight * 0.5));
   const helpHeight = helpFontSize * 1.25;
-  const maxCellFromHeight = (availableHeight - helpHeight - unitGap - (columnGap * Math.max(0, rows - 1))) / rows;
-  const cellSize = Math.max(4, Math.min(maxCellFromWidth, maxCellFromHeight));
-  const leftoverGridHeight = availableHeight - helpHeight - unitGap - (rows * cellSize);
-  const rowGap = rows > 1 ? Math.max(columnGap, leftoverGridHeight / (rows - 1)) : columnGap;
+  const rowGap = columnGap;
   const gridWidth = (cols * cellSize) + labelWidth + (columnGap * cols);
-  const labelFontSize = Math.max(9, Math.min(15, cellSize * 0.42));
 
   const styleTargets = [dialogContent, body, frame, unit, grid].filter((target, index, targets) => target && targets.indexOf(target) === index);
   for (const target of styleTargets) {
     target.style.setProperty("--pc-hp-cell-width", `${cellSize.toFixed(2)}px`);
     target.style.setProperty("--pc-hp-cell-height", `${cellSize.toFixed(2)}px`);
+    target.style.setProperty("--pc-hp-grid-row-height", `${rowHeight.toFixed(2)}px`);
     target.style.setProperty("--pc-hp-grid-gap", `${columnGap.toFixed(2)}px`);
     target.style.setProperty("--pc-hp-grid-column-gap", `${columnGap.toFixed(2)}px`);
     target.style.setProperty("--pc-hp-grid-row-gap", `${rowGap.toFixed(2)}px`);
@@ -244,7 +294,7 @@ function bindHpGridDialog(sheet, root) {
   if (!rootElement) return;
 
   clearHpGridBindings(rootElement);
-  applyHpGridDialogAspect(sheet, rootElement);
+  applyHpGridDialogSizing(sheet, rootElement);
   const controller = new AbortController();
   let resizeObserver = null;
   try {
@@ -270,17 +320,13 @@ function bindHpGridDialog(sheet, root) {
     view.requestAnimationFrame(() => syncHpGridDialogScale(rootElement));
   }
 
-  const refresh = async () => {
-    await sheet.render(false);
-    refreshHpGridDialog(sheet, rootElement);
-  };
+  if (!canModifySheetActor(sheet)) return;
 
   const bindResize = (selector, rowDelta, colDelta) => {
     for (const button of qsa(rootElement, selector)) {
       button.addEventListener("click", async (ev) => {
         ev.preventDefault();
         await changeHpGridSize(sheet, rowDelta, colDelta);
-        await refresh();
       }, { signal });
     }
   };
@@ -298,7 +344,6 @@ function bindHpGridDialog(sheet, root) {
       if (Number.isNaN(row) || Number.isNaN(col)) return;
       const current = Number(sheet.actor.system?.hp?.grid?.[row]?.[col]) || 0;
       await setHpGridCell(sheet, row, col, (current + 1) % 4);
-      await refresh();
     }, { signal });
 
     cell.addEventListener("contextmenu", async (ev) => {
@@ -307,7 +352,6 @@ function bindHpGridDialog(sheet, root) {
       const col = Number.parseInt(cell.dataset.col, 10);
       if (Number.isNaN(row) || Number.isNaN(col)) return;
       await setHpGridCell(sheet, row, col, 0);
-      await refresh();
     }, { signal });
   }
 

@@ -1,7 +1,7 @@
 import { getDefaultEdgeLabelMode, sanitizeEdgeLabelMode } from "../../../data/actor/edge-resources.mjs";
 import { delegate, qsa } from "../../dom.mjs";
 
-const TRACKED_RESOURCES = new Set(["stamina", "attunement", "capacity", "edge"]);
+const TRACKED_RESOURCES = new Set(["stamina", "attunement", "capacity", "edge", "armorCharge"]);
 
 export function setupResourceControls(sheet, html, { runQueuedInputUpdate } = {}) {
   setupResourceValueControls(sheet, html);
@@ -71,7 +71,7 @@ function setupPortraitResourceControls(sheet, html) {
     });
   }
 
-  for (const bar of qsa(html, ".pc-portrait-resource-bar")) {
+  for (const bar of qsa(html, ".pc-portrait-resource-bar, .pc-portrait-armor-charge-field")) {
     bar.addEventListener("click", (ev) => {
       if (ev.target?.closest?.("input, button, select, textarea, a")) return;
       togglePortraitResourceBarInput(bar, true);
@@ -80,7 +80,7 @@ function setupPortraitResourceControls(sheet, html) {
 
   for (const input of qsa(html, ".pc-portrait-resource-value-input, .pc-portrait-resource-max-input")) {
     input.addEventListener("blur", (ev) => {
-      const bar = ev.currentTarget.closest(".pc-portrait-resource-bar");
+      const bar = ev.currentTarget.closest(".pc-portrait-resource-bar, .pc-portrait-armor-charge-field");
       if (bar) togglePortraitResourceBarInput(bar, false);
     });
 
@@ -100,7 +100,7 @@ function togglePortraitResourceBarInput(bar, edit) {
   input.hidden = !edit;
   if (edit) {
     input.focus();
-    input.select?.();
+    if (!bar.classList.contains("pc-portrait-armor-charge-field")) input.select?.();
   }
 }
 
@@ -127,7 +127,6 @@ function setupEdgeResourceControls(sheet, html, { runQueuedInputUpdate } = {}) {
     if (!sheet.isEditMode) return;
     const selected = sanitizeEdgeLabelMode(target.value, defaultEdgeLabelMode);
     await sheet.actor.setPeasantEdgeLabelMode?.(selected);
-    sheet.render(false);
   });
 
   delegate(html, "change", ".edge-base-custom-label", async (ev, target) => {
@@ -141,9 +140,8 @@ function setupEdgeResourceControls(sheet, html, { runQueuedInputUpdate } = {}) {
     const index = Number.parseInt(input.dataset.resourceIndex, 10);
     if (!Number.isFinite(index) || index < 0) return;
     await runQueuedInputUpdate?.(input, "_edgeResourceSaveQueue", "Edge resource label mode change", async () => {
-      await sheet.actor.setPeasantEdgeResourceLabelMode?.(index, input.value, { render: false });
+      await sheet.actor.setPeasantEdgeResourceLabelMode?.(index, input.value);
     });
-    sheet.render(false);
   });
 
   delegate(html, "change", ".edge-resource-custom-label", async (ev, input) => {
@@ -151,7 +149,7 @@ function setupEdgeResourceControls(sheet, html, { runQueuedInputUpdate } = {}) {
     const index = Number.parseInt(input.dataset.resourceIndex, 10);
     if (!Number.isFinite(index) || index < 0) return;
     await runQueuedInputUpdate?.(input, "_edgeResourceSaveQueue", "Edge resource custom label change", async () => {
-      await sheet.actor.setPeasantEdgeResourceCustomLabel?.(index, input.value, { render: false });
+      await sheet.actor.setPeasantEdgeResourceCustomLabel?.(index, input.value);
     });
   });
 
@@ -189,14 +187,14 @@ function setupEdgeResourceControls(sheet, html, { runQueuedInputUpdate } = {}) {
         if (isMax) {
           const maxValue = Math.max(0, Number.parseInt(input.value, 10) || 0);
           input.value = String(maxValue);
-          await sheet.actor.setPeasantEdgeResourceMax?.(index, maxValue, { render: false });
+          await sheet.actor.setPeasantEdgeResourceMax?.(index, maxValue);
         } else {
           const entry = getEdgeResourceAt(index);
           const maxValue = Math.max(0, Number.parseInt(entry?.max, 10) || 0);
           const value = Math.max(0, Number.parseInt(input.value, 10) || 0);
           const nextValue = Math.min(value, maxValue);
           input.value = String(nextValue);
-          await sheet.actor.setPeasantEdgeResourceValue?.(index, nextValue, { render: false });
+          await sheet.actor.setPeasantEdgeResourceValue?.(index, nextValue);
         }
       }
     );

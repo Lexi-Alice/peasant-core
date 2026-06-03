@@ -2,7 +2,6 @@ export async function performPeasantShortRest(sheet) {
   if (!canUseRestControls(sheet)) return;
 
   await sheet.actor.performPeasantShortRest?.();
-  sheet.render(false);
   ui.notifications?.info?.("Short rest complete.");
 }
 
@@ -10,7 +9,6 @@ export async function performPeasantLongRest(sheet) {
   if (!canUseRestControls(sheet)) return;
 
   await sheet.actor.performPeasantLongRest?.();
-  sheet.render(false);
   ui.notifications?.info?.("Long rest complete.");
 }
 
@@ -29,7 +27,7 @@ export async function confirmPeasantShortRest(sheet) {
     title: "Short Rest",
     content: `
       <div style="padding: 4px 2px;">
-        <p style="margin: 0; color: #e0e0e0;">Take a short rest and refresh stamina, attunement, and short stresses?</p>
+        <p style="margin: 0; color: #e0e0e0;">Take a short rest and refresh stamina, attunement, armor charge, and short stresses?</p>
       </div>
     `,
     buttons: {
@@ -56,7 +54,7 @@ export async function confirmPeasantLongRest(sheet) {
     title: "Long Rest",
     content: `
       <div style="padding: 4px 2px;">
-        <p style="margin: 0 0 6px; color: #e0e0e0;">Take a long rest and refresh stamina, attunement, capacity, short stress,</p>
+        <p style="margin: 0 0 6px; color: #e0e0e0;">Take a long rest and refresh stamina, attunement, capacity, armor charge, short stress,</p>
         <p style="margin: 0; color: #e0e0e0;">set temporary HP to damaged HP, apply a cycle of natural healing, and general stress recovery?</p>
       </div>
     `,
@@ -108,7 +106,6 @@ export async function refreshPeasantResourcesAndResetTracks(sheet) {
   if (!canUseRestControls(sheet)) return;
 
   await sheet.actor.refreshPeasantResourcesAndResetTracks?.();
-  sheet.render(false);
   ui.notifications?.info?.("Resources refreshed.");
 }
 

@@ -85,7 +85,6 @@ function openDamageDialog(sheet, trigger) {
             return false;
           }
 
-          sheet.render(false);
           return true;
         }
       }
@@ -137,7 +136,6 @@ function openHealDialog(sheet, trigger) {
             return false;
           }
 
-          sheet.render(false);
           return true;
         }
       }

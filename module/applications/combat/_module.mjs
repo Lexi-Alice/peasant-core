@@ -4,7 +4,7 @@ export { rollAutomatedCombatDamage } from "./automated-damage-rolls.mjs";
 export { showDefensePromptDialog } from "./defense-prompt-dialog.mjs";
 export { emitDefensePromptRequestsForAttack } from "./defense-prompt-requests.mjs";
 export { maybeForcePassFailedNotableRoll } from "./force-pass.mjs";
-export { applyIncomingHit, requestIncomingHitApplicationForTarget, requestIncomingHitResolutionForTarget, showIncomingHitPrompt } from "./incoming-hit.mjs";
+export { applyIncomingHeal, applyIncomingHit, requestIncomingHealApplicationForTarget, requestIncomingHitApplicationForTarget, requestIncomingHitResolutionForTarget, showIncomingHitPrompt } from "./incoming-hit.mjs";
 export { consumeNotableCombatRollUse, executeResolvedNotableCombatRoll } from "./notable-combat-rolls.mjs";
 export { performNotableCombatRoll, startNotableCombatRoll } from "./notable-combat-workflow.mjs";
 export { isChainCancelledResult, showFlexibleDamageTypePrompt, showForcePassPromptDialog, withWaitingForDefenderResponse } from "./prompt-dialogs.mjs";

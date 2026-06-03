@@ -18,6 +18,7 @@ import {
   sanitizeCombatHaltBuffs,
   sanitizeCombatHaltBuffType
 } from "../combat-modifiers.mjs";
+import { getCombatDesperateDieRateModifier } from "../combat-damage.mjs";
 import {
   EDGE_LABEL_MODE_CUSTOM,
   getDefaultEdgeLabelMode,
@@ -141,6 +142,8 @@ export function prepareActorNotableCombatContext(data, actor) {
     const hasRangeRate = hasRangeRateValue(combat.rangeRate);
     const rangeRateDisplay = formatRangeRateValue(combat.rangeRate);
     const hasDamage = hasCombatDice(combat.damage);
+    const desperate = getCombatDesperateDieRateModifier(actor, combat);
+    const damageDiceRateMod = diceRateMod + desperate.modifier;
     let damageDisplay = "";
     let modifiedDamageDice = 0;
     let modifiedDamageValue = 0;
@@ -150,7 +153,7 @@ export function prepareActorNotableCombatContext(data, actor) {
         combat.damage.diceCount,
         combat.damage.diceValue,
         combat.damage.flat || 0,
-        diceRateMod,
+        damageDiceRateMod,
         combat.damage.diceBonus || 0
       );
       modifiedDamageDice = damageResult.diceCount;
@@ -211,6 +214,7 @@ export function prepareActorNotableCombatContext(data, actor) {
     const hasOverkill = !!combat.overkill;
     const magnetismGrade = getCombatMagnetismGrade(combat);
     const hasMagnetism = magnetismGrade > 0;
+    const hasDesperate = desperate.value !== 0;
     const hasStrengthen = !!combat.stability && !!combat.strengthen;
     const customTags = getCombatCustomTags(combat);
     const hasCustom = customTags.length > 0;
@@ -233,6 +237,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       range: { has: hasRange, label: "Range", value: combat.range },
       rangeRate: { has: hasRangeRate, label: "Range-Rate", value: rangeRateDisplay },
       damage: { has: hasDamage, label: "Damage", value: damageDisplay, rollable: true },
+      desperate: { has: hasDesperate, label: "Desperate", value: formatDesperateTagValue(desperate) },
       heal: { has: hasHeal, label: "Heal", value: healDisplay, rollable: true },
       manifest: { has: hasManifest, label: "Manifest", value: manifestDisplay, rollable: true },
       tagUses: { has: hasTagUses, label: "Uses", current: combat.tagUses?.current || 0, max: combat.tagUses?.max || 0, isUses: true },
@@ -283,6 +288,7 @@ export function prepareActorNotableCombatContext(data, actor) {
       hasToHitMod: toHitMod !== 0,
       hasAccuracyMod: accuracyMod !== 0,
       hasDiceRateMod: diceRateMod !== 0,
+      hasDesperateDieRateMod: desperate.modifier !== 0,
       hasFlatDamageMod: flatDamageMod !== 0,
       modifiedDamageDice,
       modifiedDamageValue,
@@ -305,6 +311,8 @@ export function prepareActorNotableCombatContext(data, actor) {
       rangeRate: rangeRateDisplay,
       hasDamage,
       damageDisplay,
+      hasDesperate,
+      desperate,
       hasHeal,
       healDisplay,
       hasManifest,
@@ -331,7 +339,17 @@ export function prepareActorNotableCombatContext(data, actor) {
       activeTags,
       customTags,
       tagOrder: combat.tagOrder || [],
-      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasTagUses || hasSections || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
+      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasDesperate || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasTagUses || hasSections || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
     };
   });
+}
+
+function formatDesperateTagValue(desperate) {
+  const valueText = formatSignedInteger(desperate.value);
+  if (desperate.filledRows <= 0) return `${valueText}/row`;
+  return `${valueText}/row (${formatSignedInteger(desperate.modifier)})`;
+}
+
+function formatSignedInteger(value) {
+  return value > 0 ? `+${value}` : String(value);
 }

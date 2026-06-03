@@ -20,9 +20,8 @@ export function setupNotableCombatControls(sheet, html, {
     if (!sheet.isEditMode) return;
     await blurActiveEditableInSheet?.();
     await enqueue("_combatSaveQueue", "Combat add", async () => {
-      await sheet.actor.addPeasantNotableCombat?.({ render: false });
+      await sheet.actor.addPeasantNotableCombat?.();
     });
-    sheet.render(true);
   });
 
   delegate(root, "click", ".combat-toggle-type", async (ev, target) => {
@@ -34,9 +33,8 @@ export function setupNotableCombatControls(sheet, html, {
     const index = resolveRowIndex(row, "data-combat-index");
     if (Number.isNaN(index)) return;
     await enqueue("_combatSaveQueue", "Combat type toggle", async () => {
-      await sheet.actor.setPeasantNotableCombatType?.(index, "Other", { clearStandardFields: true, render: false });
+      await sheet.actor.setPeasantNotableCombatType?.(index, "Other", { clearStandardFields: true });
     });
-    sheet.render(true);
   });
 
   delegate(root, "change", ".combat-select", async (ev, select) => {
@@ -46,9 +44,8 @@ export function setupNotableCombatControls(sheet, html, {
     const index = resolveRowIndex(row, "data-combat-index");
     if (Number.isNaN(index)) return;
     await enqueue("_combatSaveQueue", "Combat type select", async () => {
-      await sheet.actor.setPeasantNotableCombatType?.(index, newType, { render: false });
+      await sheet.actor.setPeasantNotableCombatType?.(index, newType);
     });
-    sheet.render(true);
   });
 
   delegate(root, "click", ".combat-delete", async (ev, target) => {
@@ -60,9 +57,8 @@ export function setupNotableCombatControls(sheet, html, {
     const index = resolveRowIndex(row, "data-combat-index");
     if (Number.isNaN(index)) return;
     await enqueue("_combatSaveQueue", "Combat delete", async () => {
-      await sheet.actor.removePeasantNotableCombat?.(index, { render: false });
+      await sheet.actor.removePeasantNotableCombat?.(index);
     });
-    sheet.render(true);
   });
 
   delegate(root, "click", ".combat-indent", async (ev, target) => {
@@ -75,9 +71,8 @@ export function setupNotableCombatControls(sheet, html, {
       const index = resolveRowIndex(row, "data-combat-index");
       if (Number.isNaN(index)) return;
       await enqueue("_combatSaveQueue", "Combat indent", async () => {
-        await sheet.actor.changePeasantNotableCombatIndent?.(index, 1, { render: false });
+        await sheet.actor.changePeasantNotableCombatIndent?.(index, 1);
       });
-      sheet.render(true);
     } catch (e) {
       pcLog.debug("combat indent failed", e);
     }
@@ -93,9 +88,8 @@ export function setupNotableCombatControls(sheet, html, {
       const index = resolveRowIndex(row, "data-combat-index");
       if (Number.isNaN(index)) return;
       await enqueue("_combatSaveQueue", "Combat outdent", async () => {
-        await sheet.actor.changePeasantNotableCombatIndent?.(index, -1, { render: false });
+        await sheet.actor.changePeasantNotableCombatIndent?.(index, -1);
       });
-      sheet.render(true);
     } catch (e) {
       pcLog.debug("combat outdent failed", e);
     }
@@ -108,7 +102,7 @@ export function setupNotableCombatControls(sheet, html, {
         const index = resolveItemIndex(checkbox, { dataKey: "index", rowSelector: ".combat-item", rowAttr: "data-combat-index" });
         if (index < 0) return;
 
-        await sheet.actor.setPeasantNotableCombatSig?.(index, !!checkbox.checked, { render: false });
+        await sheet.actor.setPeasantNotableCombatSig?.(index, !!checkbox.checked);
       });
     } catch (err) {
       console.warn("Failed to persist combat sig change:", err);
@@ -149,7 +143,7 @@ export function setupNotableCombatControls(sheet, html, {
         if (accuracyEl) fields.accuracy = accuracyEl.value;
         if (specialGradeEl) fields.specialGrade = specialGradeEl.value;
 
-        const result = await sheet.actor.setPeasantNotableCombatMainFields?.(index, fields, { render: false });
+        const result = await sheet.actor.setPeasantNotableCombatMainFields?.(index, fields);
         const savedCombat = result?.combats?.[index] || {};
         if (tohitEl) tohitEl.value = formatOptionalIntegerInput(savedCombat.tohit ?? parseOptionalInteger(fields.tohit, { min: 1 }));
         if (accuracyEl) accuracyEl.value = formatOptionalIntegerInput(savedCombat.accuracy ?? parseOptionalInteger(fields.accuracy, { allowSign: true }), { showPlus: true });
@@ -167,7 +161,7 @@ export function setupNotableCombatControls(sheet, html, {
 
     try {
       await runQueued(input, "_combatSaveQueue", "Combat usesMax change", async () => {
-        await sheet.actor.setPeasantNotableCombatUsesMax?.(index, input.value, { render: false });
+        await sheet.actor.setPeasantNotableCombatUsesMax?.(index, input.value);
       });
     } catch (err) {
       console.warn("Failed to persist combat usesMax change:", err);
@@ -182,7 +176,7 @@ export function setupNotableCombatControls(sheet, html, {
 
     try {
       await runQueued(input, "_combatSaveQueue", "Combat usesCurrent change", async () => {
-        await sheet.actor.setPeasantNotableCombatUsesCurrent?.(idx, raw, { render: false });
+        await sheet.actor.setPeasantNotableCombatUsesCurrent?.(idx, raw);
       });
     } catch (err) {
       console.warn("Failed to persist combat usesCurrent change:", err);
@@ -197,7 +191,7 @@ export function setupNotableCombatControls(sheet, html, {
 
     try {
       await runQueued(input, "_combatSaveQueue", "Combat sections current change", async () => {
-        await sheet.actor.setPeasantNotableCombatSectionsCurrent?.(idx, raw, { render: false });
+        await sheet.actor.setPeasantNotableCombatSectionsCurrent?.(idx, raw);
       });
     } catch (err) {
       console.warn("Failed to persist combat sections current change:", err);
@@ -212,7 +206,7 @@ export function setupNotableCombatControls(sheet, html, {
 
     try {
       await runQueued(input, "_combatSaveQueue", "Combat split second current change", async () => {
-        await sheet.actor.setPeasantNotableCombatSplitSecondCurrent?.(idx, raw, { render: false });
+        await sheet.actor.setPeasantNotableCombatSplitSecondCurrent?.(idx, raw);
       });
     } catch (err) {
       console.warn("Failed to persist combat split second current change:", err);
@@ -227,7 +221,7 @@ export function setupNotableCombatControls(sheet, html, {
         if (Number.isNaN(index) || index < 0) return;
 
         const newVal = Math.max(0, Number.parseInt(input.value, 10) || 0);
-        await sheet.actor.setPeasantNotableCombatTagUsesCurrent?.(index, newVal, { render: false });
+        await sheet.actor.setPeasantNotableCombatTagUsesCurrent?.(index, newVal);
       });
     } catch (e) {
       pcLog.debug("combat-tag-uses-current change failed", e);

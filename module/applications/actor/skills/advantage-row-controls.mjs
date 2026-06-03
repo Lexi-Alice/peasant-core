@@ -15,7 +15,6 @@ export function setupAdvantageRowControls(sheet, html, { blurActiveEditableInShe
       const adv = collectAdvantagesFromDOM?.() ?? { names: [], descriptions: [] };
       await sheet.actor.addPeasantFlexibleAdvantage?.(adv.names, adv.descriptions);
     });
-    sheet.render(true);
   });
 
   delegate(root, "click", ".advantage-delete", async (ev, target) => {
@@ -30,7 +29,6 @@ export function setupAdvantageRowControls(sheet, html, { blurActiveEditableInShe
       const adv = collectAdvantagesFromDOM?.() ?? { names: [], descriptions: [] };
       await sheet.actor.removePeasantFlexibleAdvantage?.(index, adv.names, adv.descriptions);
     });
-    sheet.render(true);
   });
 
   delegate(root, "change", ".advantage-input", async (ev, input) => {
@@ -45,7 +43,7 @@ export function setupAdvantageRowControls(sheet, html, { blurActiveEditableInShe
       const adv = collectAdvantagesFromDOM?.() ?? { names: [], descriptions: [] };
       while (adv.names.length <= index) adv.names.push("");
       while (adv.descriptions.length <= index) adv.descriptions.push("");
-      await sheet.actor.setPeasantFlexibleAdvantages?.(adv.names, adv.descriptions, { render: false });
+      await sheet.actor.setPeasantFlexibleAdvantages?.(adv.names, adv.descriptions);
     });
   });
 
@@ -98,7 +96,6 @@ export function setupAdvantageDeleteBackupHandler(sheet, html, { blurActiveEdita
         const adv = collectAdvantagesFromDOM?.() ?? { names: [], descriptions: [] };
         await sheet.actor.removePeasantFlexibleAdvantage?.(index, adv.names, adv.descriptions);
       });
-      sheet.render(true);
     });
   }
 }

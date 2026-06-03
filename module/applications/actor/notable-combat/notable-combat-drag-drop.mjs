@@ -158,20 +158,16 @@ function setupCombatTagDragDrop(sheet, root) {
 
       const insertAfter = isDropAfter(tag, event.clientX);
       if (draggedType === "custom" && target.type === "custom" && !Number.isNaN(draggedCustomIndex) && !Number.isNaN(target.customIndex)) {
-        const result = await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIndex, draggedCustomIndex, target.customIndex, {
-          insertAfter,
-          render: false
+        await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIndex, draggedCustomIndex, target.customIndex, {
+          insertAfter
         });
-        if (result?.changed) sheet.render(false);
         sheet._tagDragState = null;
         return;
       }
 
-      const result = await sheet.actor.reorderPeasantNotableCombatTag?.(combatIndex, draggedType, target.type, {
-        insertAfter,
-        render: false
+      await sheet.actor.reorderPeasantNotableCombatTag?.(combatIndex, draggedType, target.type, {
+        insertAfter
       });
-      if (result?.changed) sheet.render(false);
 
       sheet._tagDragState = null;
     } catch (e) {
@@ -244,8 +240,7 @@ function setupCombatRowDragDrop(sheet, root, sheetDocument) {
       if (Number.isNaN(toIndex)) return;
 
       sheet._combatDragState = null;
-      await sheet.actor.reorderPeasantNotableCombat?.(fromIndex, toIndex, { render: false });
-      sheet.render(true);
+      await sheet.actor.reorderPeasantNotableCombat?.(fromIndex, toIndex);
     } catch (e) {
       console.warn("Failed to reorder combats via drag/drop:", e);
     }

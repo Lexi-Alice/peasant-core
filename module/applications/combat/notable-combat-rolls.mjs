@@ -11,7 +11,6 @@ import { markRollFailureDueToDefense } from "./roll-chat-updates.mjs";
 export async function consumeNotableCombatRollUse(actor, combatIndex, sheet = null) {
   try {
     const result = await actor?.consumePeasantCombatUse?.(combatIndex);
-    if (result?.changed && typeof sheet?.render === "function") sheet.render(false);
     return result;
   } catch (err) {
     console.warn("Failed to consume combat use after autoroll:", err);

@@ -1,4 +1,5 @@
 import { normalizeAutomatedCombatHealType, rollAutomatedCombatHeal } from "./automated-heal-rolls.mjs";
+import { requestIncomingHealApplicationForTarget } from "./incoming-hit.mjs";
 
 export async function resolveSuccessfulHealForTarget({
   actor = null,
@@ -19,25 +20,21 @@ export async function resolveSuccessfulHealForTarget({
     return { handled: false, reason: "noHealRolled", healRoll };
   }
 
-  if (typeof targetActor.applyPeasantHeal !== "function") {
-    ui.notifications?.warn?.(`${targetActor.name || "Target"} cannot receive Peasant Core healing.`);
-    return { handled: false, reason: "healUnavailable", healRoll };
-  }
-
   const healType = normalizeAutomatedCombatHealType(combat.heal.type);
-  let application;
-  try {
-    application = await targetActor.applyPeasantHeal(Number(healRoll.total) || 0, healType);
-  } catch (error) {
-    console.error("Peasant Core | Failed to apply automated healing", error);
-    application = { ok: false, message: `Could not apply healing to ${targetActor.name || "target"}.` };
-  }
-  if (!application?.ok) {
-    ui.notifications?.warn?.(application?.message || `Could not apply healing to ${targetActor.name || "target"}.`);
+  const application = await requestIncomingHealApplicationForTarget({
+    target,
+    attackerActor: actor,
+    attackerToken,
+    combat,
+    healRoll,
+    healType
+  });
+  if (application?.handled && !application?.applied) {
+    ui.notifications?.warn?.(application?.applyResult?.message || `Could not apply healing to ${targetActor.name || "target"}.`);
   }
 
   return {
-    handled: !!application?.ok,
+    handled: !!application?.handled,
     healType,
     healRoll,
     application,

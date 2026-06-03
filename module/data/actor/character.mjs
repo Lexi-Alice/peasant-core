@@ -154,6 +154,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         max: new fields.NumberField({ integer: true, min: 0, initial: 0 })
       }),
+      armorCharge: new fields.SchemaField({
+        value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
+        max: new fields.NumberField({ integer: true, min: 0, initial: 0 })
+      }),
       health: new fields.SchemaField({
         value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         max: new fields.NumberField({ integer: true, min: 0, initial: 0 })
@@ -342,6 +346,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
           flat: new fields.NumberField({ integer: true, initial: 0 }),
           type: new fields.StringField({ initial: "" }) // Blunt, Lethal, Hybrid, Crit
         }),
+        desperate: new fields.NumberField({ integer: true, initial: 0 }),
         overkill: new fields.BooleanField({ initial: false }),
         magnetism: new fields.SchemaField({
           grade: new fields.NumberField({ integer: true, min: 0, initial: 0 })

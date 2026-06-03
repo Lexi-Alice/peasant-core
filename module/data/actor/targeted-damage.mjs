@@ -78,6 +78,14 @@ export function getArmorChargeMultiplier(actor) {
   );
 }
 
+export function getArmorChargeValue(actor) {
+  const value = Number(actor?.system?.armorCharge?.value);
+  if (!Number.isFinite(value)) return 0;
+  const max = Number(actor?.system?.armorCharge?.max);
+  const normalizedValue = Math.max(0, Math.floor(value));
+  return Number.isFinite(max) ? Math.min(normalizedValue, Math.max(0, Math.floor(max))) : normalizedValue;
+}
+
 export function getTargetedDamageLocationDisplay(location) {
   return TARGETED_DAMAGE_LOCATION_DISPLAY_MAP[location] || location || "Torso";
 }

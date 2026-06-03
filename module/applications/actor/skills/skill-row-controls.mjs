@@ -17,7 +17,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     await enqueue("_skillsSaveQueue", "Skill add", async () => {
       await sheet.actor.addPeasantSkill?.();
     });
-    sheet.render(true);
   });
 
   delegate(root, "click", ".skill-toggle-type", async (ev, target) => {
@@ -32,7 +31,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     await enqueue("_skillsSaveQueue", "Skill type toggle", async () => {
       await sheet.actor.setPeasantSkillType?.(index, "Other");
     });
-    sheet.render(true);
   });
 
   delegate(root, "change", ".skill-select", async (ev, select) => {
@@ -45,7 +43,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     await enqueue("_skillsSaveQueue", "Skill type select", async () => {
       await sheet.actor.setPeasantSkillType?.(index, newType);
     });
-    sheet.render(true);
   });
 
   delegate(root, "click", ".skill-indent", async (ev, target) => {
@@ -60,7 +57,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
       await enqueue("_skillsSaveQueue", "Skill indent", async () => {
         await sheet.actor.changePeasantSkillIndent?.(index, 1);
       });
-      sheet.render(true);
     } catch (e) {
       pcLog.debug("skill indent failed", e);
     }
@@ -78,7 +74,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
       await enqueue("_skillsSaveQueue", "Skill outdent", async () => {
         await sheet.actor.changePeasantSkillIndent?.(index, -1);
       });
-      sheet.render(true);
     } catch (e) {
       pcLog.debug("skill outdent failed", e);
     }
@@ -95,7 +90,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     await enqueue("_skillsSaveQueue", "Skill delete", async () => {
       await sheet.actor.removePeasantSkill?.(index);
     });
-    sheet.render(true);
   });
 
   delegate(root, "change", ".skill-sig-checkbox", async (ev, checkbox) => {
@@ -130,7 +124,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
           /* ignore */
         }
 
-        sheet.render(true);
       });
     } catch (err) {
       console.warn("Failed to persist SIG checkbox click:", err);
@@ -146,7 +139,7 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     const val = Number.isNaN(Number.parseInt(input.value, 10)) ? 0 : Number.parseInt(input.value, 10);
     try {
       await runQueued(input, "_skillsSaveQueue", "Skill usesMax change", async () => {
-        const result = await sheet.actor.setPeasantSkillUsesMax?.(index, val, { render: false });
+        const result = await sheet.actor.setPeasantSkillUsesMax?.(index, val);
         if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
       });
     } catch (err) {
@@ -181,7 +174,7 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
         const accVal = (accValRaw === "" || accValRaw === null) ? "" : String(accValRaw);
 
         pcLog.debug("Persisting skill tohit/accuracy (index):", index, { tohit: tohitVal, accuracy: accVal });
-        const result = await sheet.actor.setPeasantSkillToHitAccuracy?.(index, { tohit: tohitVal, accuracy: accVal }, { render: false });
+        const result = await sheet.actor.setPeasantSkillToHitAccuracy?.(index, { tohit: tohitVal, accuracy: accVal });
         const savedSkill = result?.skills?.[index] || {};
         if (tohitEl) tohitEl.value = formatOptionalIntegerInput(savedSkill.tohit ?? parseOptionalInteger(tohitVal, { min: 1 }));
         if (accEl) accEl.value = formatOptionalIntegerInput(savedSkill.accuracy ?? parseOptionalInteger(accVal, { allowSign: true }), { showPlus: true });
@@ -200,7 +193,7 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
 
     try {
       await runQueued(input, "_skillsSaveQueue", "Skill usesCurrent change", async () => {
-        const result = await sheet.actor.setPeasantSkillUsesCurrent?.(idx, raw, { render: false });
+        const result = await sheet.actor.setPeasantSkillUsesCurrent?.(idx, raw);
         if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
       });
     } catch (err) {
@@ -233,7 +226,7 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
         if (specialGradeEl) fields.specialGrade = specialGradeEl.value;
 
         pcLog.debug("Persisting skill class/rank/name/ap/sp (index):", index, fields);
-        const result = await sheet.actor.setPeasantSkillMainFields?.(index, fields, { render: false });
+        const result = await sheet.actor.setPeasantSkillMainFields?.(index, fields);
         const savedSkill = result?.skills?.[index] || {};
         if (apEl) apEl.value = formatOptionalIntegerInput(savedSkill.ap ?? parseOptionalInteger(fields.ap, { min: 0 }));
         if (spEl) spEl.value = formatOptionalIntegerInput(savedSkill.sp ?? parseOptionalInteger(fields.sp, { min: 0 }));
@@ -288,7 +281,6 @@ export function setupSkillDeleteBackupHandler(sheet, html, { blurActiveEditableI
       await enqueue("_skillsSaveQueue", "Skill delete backup", async () => {
         await sheet.actor.removePeasantSkill?.(index);
       });
-      sheet.render(true);
     });
   }
 }

@@ -1,4 +1,4 @@
-import { absorbBolsteredFromCounts, absorbTempHpFromCounts, applyDamageResistanceToCounts, splitDamageCounts, sumDamageCounts, toSimplifiedHpDamageFromCountsWithResistance, toSimplifiedHpDamageWithResistance } from "../data/actor/damage.mjs";
+import { absorbBolsteredFromCounts, absorbTempHpFromCounts, applyDamageResistanceToCounts, splitDamageCounts, sumDamageCounts, toSimplifiedHpDamageFromCounts, toSimplifiedHpDamageFromCountsWithResistance, toSimplifiedHpDamageWithResistance } from "../data/actor/damage.mjs";
 import {
   COMBAT_HALT_BUFF_TYPE_COST,
   COMBAT_HALT_BUFF_TYPE_CUSTOM,
@@ -18,11 +18,11 @@ import { getDefaultEdgeLabelMode, normalizeEdgeResourceEntry, sanitizeEdgeLabelM
 import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor, parseOptionalInteger } from "../data/actor/helpers.mjs";
 import { parseHpValueCommand } from "../data/actor/hp-commands.mjs";
 import { applyCombatStressDamageForActor } from "../data/actor/stress.mjs";
-import { TARGETED_DAMAGE_HALT_INDEX_MAP, TARGETED_DAMAGE_HARD_FLAG_MAP, getArmorChargeMultiplier, getTargetedDamageConditionKey, getTargetedDamageLocationDisplay, getWoundThresholdMultipliers, normalizeAppliedDamageType } from "../data/actor/targeted-damage.mjs";
+import { TARGETED_DAMAGE_HALT_INDEX_MAP, TARGETED_DAMAGE_HARD_FLAG_MAP, getArmorChargeMultiplier, getArmorChargeValue, getTargetedDamageConditionKey, getTargetedDamageLocationDisplay, getWoundThresholdMultipliers, normalizeAppliedDamageType } from "../data/actor/targeted-damage.mjs";
 import { pcLog } from "../utils/logging.mjs";
 
 export class PeasantActor extends Actor {
-  static RESOURCE_NAMES = Object.freeze(["stamina", "attunement", "capacity", "edge"]);
+  static RESOURCE_NAMES = Object.freeze(["stamina", "attunement", "capacity", "edge", "armorCharge"]);
   static STRESS_TYPES = Object.freeze(["physical", "mental", "general"]);
   static CONDITION_KEYS = Object.freeze(["wounded", "head", "rightArm", "leftArm", "rightLeg", "leftLeg", "torso", "arms", "legs"]);
   static WOUND_STATUSES = Object.freeze(["disabled", "crippled"]);
@@ -201,6 +201,9 @@ export class PeasantActor extends Actor {
     const haltIndex = TARGETED_DAMAGE_HALT_INDEX_MAP[location] ?? 0;
     const isHybrid = normalizedType === "hybrid";
 
+    const armorChargeValue = getArmorChargeValue(this);
+    useArmorCharge = !!useArmorCharge && armorChargeValue > 0;
+
     let netDamage = damageAmount;
     let haltUsed = 0;
 
@@ -233,6 +236,7 @@ export class PeasantActor extends Actor {
     if (isSimplifiedHpActor(this)) {
       const scaledDamage = toSimplifiedHpDamageFromCountsWithResistance(rawCounts, this, isHard);
       const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
+      if (useArmorCharge) await this.setPeasantResourceValue("armorCharge", armorChargeValue - 1);
       return {
         ...result,
         location,
@@ -360,7 +364,8 @@ export class PeasantActor extends Actor {
       "system.health.max": totalCells,
       "system.temporaryHp.value": newTempHpValue,
       "system.temporaryHp.max": newTempHpMax,
-      "system.bolsteredHp": bolsteredHp
+      "system.bolsteredHp": bolsteredHp,
+      ...(useArmorCharge ? { "system.armorCharge.value": Math.max(0, armorChargeValue - 1) } : {})
     });
 
     return {
@@ -495,6 +500,8 @@ export class PeasantActor extends Actor {
       return { ok: false, message: "Heal type must be temporary or greater." };
     }
 
+    const emptyHealedDamageCounts = () => ({ blunt: 0, lethal: 0, critical: 0 });
+
     if (isSimplifiedHpActor(this)) {
       const maxHealth = getActorHealthMax(this);
       const currentHealthRaw = Number(this.system?.health?.value);
@@ -515,7 +522,13 @@ export class PeasantActor extends Actor {
         updates["system.health.value"] = currentHealth;
         updates["system.health.max"] = maxHealth;
         await this.update(updates);
-        return { ok: true, value: currentHealth };
+        return {
+          ok: true,
+          value: currentHealth,
+          healedDamageCounts: emptyHealedDamageCounts(),
+          bolsteredHpGained: 0,
+          effectiveHealingPower: 0
+        };
       }
 
       let remaining = amount;
@@ -528,11 +541,15 @@ export class PeasantActor extends Actor {
       remaining -= hpHealed;
       const newHealth = Math.min(maxHealth, currentHealth + hpHealed);
 
-      let newBolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
+      const previousBolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
+      let newBolsteredHp = previousBolsteredHp;
       if (remaining > 0) {
         const bolsteredGain = Math.floor(remaining / 2);
         newBolsteredHp = Math.min(bolsteredCap, newBolsteredHp + bolsteredGain);
       }
+      const bolsteredHpGained = Math.max(0, newBolsteredHp - previousBolsteredHp);
+      const healedDamageCounts = { blunt: hpHealed, lethal: 0, critical: 0 };
+      const effectiveHealingPower = toSimplifiedHpDamageFromCounts(healedDamageCounts) + bolsteredHpGained;
 
       const newTempHpMax = Math.max(0, maxHealth - newHealth);
       const newTempHpValue = Math.min(currentTempHp + tempHpGranted, newTempHpMax);
@@ -543,7 +560,13 @@ export class PeasantActor extends Actor {
       updates["system.temporaryHp.max"] = newTempHpMax;
       updates["system.bolsteredHp"] = newBolsteredHp;
       await this.update(updates);
-      return { ok: true, value: newHealth };
+      return {
+        ok: true,
+        value: newHealth,
+        healedDamageCounts,
+        bolsteredHpGained,
+        effectiveHealingPower
+      };
     }
 
     const hpData = this.system?.hp;
@@ -561,7 +584,8 @@ export class PeasantActor extends Actor {
     let updates = {};
     let remaining = amount;
     let tempHpGranted = 0;
-    let bolsteredHpGenerated = 0;
+    let bolsteredHpGained = 0;
+    const healedDamageCounts = emptyHealedDamageCounts();
 
     if (healType === "temporary") {
       const canGrantTempHp = Math.max(0, tempHpMax - currentTempHp);
@@ -577,13 +601,23 @@ export class PeasantActor extends Actor {
       for (let r = hp.rows - 1; r >= 0 && remaining > 0; r--) {
         for (let c = hp.cols - 1; c >= 0 && remaining > 0; c--) {
           if (hp.grid[r][c] > 0) {
+            const healedCell = Number(hp.grid[r][c]) || 0;
+            if (healedCell === 1) healedDamageCounts.blunt += 1;
+            else if (healedCell === 2) healedDamageCounts.lethal += 1;
+            else if (healedCell === 3) healedDamageCounts.critical += 1;
             hp.grid[r][c] = 0;
             remaining--;
           }
         }
       }
 
-      if (remaining > 0) bolsteredHpGenerated = Math.min(Math.floor(remaining / 2), hp.cols);
+      const previousBolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
+      let newBolsteredHp = previousBolsteredHp;
+      if (remaining > 0) {
+        const bolsteredHpGenerated = Math.min(Math.floor(remaining / 2), hp.cols);
+        newBolsteredHp = Math.min(getActorBolsteredMax(this), previousBolsteredHp + bolsteredHpGenerated);
+      }
+      bolsteredHpGained = Math.max(0, newBolsteredHp - previousBolsteredHp);
 
       regularCells = 0;
       for (let row of hp.grid) for (let cell of row) if (cell === 0) regularCells++;
@@ -595,11 +629,17 @@ export class PeasantActor extends Actor {
       updates["system.health.max"] = totalCells;
       updates["system.temporaryHp.value"] = newTempHpValue;
       updates["system.temporaryHp.max"] = newTempHpMax;
-      if (bolsteredHpGenerated > 0) updates["system.bolsteredHp"] = bolsteredHpGenerated;
+      if (newBolsteredHp !== previousBolsteredHp) updates["system.bolsteredHp"] = newBolsteredHp;
     }
 
     await this.update(updates);
-    return { ok: true, value: regularCells };
+    return {
+      ok: true,
+      value: regularCells,
+      healedDamageCounts,
+      bolsteredHpGained,
+      effectiveHealingPower: toSimplifiedHpDamageFromCounts(healedDamageCounts) + bolsteredHpGained
+    };
   }
 
   async applyPeasantHpValueCommand(raw) {
@@ -794,6 +834,7 @@ export class PeasantActor extends Actor {
       resourceCosts: [],
       speed: { type: "", splitSecondCurrent: 0, splitSecondMax: 0 },
       damage: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
+      desperate: 0,
       overkill: false,
       magnetism: { grade: 0 },
       heal: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
@@ -816,6 +857,7 @@ export class PeasantActor extends Actor {
     merged.resourceCosts = Array.isArray(existing.resourceCosts) ? existing.resourceCosts : [];
     merged.speed = { ...defaults.speed, ...(existing.speed || {}) };
     merged.damage = { ...defaults.damage, ...(existing.damage || {}) };
+    merged.desperate = Number.parseInt(merged.desperate, 10) || 0;
     merged.magnetism = normalizeCombatMagnetism(existing.magnetism);
     merged.heal = { ...defaults.heal, ...(existing.heal || {}) };
     merged.manifest = { ...defaults.manifest, ...(existing.manifest || {}) };
@@ -853,13 +895,13 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, combats: list };
   }
 
-  async addPeasantNotableCombat(options = { render: false }) {
+  async addPeasantNotableCombat(options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     combats.push(PeasantActor.createDefaultPeasantCombatEntry());
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async removePeasantNotableCombat(index, options = { render: false }) {
+  async removePeasantNotableCombat(index, options = {}) {
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0) return { ok: false, changed: false };
     const combats = this.getPeasantNotableCombatsForUpdate();
@@ -868,7 +910,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async reorderPeasantNotableCombat(fromIndex, toIndex, options = { render: false }) {
+  async reorderPeasantNotableCombat(fromIndex, toIndex, options = {}) {
     const from = Number.parseInt(fromIndex, 10);
     let to = Number.parseInt(toIndex, 10);
     if (!Number.isFinite(from) || !Number.isFinite(to)) return { ok: false, changed: false };
@@ -882,7 +924,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async updatePeasantNotableCombat(index, patch, options = { render: false }) {
+  async updatePeasantNotableCombat(index, patch, options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const combat = this.ensurePeasantNotableCombatAt(combats, index);
     if (!combat) return { ok: false, changed: false };
@@ -890,7 +932,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async setPeasantNotableCombatType(index, rawType, { clearStandardFields = false, render = false } = {}) {
+  async setPeasantNotableCombatType(index, rawType, { clearStandardFields = false, render } = {}) {
     const type = String(rawType ?? "standard").trim() || "standard";
     const combats = this.getPeasantNotableCombatsForUpdate();
     const combat = this.ensurePeasantNotableCombatAt(combats, index);
@@ -917,7 +959,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, { render });
   }
 
-  async changePeasantNotableCombatIndent(index, delta, options = { render: false }) {
+  async changePeasantNotableCombatIndent(index, delta, options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const combat = this.ensurePeasantNotableCombatAt(combats, index);
     if (!combat) return { ok: false, changed: false };
@@ -925,11 +967,11 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async setPeasantNotableCombatSig(index, enabled, options = { render: false }) {
+  async setPeasantNotableCombatSig(index, enabled, options = {}) {
     return this.updatePeasantNotableCombat(index, { sig: !!enabled }, options);
   }
 
-  async setPeasantNotableCombatMainFields(index, fields = {}, options = { render: false }) {
+  async setPeasantNotableCombatMainFields(index, fields = {}, options = {}) {
     const patch = {};
     if ("class" in fields) patch.class = Number.parseInt(fields.class, 10) || 1;
     if ("rank" in fields) {
@@ -943,18 +985,18 @@ export class PeasantActor extends Actor {
     return this.updatePeasantNotableCombat(index, patch, options);
   }
 
-  async setPeasantNotableCombatUsesMax(index, rawValue, options = { render: false }) {
+  async setPeasantNotableCombatUsesMax(index, rawValue, options = {}) {
     return this.updatePeasantNotableCombat(index, { usesMax: Number.parseInt(rawValue, 10) || 0 }, options);
   }
 
-  async setPeasantNotableCombatUsesCurrent(index, rawValue, options = { render: false }) {
+  async setPeasantNotableCombatUsesCurrent(index, rawValue, options = {}) {
     const combat = this.getPeasantNotableCombatsForUpdate()[Number.parseInt(index, 10)];
     const max = Number.parseInt(combat?.usesMax, 10) || 0;
     const value = Math.min(Number.parseInt(rawValue, 10) || 0, Math.max(0, max));
     return this.updatePeasantNotableCombat(index, { usesCurrent: value }, options);
   }
 
-  async setPeasantNotableCombatSectionsCurrent(index, rawValue, options = { render: false }) {
+  async setPeasantNotableCombatSectionsCurrent(index, rawValue, options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const combat = this.ensurePeasantNotableCombatAt(combats, index);
     if (!combat) return { ok: false, changed: false };
@@ -964,7 +1006,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async setPeasantNotableCombatSplitSecondCurrent(index, rawValue, options = { render: false }) {
+  async setPeasantNotableCombatSplitSecondCurrent(index, rawValue, options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const combat = this.ensurePeasantNotableCombatAt(combats, index);
     if (!combat) return { ok: false, changed: false };
@@ -974,7 +1016,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async setPeasantNotableCombatTagUsesCurrent(index, rawValue, options = { render: false }) {
+  async setPeasantNotableCombatTagUsesCurrent(index, rawValue, options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0 || numericIndex >= combats.length || !combats[numericIndex].tagUses) {
@@ -984,7 +1026,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async reorderPeasantNotableCombatCustomTag(index, fromCustomIndex, toCustomIndex, { insertAfter = false, render = false } = {}) {
+  async reorderPeasantNotableCombatCustomTag(index, fromCustomIndex, toCustomIndex, { insertAfter = false, render } = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0 || numericIndex >= combats.length) return { ok: false, changed: false };
@@ -1010,7 +1052,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, { render });
   }
 
-  async reorderPeasantNotableCombatTag(index, draggedType, targetType, { insertAfter = false, render = false } = {}) {
+  async reorderPeasantNotableCombatTag(index, draggedType, targetType, { insertAfter = false, render } = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0 || numericIndex >= combats.length) return { ok: false, changed: false };
@@ -1041,7 +1083,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, { render });
   }
 
-  async removePeasantNotableCombatTag(index, rawTagType, { customIndex = null, render = false } = {}) {
+  async removePeasantNotableCombatTag(index, rawTagType, { customIndex = null, render } = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0 || numericIndex >= combats.length) return { ok: false, changed: false };
@@ -1072,6 +1114,9 @@ export class PeasantActor extends Actor {
         break;
       case "damage":
         combat.damage = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
+        break;
+      case "desperate":
+        combat.desperate = 0;
         break;
       case "overkill":
         combat.overkill = false;
@@ -1134,7 +1179,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, { render });
   }
 
-  async setPeasantNotableCombatTag(index, rawTagType, data = {}, { mode = "add", customIndex = null, render = false } = {}) {
+  async setPeasantNotableCombatTag(index, rawTagType, data = {}, { mode = "add", customIndex = null, render } = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     const combat = this.ensurePeasantNotableCombatAt(combats, index);
     if (!combat) return { ok: false, changed: false };
@@ -1172,6 +1217,9 @@ export class PeasantActor extends Actor {
           flat: Number.parseInt(data.damage?.flat, 10) || 0,
           type: String(data.damage?.type ?? "")
         };
+        break;
+      case "desperate":
+        combat.desperate = Number.parseInt(data.desperate, 10) || 0;
         break;
       case "overkill":
         combat.overkill = true;
@@ -1639,7 +1687,7 @@ export class PeasantActor extends Actor {
 
   async performPeasantShortRest() {
     const updateData = {};
-    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement"]);
+    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "armorCharge"]);
     this.addPeasantStressClearUpdates(updateData, ["physical", "mental"]);
 
     await this.update(updateData);
@@ -1648,7 +1696,7 @@ export class PeasantActor extends Actor {
 
   async performPeasantLongRest() {
     const updateData = {};
-    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity"]);
+    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity", "armorCharge"]);
     this.addPeasantStressClearUpdates(updateData, ["physical", "mental"]);
     this.addPeasantLongRestHpRecoveryUpdates(updateData);
     this.addPeasantStressRecoveryUpdates(updateData, "general", 3);
@@ -1660,7 +1708,7 @@ export class PeasantActor extends Actor {
   async refreshPeasantResourcesAndResetTracks() {
     const updateData = {};
 
-    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity"]);
+    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity", "armorCharge"]);
     this.addPeasantStressClearUpdates(updateData, ["physical", "mental", "general"]);
 
     updateData["system.conditions.wounded"] = false;
@@ -1811,7 +1859,7 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, initiative };
   }
 
-  async setPeasantHaltValues(rawValues, { natural = false, render = false } = {}) {
+  async setPeasantHaltValues(rawValues, { natural = false, render } = {}) {
     const field = natural ? "naturalHaltValues" : "haltValues";
     const values = normalizeHaltValues(rawValues);
     await this.update({ [`system.${field}`]: values }, { render });
@@ -1891,7 +1939,7 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, entry, buffs };
   }
 
-  async removePeasantCombatHaltBuff(index, options = { render: false }) {
+  async removePeasantCombatHaltBuff(index, options = {}) {
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0) return { ok: false, changed: false };
 
@@ -1903,7 +1951,7 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, removed, buffs };
   }
 
-  async updatePeasantCombatHaltBuff(index, patch, options = { render: false }) {
+  async updatePeasantCombatHaltBuff(index, patch, options = {}) {
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0) return { ok: false, changed: false };
 
@@ -1916,11 +1964,11 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, entry: sanitized[numericIndex], buffs: sanitized };
   }
 
-  async setPeasantCombatHaltBuffValues(index, rawValues, options = { render: false }) {
+  async setPeasantCombatHaltBuffValues(index, rawValues, options = {}) {
     return this.updatePeasantCombatHaltBuff(index, { values: normalizeHaltValues(rawValues) }, options);
   }
 
-  async setPeasantCombatHaltBuffValue(index, rawValue, options = { render: false }) {
+  async setPeasantCombatHaltBuffValue(index, rawValue, options = {}) {
     const current = this.getPeasantCombatHaltBuffsForUpdate()[Number.parseInt(index, 10)];
     const type = sanitizeCombatHaltBuffType(current?.type);
     if (type !== COMBAT_HALT_BUFF_TYPE_FLAT && type !== COMBAT_HALT_BUFF_TYPE_COST && type !== COMBAT_HALT_BUFF_TYPE_CUSTOM) {
@@ -1930,14 +1978,14 @@ export class PeasantActor extends Actor {
     return this.updatePeasantCombatHaltBuff(index, { value: Number.parseInt(rawValue, 10) || 0 }, options);
   }
 
-  async setPeasantCombatCustomBuffName(index, rawName, options = { render: false }) {
+  async setPeasantCombatCustomBuffName(index, rawName, options = {}) {
     const current = this.getPeasantCombatHaltBuffsForUpdate()[Number.parseInt(index, 10)];
     if (sanitizeCombatHaltBuffType(current?.type) !== COMBAT_HALT_BUFF_TYPE_CUSTOM) return { ok: false, changed: false };
 
     return this.updatePeasantCombatHaltBuff(index, { customName: String(rawName ?? "").trim() || "Custom" }, options);
   }
 
-  async setPeasantCombatCostBuffResource(index, rawResourceType, options = { render: false }) {
+  async setPeasantCombatCostBuffResource(index, rawResourceType, options = {}) {
     const numericIndex = Number.parseInt(index, 10);
     if (!Number.isFinite(numericIndex) || numericIndex < 0) return { ok: false, changed: false };
 
@@ -2075,7 +2123,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantSkills(skills, options);
   }
 
-  async setPeasantSkillUsesMax(index, rawValue, options = { render: false }) {
+  async setPeasantSkillUsesMax(index, rawValue, options = {}) {
     const skills = this.getPeasantSkillsForUpdate();
     const skill = this.ensurePeasantSkillEntryAt(skills, index);
     if (!skill) return { ok: false, changed: false };
@@ -2088,7 +2136,7 @@ export class PeasantActor extends Actor {
     return this.setPeasantSkills(skills, options);
   }
 
-  async setPeasantSkillUsesCurrent(index, rawValue, options = { render: false }) {
+  async setPeasantSkillUsesCurrent(index, rawValue, options = {}) {
     const skills = this.getPeasantSkillsForUpdate();
     const skill = this.ensurePeasantSkillEntryAt(skills, index);
     if (!skill) return { ok: false, changed: false };
@@ -2098,14 +2146,14 @@ export class PeasantActor extends Actor {
     return this.setPeasantSkills(skills, options);
   }
 
-  async setPeasantSkillToHitAccuracy(index, { tohit = "", accuracy = "" } = {}, options = { render: false }) {
+  async setPeasantSkillToHitAccuracy(index, { tohit = "", accuracy = "" } = {}, options = {}) {
     return this.updatePeasantSkill(index, {
       tohit: parseOptionalInteger(tohit, { min: 1 }),
       accuracy: parseOptionalInteger(accuracy, { allowSign: true })
     }, options);
   }
 
-  async setPeasantSkillMainFields(index, fields = {}, options = { render: false }) {
+  async setPeasantSkillMainFields(index, fields = {}, options = {}) {
     const patch = {};
     if ("class" in fields) patch.class = Number.parseInt(fields.class, 10) || 1;
     if ("rank" in fields) {
@@ -2263,7 +2311,7 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, entry: resources[numericIndex], resources };
   }
 
-  async setPeasantEdgeResourceLabelMode(index, rawMode, options = { render: false }) {
+  async setPeasantEdgeResourceLabelMode(index, rawMode, options = {}) {
     const current = this.getPeasantEdgeResource(index);
     if (!current) return { ok: false, changed: false };
     return this.updatePeasantEdgeResource(index, {
@@ -2271,13 +2319,13 @@ export class PeasantActor extends Actor {
     }, options);
   }
 
-  async setPeasantEdgeResourceCustomLabel(index, rawLabel, options = { render: false }) {
+  async setPeasantEdgeResourceCustomLabel(index, rawLabel, options = {}) {
     return this.updatePeasantEdgeResource(index, {
       customLabel: String(rawLabel ?? "").trim()
     }, options);
   }
 
-  async setPeasantEdgeResourceValue(index, rawValue, options = { render: false }) {
+  async setPeasantEdgeResourceValue(index, rawValue, options = {}) {
     const current = this.getPeasantEdgeResource(index);
     if (!current) return { ok: false, changed: false };
     const max = Math.max(0, Number.parseInt(current.max, 10) || 0);
@@ -2285,7 +2333,7 @@ export class PeasantActor extends Actor {
     return this.updatePeasantEdgeResource(index, { value }, options);
   }
 
-  async setPeasantEdgeResourceMax(index, rawMax, options = { render: false }) {
+  async setPeasantEdgeResourceMax(index, rawMax, options = {}) {
     const current = this.getPeasantEdgeResource(index);
     if (!current) return { ok: false, changed: false };
     const max = Math.max(0, Number.parseInt(rawMax, 10) || 0);

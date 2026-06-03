@@ -62,11 +62,11 @@ export function renderDefenseTagInputs($area, combatData) {
               ${COMBAT_DEFENSE_SHIELD_ARM_OPTIONS.map((option) => `<option value="${escapeHtml(option.key)}" ${defenseData.shieldArm === option.key ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
             </select>
           </label>
-          <label class="defense-inline-field defense-hardness-field" style="display:${defenseData.blockType === "Shield" ? "flex" : "none"};">
+          <label class="defense-inline-field defense-hardness-field" style="display:${defenseData.blockType === "Shield" || defenseData.blockType === "Weapon" ? "flex" : "none"};">
             <span class="defense-hardness-label">Hardness</span>
             <input type="number" class="tag-defense-hardness ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.hardness || ""}" min="0" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
           </label>
-          <label class="defense-inline-field">
+          <label class="defense-inline-field defense-hp-field" style="display:${defenseData.blockType === "Weapon" ? "none" : "flex"};">
             <span>HP</span>
             <input type="number" class="tag-defense-hp ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.hp || ""}" min="0" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
           </label>
@@ -155,7 +155,8 @@ export function renderDefenseTagInputs($area, combatData) {
     const isShield = blockType === "Shield";
     const isWeapon = blockType === "Weapon";
     $area.find(".defense-shield-arm-field").css("display", isShield ? "flex" : "none");
-    $area.find(".defense-hardness-field").css("display", isShield ? "flex" : "none");
+    $area.find(".defense-hardness-field").css("display", (isShield || isWeapon) ? "flex" : "none");
+    $area.find(".defense-hp-field").css("display", isWeapon ? "none" : "flex");
     $area.find(".defense-mastery-bonus-row").css("display", isWeapon ? "flex" : "none");
   };
 

@@ -127,7 +127,6 @@ function setupSkillDragDropControls(sheet, root, sheetDocument) {
         }
       } catch (e) {}
       await sheet.actor.reorderPeasantSkill?.(fromIndex, toIndex);
-      sheet.render(true);
     } catch (e) {
       console.warn("Failed to reorder skills via drag/drop:", e);
     }
@@ -228,7 +227,6 @@ function setupAdvantageDragDropControls(sheet, html, {
         sheet._advDragState = null;
         await sheet.actor.reorderPeasantFlexibleAdvantage?.(fromIndex, toIndex, adv.names, adv.descriptions);
       });
-      sheet.render(true);
     } catch (e) {
       console.warn("Failed to reorder advantages via drag/drop:", e);
     }
@@ -323,7 +321,6 @@ function setupAdvantagePointerDragControls(sheet, html, {
               const adv = collectAdvantagesFromDOM?.() ?? { names: [], descriptions: [] };
               await sheet.actor.reorderPeasantFlexibleAdvantage?.(f, toIndex, adv.names, adv.descriptions);
             });
-            sheet.render(true);
           } catch (e) {
             console.warn("Pointer drag reorder for advantages failed", e);
           }

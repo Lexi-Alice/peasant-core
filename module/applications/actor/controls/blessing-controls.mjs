@@ -28,8 +28,6 @@ export function setupBlessingControls(sheet, html) {
       } catch (err) {
         console.warn("Failed to update toHitPenaltyTarget", err);
       }
-
-      await sheet.render(true);
     } catch (err) {
       console.error("Error handling characteristic-label click:", err);
     }
@@ -71,7 +69,6 @@ function openBlessingDialog(sheet, attr, trigger) {
           }
 
           await sheet.actor.setPeasantBlessing?.(chosenType, chosenTarget);
-          sheet.render(false);
           return true;
         }
       },
@@ -85,7 +82,6 @@ function openBlessingDialog(sheet, attr, trigger) {
             console.warn("Failed to clear blessing:", err);
             return false;
           }
-          sheet.render(false);
           return true;
         }
       }

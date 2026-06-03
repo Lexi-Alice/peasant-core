@@ -1,7 +1,9 @@
 import { getAutomatedCombatDamageTypeLabel } from "../../data/actor/combat-damage.mjs";
 import { normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
 import { getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
+import { applyCombatStressDamageForActor } from "../../data/actor/stress.mjs";
 import {
+  getArmorChargeValue,
   getTargetedDamageLocationDisplay,
   isArmorPenLocationLike,
   normalizeAppliedDamageType
@@ -61,9 +63,9 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
     };
     combats[combatIndex] = combat;
     if (typeof defenderActor.setPeasantNotableCombats === "function") {
-      await defenderActor.setPeasantNotableCombats(combats, { render: false });
+      await defenderActor.setPeasantNotableCombats(combats);
     } else {
-      await defenderActor.update({ "system.notableCombats": combats }, { render: false });
+      await defenderActor.update({ "system.notableCombats": combats });
     }
   }
 
@@ -122,23 +124,9 @@ async function applyIncomingWeaponBlock(defenderActor, payload = {}) {
     return { handled: false, applied: false, reason: "invalidWeaponBlockDefense" };
   }
 
-  const weaponHpBefore = Math.max(0, Number.parseInt(defense.hp, 10) || 0);
-  const weaponDamageApplied = Math.min(weaponHpBefore, originalDamageAmount);
-  const weaponOverflowDamage = Math.max(0, originalDamageAmount - weaponHpBefore);
-  const weaponHpAfter = Math.max(0, weaponHpBefore - weaponDamageApplied);
-
-  if (weaponHpAfter !== weaponHpBefore) {
-    combat.defense = {
-      ...defense,
-      hp: weaponHpAfter
-    };
-    combats[combatIndex] = combat;
-    if (typeof defenderActor.setPeasantNotableCombats === "function") {
-      await defenderActor.setPeasantNotableCombats(combats, { render: false });
-    } else {
-      await defenderActor.update({ "system.notableCombats": combats }, { render: false });
-    }
-  }
+  const weaponHardness = Math.max(0, Number.parseInt(defense.hardness, 10) || 0);
+  const weaponDamageMitigated = Math.min(weaponHardness, originalDamageAmount);
+  const weaponOverflowDamage = Math.max(0, originalDamageAmount - weaponHardness);
 
   let applyResult = null;
   if (weaponOverflowDamage > 0) {
@@ -169,10 +157,9 @@ async function applyIncomingWeaponBlock(defenderActor, payload = {}) {
     applied: true,
     weaponBlock: true,
     originalDamageAmount,
-    weaponDamageApplied,
+    weaponHardness,
+    weaponDamageMitigated,
     weaponOverflowDamage,
-    weaponHpBefore,
-    weaponHpAfter,
     masteryBonus: !!defense.masteryBonus,
     overflowApplyResult: applyResult
   };
@@ -256,6 +243,94 @@ export async function applyIncomingHit(payload = {}) {
   };
 }
 
+export async function applyIncomingHeal(payload = {}) {
+  const targetActor = await resolveDefensePromptActor(payload);
+  if (!targetActor) return null;
+
+  const healAmount = Number(payload.healAmount);
+  if (!Number.isFinite(healAmount) || healAmount <= 0) {
+    return { handled: false, applied: false, reason: "invalidHeal" };
+  }
+
+  const healType = String(payload.healType || "").trim().toLowerCase() === "greater" ? "greater" : "temporary";
+  if (typeof targetActor.applyPeasantHeal !== "function") {
+    return { handled: false, applied: false, reason: "healUnavailable" };
+  }
+
+  let applyResult = null;
+  try {
+    applyResult = await targetActor.applyPeasantHeal(healAmount, healType);
+  } catch (error) {
+    console.error("Peasant Core | applyIncomingHeal failed while applying healing", {
+      payload,
+      target: targetActor?.name,
+      error
+    });
+    return {
+      handled: true,
+      applied: false,
+      reason: "workflowError",
+      error: String(error?.message || error || "Unknown error")
+    };
+  }
+
+  let secondaryHealingStress = null;
+  const effectiveHealingPower = Math.max(0, Math.floor(Number(applyResult?.effectiveHealingPower) || 0));
+  if (applyResult?.ok && effectiveHealingPower > 0) {
+    try {
+      const buildScore = Math.max(0, Math.floor(Number(targetActor.system?.build) || 0));
+      const buildDivisor = Math.max(1, buildScore);
+      const stressAmount = Math.max(0, Math.floor(effectiveHealingPower / buildDivisor));
+      let overflow = 0;
+      let appliedStress = 0;
+      if (stressAmount > 0) {
+        overflow = Math.max(0, Number(await applyCombatStressDamageForActor(targetActor, "general", stressAmount)) || 0);
+        appliedStress = Math.max(0, stressAmount - overflow);
+        if (overflow > 0) {
+          ui.notifications?.warn?.(`Not enough General Stress capacity; applied ${appliedStress} of ${stressAmount}.`);
+        }
+      }
+
+      secondaryHealingStress = {
+        applied: appliedStress > 0,
+        stressType: "general",
+        amount: stressAmount,
+        appliedStress,
+        overflow,
+        effectiveHealingPower,
+        buildScore,
+        buildDivisor
+      };
+    } catch (error) {
+      console.error("Peasant Core | applyIncomingHeal failed while applying secondary healing stress", {
+        payload,
+        target: targetActor?.name,
+        error
+      });
+      secondaryHealingStress = {
+        prompted: false,
+        applied: false,
+        stressType: "general",
+        amount: 0,
+        appliedStress: 0,
+        overflow: 0,
+        effectiveHealingPower,
+        reason: "stressWorkflowError",
+        error: String(error?.message || error || "Unknown error")
+      };
+    }
+  }
+
+  return {
+    handled: true,
+    applied: !!applyResult?.ok,
+    healAmount,
+    healType,
+    applyResult,
+    secondaryHealingStress
+  };
+}
+
 export async function requestIncomingHitResolutionForTarget({
   target = null,
   attackerActor = null,
@@ -269,6 +344,17 @@ export async function requestIncomingHitResolutionForTarget({
   const targetActor = target?.actor || null;
   const targetTokenDocument = target?.tokenDocument || target?.token?.document || target?.token || null;
   if (!targetActor || !combat || !locationRoll) return null;
+
+  if (getArmorChargeValue(targetActor) <= 0) {
+    let appliedDamageType = normalizeAppliedDamageType(damageType, "blunt");
+    if (appliedDamageType === "flexible") appliedDamageType = "blunt";
+    return {
+      handled: true,
+      useArmorCharge: false,
+      appliedDamageType,
+      armorChargeUnavailable: true
+    };
+  }
 
   const recipient = getPreferredDefensePromptRecipientUser(targetActor, targetTokenDocument);
   if (!recipient?.id) {
@@ -456,6 +542,104 @@ export async function requestIncomingHitApplicationForTarget({
     applicationResult = await applyIncomingHitForUser(recipient.id, payload);
   } else {
     applicationResult = await applyIncomingHit(payload);
+  }
+
+  const applicationHandled = !!(applicationResult && typeof applicationResult === "object" && applicationResult.handled);
+  const applicationApplied = !!(applicationResult && typeof applicationResult === "object" && applicationResult.applied);
+  if (applicationHandled && applicationApplied) {
+    return applicationResult;
+  }
+
+  return applicationResult;
+}
+
+export async function requestIncomingHealApplicationForTarget({
+  target = null,
+  attackerActor = null,
+  attackerToken = null,
+  combat = null,
+  healRoll = null,
+  healType = ""
+} = {}) {
+  const targetActor = target?.actor || null;
+  const targetTokenDocument = target?.tokenDocument || target?.token?.document || target?.token || null;
+  if (!targetActor || !combat || !healRoll) return null;
+
+  const recipient = getPreferredDefensePromptRecipientUser(targetActor, targetTokenDocument);
+  if (!recipient?.id) {
+    pcLog.debug("Peasant Core | Incoming heal apply skipped: no recipient user found", {
+      target: target?.targetName || targetActor?.name,
+      combatName: combat?.name || "Combat"
+    });
+    return null;
+  }
+
+  const attackerTokenDocument = attackerToken?.document ?? attackerToken ?? null;
+  const attackerName = String(
+    attackerToken?.name
+    || attackerTokenDocument?.name
+    || attackerActor?.name
+    || "Healer"
+  ).trim() || "Healer";
+  const resolvedHealAmount = Number(healRoll.total) || 0;
+  const resolvedHealType = String(healType || healRoll?.healType || combat?.heal?.type || "").trim().toLowerCase() === "greater"
+    ? "greater"
+    : "temporary";
+
+  const payload = {
+    originatingUserId: game.user?.id || null,
+    recipientUserId: recipient.id,
+    attackerActorId: attackerActor?.id || null,
+    attackerActorUuid: attackerActor?.uuid || null,
+    attackerTokenUuid: attackerTokenDocument?.uuid || null,
+    attackerTokenName: attackerName,
+    attackCombatIndex: null,
+    attackCombatName: String(combat?.name || "Heal").trim() || "Heal",
+    attackTargetingType: getCombatTargetingType(combat),
+    targetSceneId: targetTokenDocument?.parent?.id || targetTokenDocument?.scene?.id || null,
+    targetTokenId: targetTokenDocument?.id || null,
+    targetTokenUuid: targetTokenDocument?.uuid || null,
+    targetTokenName: target?.targetName || targetTokenDocument?.name || targetActor?.name || "Target",
+    targetActorId: targetActor?.id || null,
+    targetActorUuid: targetActor?.uuid || null,
+    healAmount: resolvedHealAmount,
+    healType: resolvedHealType
+  };
+
+  const applyIncomingHealForUser = game.peasantCore?.applyIncomingHealForUser;
+  if (recipient.id !== game.user?.id && typeof applyIncomingHealForUser === "function") {
+    try {
+      const remoteApplication = await applyIncomingHealForUser(recipient.id, payload);
+      if (remoteApplication) return remoteApplication;
+    } catch (error) {
+      console.error("Peasant Core | Remote incoming heal apply failed, falling back to local application.", error);
+    }
+  }
+
+  let canApplyLocally = false;
+  try {
+    canApplyLocally = !!game.user?.isGM
+      || (typeof targetActor?.canUserModify === "function" && targetActor.canUserModify(game.user, "update"));
+  } catch (e) {
+    pcLog.debug("Peasant Core | Failed to test local incoming-heal apply permission", e);
+  }
+
+  if (canApplyLocally) {
+    try {
+      const localApplication = await applyIncomingHeal(payload);
+      if (localApplication?.handled && localApplication?.applied) {
+        return localApplication;
+      }
+    } catch (error) {
+      console.error("Peasant Core | Local incoming heal apply failed, falling back to remote application.", error);
+    }
+  }
+
+  let applicationResult = null;
+  if (typeof applyIncomingHealForUser === "function") {
+    applicationResult = await applyIncomingHealForUser(recipient.id, payload);
+  } else {
+    applicationResult = await applyIncomingHeal(payload);
   }
 
   const applicationHandled = !!(applicationResult && typeof applicationResult === "object" && applicationResult.handled);

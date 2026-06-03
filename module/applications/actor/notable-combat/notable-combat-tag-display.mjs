@@ -70,6 +70,10 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
         return str;
       }
       return null;
+    case "desperate": {
+      const value = Number.parseInt(combatData.desperate, 10) || 0;
+      return value !== 0 ? `Desperate: ${formatSignedInteger(value)} per filled row` : null;
+    }
     case "heal":
       if (hasCombatDice(combatData.heal)) {
         let str = `Heal: ${formatCombatDiceDisplay(combatData.heal.diceCount, combatData.heal.diceValue, combatData.heal.flat, combatData.heal.diceBonus)}`;
@@ -118,4 +122,8 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
     default:
       return null;
   }
+}
+
+function formatSignedInteger(value) {
+  return value > 0 ? `+${value}` : String(value);
 }

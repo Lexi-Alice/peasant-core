@@ -4,6 +4,7 @@ import {
   hasRangeRateValue,
   normalizeRangeRateValue
 } from "../../data/actor/combat-tags.mjs";
+import { getCombatDesperateDieRateModifier } from "../../data/actor/combat-damage.mjs";
 import { hasOptionalInteger, parseOptionalInteger } from "../../data/actor/helpers.mjs";
 import { applyToHitAccuracy } from "../../dice/roll-targets.mjs";
 import { performSkillRoll, performUntrainedSkillRoll } from "../../dice/rolls.mjs";
@@ -318,6 +319,7 @@ export async function renderNotableCombatsChat() {
         const combatMods = actorNow.system.combatMods || { diceRate: 0, flatDamage: 0 };
         const diceRateMod = parseInt(combatMods.diceRate) || 0;
         const flatDamageMod = parseInt(combatMods.flatDamage) || 0;
+        const desperateDieRateMod = getCombatDesperateDieRateModifier(actorNow, combat).modifier;
 
         let diceCount = 0;
         let diceValue = 0;
@@ -326,7 +328,7 @@ export async function renderNotableCombatsChat() {
         let typeLabel = '';
 
         if (rollType === 'damage' && combat.damage) {
-          const result = applyDieRate(combat.damage.diceCount || 0, combat.damage.diceValue || 0, combat.damage.flat || 0, diceRateMod, combat.damage.diceBonus || 0);
+          const result = applyDieRate(combat.damage.diceCount || 0, combat.damage.diceValue || 0, combat.damage.flat || 0, diceRateMod + desperateDieRateMod, combat.damage.diceBonus || 0);
           diceCount = result.diceCount;
           diceValue = result.diceValue;
           flat = result.flat + flatDamageMod;

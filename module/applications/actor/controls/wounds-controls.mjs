@@ -2,11 +2,22 @@ import { escapeHtml } from "../../../utils/chat.mjs";
 import { delegate, qs, qsa, toElement } from "../../dom.mjs";
 import { renderSheetResourceDialog } from "./resource-dialogs.mjs";
 
-export function setupWoundsControls(sheet, html) {
+const openWoundsDialogs = new Set();
+
+function isSameDialogActor(sheet, actor) {
+  const sheetActor = sheet?.actor;
+  return !!sheetActor && (
+    sheetActor === actor
+    || sheetActor.uuid === actor?.uuid
+    || (!!sheetActor.id && sheetActor.id === actor?.id)
+  );
+}
+
+export function setupWoundsControls(sheet, html, { readOnly = !!sheet?.isReadOnlyObserver } = {}) {
   delegate(html, "click", ".toggle-wounds-menu", (ev, target) => {
     ev.preventDefault();
     ev.stopPropagation();
-    openWoundsDialog(sheet, target);
+    openWoundsDialog(sheet, target, null, { readOnly });
   });
 }
 
@@ -80,18 +91,18 @@ function getDialogWindowPosition(html, width) {
   };
 }
 
-function openWoundsDialog(sheet, trigger = null, position = null) {
-  return renderSheetResourceDialog(sheet, "wounds", {
+function openWoundsDialog(sheet, trigger = null, position = null, { readOnly = !!sheet?.isReadOnlyObserver } = {}) {
+  const dialog = renderSheetResourceDialog(sheet, "wounds", {
     title: "Active Wounds",
     ...(position ? { position } : {}),
     content: `
       <div class="pc-resource-form pc-wounds-form">
         <div class="pc-wounds-list">
-          ${renderActiveWounds(sheet.actor)}
+          ${renderActiveWounds(sheet.actor, { readOnly })}
         </div>
       </div>
     `,
-    buttons: {
+    buttons: readOnly ? {} : {
       add: {
         icon: "fa-solid fa-plus",
         label: "Add Wound",
@@ -101,39 +112,75 @@ function openWoundsDialog(sheet, trigger = null, position = null) {
       }
     },
     render: (html) => {
-      for (const tagEl of qsa(html, ".pc-wound-tag")) {
-        bindWoundTagHover(tagEl);
-      }
-
-      for (const button of qsa(html, ".pc-remove-condition")) {
-        button.addEventListener("click", async (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-
-          const key = button.dataset.condition;
-
-          try {
-            await sheet.actor.clearPeasantCondition?.(key);
-          } catch (err) {
-            console.warn("Failed to remove condition:", err);
-            return;
-          }
-
-          button.closest(".pc-wound-tag")?.remove();
-          const list = qs(html, ".pc-wounds-list");
-          if (list && !qs(list, ".pc-wound-tag")) {
-            list.innerHTML = `<div class="pc-resource-empty">No active wounds</div>`;
-          }
-
-          sheet.render(false);
-        });
-      }
+      bindWoundsDialog(sheet, html, { readOnly });
     }
   }, trigger, {
     width: 300,
     height: 260,
     classes: ["pc-wounds-dialog"]
   });
+
+  const registration = { sheet, dialog };
+  openWoundsDialogs.add(registration);
+  if (typeof dialog?.close === "function") {
+    const closeDialog = dialog.close.bind(dialog);
+    dialog.close = (...args) => {
+      openWoundsDialogs.delete(registration);
+      return closeDialog(...args);
+    };
+  }
+
+  return dialog;
+}
+
+export function refreshOpenWoundsDialogsForActor(actor) {
+  if (!actor) return;
+  for (const registration of Array.from(openWoundsDialogs)) {
+    const { sheet, dialog } = registration;
+    if (!isSameDialogActor(sheet, actor)) continue;
+
+    const root = toElement(dialog);
+    if (!root?.isConnected) {
+      openWoundsDialogs.delete(registration);
+      continue;
+    }
+
+    refreshWoundsDialog(sheet, root);
+  }
+}
+
+function refreshWoundsDialog(sheet, root) {
+  const rootElement = toElement(root);
+  const list = qs(rootElement, ".pc-wounds-list");
+  if (!list) return;
+
+  const readOnly = !!sheet?.isReadOnlyObserver;
+  list.innerHTML = renderActiveWounds(sheet.actor, { readOnly });
+  bindWoundsDialog(sheet, rootElement, { readOnly });
+}
+
+function bindWoundsDialog(sheet, html, { readOnly = !!sheet?.isReadOnlyObserver } = {}) {
+  for (const tagEl of qsa(html, ".pc-wound-tag")) {
+    bindWoundTagHover(tagEl);
+  }
+
+  if (readOnly) return;
+
+  for (const button of qsa(html, ".pc-remove-condition")) {
+    button.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const key = button.dataset.condition;
+
+      try {
+        await sheet.actor.clearPeasantCondition?.(key);
+      } catch (err) {
+        console.warn("Failed to remove condition:", err);
+        return;
+      }
+    });
+  }
 }
 
 function openAddWoundDialog(sheet, trigger = null, position = null) {
@@ -178,7 +225,6 @@ function openAddWoundDialog(sheet, trigger = null, position = null) {
           const position = getDialogWindowPosition(html, 300);
           await sheet.actor.addPeasantWound?.(woundType);
           openWoundsDialog(sheet, trigger, position);
-          sheet.render(false);
           return true;
         }
       },
@@ -195,7 +241,7 @@ function openAddWoundDialog(sheet, trigger = null, position = null) {
   });
 }
 
-function renderActiveWounds(actor) {
+function renderActiveWounds(actor, { readOnly = false } = {}) {
   const conditions = actor?.system?.conditions || {};
   const entries = [];
 
@@ -226,9 +272,9 @@ function renderActiveWounds(actor) {
   if (!entries.length) return `<div class="pc-resource-empty">No active wounds</div>`;
 
   return entries.map((entry) => `
-    <div class="pc-wound-tag">
+    <div class="pc-wound-tag"${readOnly ? ` tabindex="0"` : ""}>
       <span>${escapeHtml(entry.label)}</span>
-      <button type="button" class="pc-remove-condition" data-condition="${escapeHtml(entry.key)}" title="Remove ${escapeHtml(entry.label)}" aria-label="Remove ${escapeHtml(entry.label)}">&times;</button>
+      ${readOnly ? "" : `<button type="button" class="pc-remove-condition" data-condition="${escapeHtml(entry.key)}" title="Remove ${escapeHtml(entry.label)}" aria-label="Remove ${escapeHtml(entry.label)}">&times;</button>`}
     </div>
   `).join("");
 }

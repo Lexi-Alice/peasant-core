@@ -91,6 +91,25 @@ export class PeasantActorSheet extends ActorSheetBase {
     return this._mode === this.constructor.MODES.EDIT;
   }
 
+  get canModifyActor() {
+    return !!this.isEditable;
+  }
+
+  get canObserveActor() {
+    if (this.canModifyActor) return true;
+    const observerLevel = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OBSERVER ?? 2;
+    try {
+      return !!this.actor?.testUserPermission?.(game.user, observerLevel);
+    } catch (err) {
+      pcLog.debug("Peasant Core | Actor observer permission check failed", err);
+      return false;
+    }
+  }
+
+  get isReadOnlyObserver() {
+    return this.canObserveActor && !this.canModifyActor;
+  }
+
   _clearPendingEditAutosaves() {
     if (!(this._pendingEditAutosaveTimers instanceof Map)) {
       this._pendingEditAutosaveTimers = new Map();
@@ -292,6 +311,7 @@ export class PeasantActorSheet extends ActorSheetBase {
   }
 
   static #changeMode(event, target) {
+    if (!this.canModifyActor) return;
     this._onChangeSheetMode(event, target);
   }
 
@@ -319,40 +339,49 @@ export class PeasantActorSheet extends ActorSheetBase {
   }
 
   static async _onRefreshResourcesAction() {
+    if (!this.canModifyActor) return;
     await confirmPeasantResourceRefresh(this);
   }
 
   static async _onRestAction(event, target) {
+    if (!this.canModifyActor) return;
     const restButton = target ?? event?.currentTarget;
     const restType = restButton?.dataset?.type ?? restButton?.dataset?.restType;
     await confirmPeasantRest(this, restType);
   }
 
   static async _onConsciousnessRollAction(event, target) {
+    if (!this.canModifyActor) return;
     await this._rollConsciousnessFromElement(event, target);
   }
 
   static async _onInitiativeRollAction(event, target) {
+    if (!this.canModifyActor) return;
     await this._rollInitiativeFromElement(event, target);
   }
 
   static async _onCombatRollAction(event, target) {
+    if (!this.canModifyActor) return;
     await this._rollCombatFromElement(event, target);
   }
 
   static async _onCombatTagRollAction(event, target) {
+    if (!this.canModifyActor) return;
     await this._rollCombatTagFromElement(event, target);
   }
 
   static async _onSkillRollAction(event, target) {
+    if (!this.canModifyActor) return;
     await this._rollSkillFromElement(event, target);
   }
 
   static async _onAttributeToHitRollAction(event, target) {
+    if (!this.canModifyActor) return;
     await this._rollAttributeToHitFromElement(event, target);
   }
 
   static async _onAttributeSaveRollAction(event, target) {
+    if (!this.canModifyActor) return;
     await this._rollAttributeSaveFromElement(event, target);
   }
 
@@ -535,11 +564,14 @@ export class PeasantActorSheet extends ActorSheetBase {
     const sheetEl = sheet?.[0] || null;
     if (sheetEl && sheetEl.tabIndex < 0) sheetEl.tabIndex = 0;
     this.activateListeners(sheet);
+    this._bindSheetTabButtons();
     this._renderModeToggle();
     const root = getApplicationElement(this);
     root?.classList.toggle("editable", this.isEditable && this.isEditMode);
     root?.classList.toggle("interactable", this.isEditable && (this._mode === this.constructor.MODES.PLAY));
     root?.classList.toggle("locked", !this.isEditable);
+    root?.classList.toggle("readonly-observer", this.isReadOnlyObserver);
+    this._applyReadOnlyObserverState(root);
     this._syncSheetTabRailViewportMode();
   }
 
@@ -585,6 +617,19 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     this._prepareSheetTabLayout(sheet);
     this._applySheetTab(activeTab, sheet);
+  }
+
+  _bindSheetTabButtons() {
+    const root = getApplicationJQuery(this);
+    root.find(".pc-sheet-tab-button").off("click.peasantCoreSheetTabs").on("click.peasantCoreSheetTabs", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const target = event.currentTarget;
+      const tab = target?.dataset?.tab;
+      const group = target?.dataset?.group ?? "primary";
+      if (!tab) return;
+      this.changeTab(tab, group, { event });
+    });
   }
 
   _normalizeSheetTab(tab) {
@@ -734,7 +779,7 @@ export class PeasantActorSheet extends ActorSheetBase {
   _getHeaderControls() {
     const superControls = typeof super._getHeaderControls === "function" ? super._getHeaderControls() : [];
     const controls = Array.isArray(superControls) ? [...superControls] : [];
-    const canConfigure = game.user.isGM || this.actor.isOwner;
+    const canConfigure = this.canModifyActor;
     if (canConfigure) {
       const hasRefreshResources = controls.some(control => String(control?.action || "").trim().toLowerCase() === "refreshresources");
       if (!hasRefreshResources) {
@@ -804,7 +849,7 @@ export class PeasantActorSheet extends ActorSheetBase {
     const buttons = typeof super._getHeaderButtons === "function" ? super._getHeaderButtons() : [];
 
     // Legacy frame controls that are still independent of sheet mode.
-    const canConfigure = game.user.isGM || this.actor.isOwner;
+    const canConfigure = this.canModifyActor;
     if (canConfigure) {
       buttons.unshift({
         label: "Refresh Resources",
@@ -832,11 +877,15 @@ export class PeasantActorSheet extends ActorSheetBase {
         data = {
           actor: this.actor,
           editable: this.isEditable,
-          owner: this.actor?.isOwner ?? false,
+          owner: this.canModifyActor,
+          canObserve: this.canObserveActor,
           options: this.options
         };
       }
+      data.owner = this.canModifyActor;
+      data.canObserve = this.canObserveActor;
       prepareActorSheetBaseContext(data, this.actor, { isEditable: this.isEditable, isEditMode: this.isEditMode });
+      if (this.isReadOnlyObserver) data.artPanelCollapsed = false;
       if (this.isEditMode && this._initiativeInputDraft !== undefined) {
         data.initiativeInput = this._initiativeInputDraft;
       }
@@ -882,7 +931,8 @@ export class PeasantActorSheet extends ActorSheetBase {
         return {
           actor: this.actor,
           editable: this.isEditable,
-          owner: this.actor?.isOwner ?? false,
+          owner: this.canModifyActor,
+          canObserve: this.canObserveActor,
           options: this.options
         };
       } catch (err2) {
@@ -918,7 +968,6 @@ export class PeasantActorSheet extends ActorSheetBase {
         await this.actor.setFlag("peasant-core", setting.flagKey, value);
       }
 
-      this.render(false);
     } catch (err) {
       console.warn(`Peasant Core | Failed to save actor setting ${flagKey}`, err);
       ui.notifications?.warn?.("Failed to save Peasant Core setting. See console for details.");
@@ -945,6 +994,128 @@ export class PeasantActorSheet extends ActorSheetBase {
     }
   }
 
+  _applyReadOnlyObserverState(html) {
+    if (!this.isReadOnlyObserver) return;
+    const root = getApplicationElement(html);
+    if (!root) return;
+    const sheetRoot = root.matches(".actor-sheet") ? root : root.querySelector(".actor-sheet");
+    const scopes = [
+      sheetRoot,
+      ...root.querySelectorAll(".pc-sheet-tab-rail")
+    ].filter(Boolean);
+    if (sheetRoot) sheetRoot.tabIndex = -1;
+    for (const chromeAction of root.querySelectorAll(".window-header [data-pc-readonly-action='true']")) {
+      delete chromeAction.dataset.pcReadonlyAction;
+      chromeAction.removeAttribute("aria-disabled");
+    }
+
+    const allowButton = (button) => button.matches(".pc-sheet-tab-button, .pc-hp-grid-open, .pc-stress-grid-open, .toggle-wounds-menu");
+    const markReadOnlyAction = (element) => {
+      element.dataset.pcReadonlyAction = "true";
+      element.setAttribute("aria-disabled", "true");
+      if (!element.hasAttribute("tabindex")) element.setAttribute("tabindex", "0");
+      if ("disabled" in element) element.disabled = false;
+    };
+    const forEachScoped = (selector, callback) => {
+      for (const scope of scopes) {
+        for (const element of scope.querySelectorAll(selector)) callback(element);
+      }
+    };
+
+    forEachScoped("button", (button) => {
+      if (allowButton(button)) {
+        button.disabled = false;
+        button.removeAttribute("disabled");
+        button.removeAttribute("aria-disabled");
+        return;
+      }
+      markReadOnlyAction(button);
+    });
+
+    forEachScoped("fieldset", (fieldset) => {
+      fieldset.disabled = false;
+      fieldset.removeAttribute("disabled");
+    });
+
+    forEachScoped("input, textarea", (input) => {
+      if (input.type === "hidden" || input.hidden || input.hasAttribute("hidden")) return;
+      input.disabled = false;
+      input.removeAttribute("disabled");
+      input.readOnly = true;
+      input.setAttribute("aria-readonly", "true");
+      if (!input.hasAttribute("tabindex")) input.setAttribute("tabindex", "0");
+      if (["checkbox", "radio", "range", "color", "file"].includes(input.type)) markReadOnlyAction(input);
+    });
+
+    forEachScoped("select", (select) => {
+      select.disabled = false;
+      select.removeAttribute("disabled");
+      markReadOnlyAction(select);
+    });
+
+    forEachScoped('[contenteditable="true"], prose-mirror', (editable) => {
+      if ("disabled" in editable) editable.disabled = false;
+      editable.removeAttribute("disabled");
+      editable.setAttribute("contenteditable", "false");
+      editable.setAttribute("aria-readonly", "true");
+      if (!editable.hasAttribute("tabindex")) editable.setAttribute("tabindex", "0");
+    });
+
+    forEachScoped('[data-action]:not(.pc-sheet-tab-button):not(.pc-hp-grid-open):not(.pc-stress-grid-open)', (action) => {
+      markReadOnlyAction(action);
+    });
+
+    const focusableReadOnlySelectors = [
+      ".pc-banner-ap-meter",
+      ".pc-portrait-lozenge:not(.pc-portrait-lozenge-edit)",
+      ".pc-portrait-armor-charge-field",
+      ".pc-portrait-hp-main",
+      ".pc-portrait-hp-side",
+      ".pc-portrait-stress-bar",
+      ".pc-portrait-resource-bar",
+      ".halt-section",
+      ".skills-list-view",
+      ".notable-combats-list-view",
+      ".inventory-view",
+      ".advantages-list-view",
+      ".pc-biography-detail-strip",
+      ".pc-biography-notes-grid"
+    ];
+    forEachScoped(focusableReadOnlySelectors.join(", "), (element) => {
+      if (!element.hasAttribute("tabindex")) element.setAttribute("tabindex", "0");
+    });
+
+    this._bindReadOnlyObserverGuards(root);
+  }
+
+  _bindReadOnlyObserverGuards(html) {
+    const root = getApplicationElement(html);
+    if (!root || root.dataset.pcReadonlyObserverGuards === "true") return;
+    root.dataset.pcReadonlyObserverGuards = "true";
+
+    const shouldBlockActivation = (target) => {
+      const action = target?.closest?.("[data-pc-readonly-action='true']");
+      if (!action) return false;
+      if (action.closest(".window-header")) return false;
+      return !action.matches(".pc-sheet-tab-button, .pc-hp-grid-open, .pc-stress-grid-open, .toggle-wounds-menu");
+    };
+
+    const block = (event) => {
+      if (!this.isReadOnlyObserver || !shouldBlockActivation(event.target)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      event.stopPropagation();
+    };
+
+    root.addEventListener("click", block, true);
+    root.addEventListener("dblclick", block, true);
+    root.addEventListener("contextmenu", block, true);
+    root.addEventListener("keydown", (event) => {
+      if (!["Enter", " ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+      block(event);
+    }, true);
+  }
+
   activateListeners(html) {
     if (typeof super.activateListeners === "function") {
       try {
@@ -956,16 +1127,24 @@ export class PeasantActorSheet extends ActorSheetBase {
     pcLog.debug('PeasantActorSheet.activateListeners bound for actor:', this.actor?.name);
     this._setupSheetTabs(html);
     const sheetDocument = this._getElementDocument(html?.[0]);
+    teardownPortraitBindings(this);
+    html.find(".header-button.apply").remove();
+
+    if (this.isReadOnlyObserver) {
+      setupPortraitControls(this, html, { readOnly: true });
+      setupWoundsControls(this, html, { readOnly: true });
+      setupHealthStressControls(this, html, { readOnly: true });
+      return;
+    }
+
     const sheetBody = sheetDocument?.body ?? document.body;
     initializeSheetSaveQueues(this);
-    teardownPortraitBindings(this);
     const enqueueSheetUpdate = createSheetUpdateQueue(this);
 
     html.find(".pc-art-panel-toggle").off("click.peasantCoreArtPanel").on("click.peasantCoreArtPanel", async (event) => {
       event.preventDefault();
       const collapsed = !this.actor?.getFlag?.("peasant-core", PC_ART_PANEL_COLLAPSED_FLAG);
       await this.actor.setFlag("peasant-core", PC_ART_PANEL_COLLAPSED_FLAG, collapsed);
-      this.render(false);
     });
 
     html.find(".pc-banner-rest-button").off("click.peasantCoreRest").on("click.peasantCoreRest", async (event) => {
@@ -989,10 +1168,6 @@ export class PeasantActorSheet extends ActorSheetBase {
         event.stopPropagation();
         sanitizeOptionalIntegerInputElement(input, { allowSign: true });
         this._initiativeInputDraft = input.value;
-        const value = parseOptionalInteger(input.value, { allowSign: true });
-        void enqueueSheetUpdate("_portraitLozengeSaveQueue", "Portrait lozenge", async () => {
-          await this.actor.setPeasantInitiative?.(value, { render: false });
-        });
         return;
       }
       event.stopPropagation();
@@ -1007,6 +1182,9 @@ export class PeasantActorSheet extends ActorSheetBase {
         const value = parseOptionalInteger(input.value, { allowSign: true });
         input.value = formatOptionalIntegerInput(value, { showPlus: true });
         this._initiativeInputDraft = undefined;
+        await enqueueSheetUpdate("_portraitLozengeSaveQueue", "Portrait lozenge", async () => {
+          await this.actor.setPeasantInitiative?.(value);
+        });
         return;
       }
       event.stopPropagation();
@@ -1034,8 +1212,6 @@ export class PeasantActorSheet extends ActorSheetBase {
     } catch (err) {
       pcLog.debug('Failed to setup arrow key navigation:', err);
     }
-    // Remove any stray header 'Apply' button that may have been injected
-    html.find(".header-button.apply").remove();
 
     setupWoundsControls(this, html);
 

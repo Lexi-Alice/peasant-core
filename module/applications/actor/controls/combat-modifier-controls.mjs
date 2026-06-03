@@ -114,7 +114,6 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
             if (result?.reason === "duplicate-cost") {
               ui.notifications?.info?.(`${result.resourceType || selectedResourceType} cost buff already exists.`);
             }
-            sheet.render(false);
           }
         },
         cancel: {
@@ -147,9 +146,8 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     if (!Number.isFinite(index) || index < 0) return;
 
     await enqueueSheetUpdate?.("_combatSaveQueue", "Remove combat HALT buff", async () => {
-      await sheet.actor.removePeasantCombatHaltBuff?.(index, { render: false });
+      await sheet.actor.removePeasantCombatHaltBuff?.(index);
     });
-    sheet.render(false);
   });
 
   delegate(root, "input", ".combat-halt-buff-input", (ev) => {
@@ -174,10 +172,9 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     if (normalized !== input.value) input.value = normalized;
 
     await runQueuedInputUpdate?.(input, "_combatSaveQueue", "Combat HALT buff values change", async () => {
-      await sheet.actor.setPeasantCombatHaltBuffValues?.(index, input.value, { render: false });
+      await sheet.actor.setPeasantCombatHaltBuffValues?.(index, input.value);
     });
     refreshCombatModifierHighlights();
-    sheet.render(false);
   };
   delegate(root, "change", ".combat-halt-buff-input", handleCombatHaltBuffCommit);
   delegate(root, "blur", ".combat-halt-buff-input", handleCombatHaltBuffCommit, true);
@@ -190,10 +187,9 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     if (String(normalizedValue) !== String(input.value)) input.value = String(normalizedValue);
 
     await runQueuedInputUpdate?.(input, "_combatSaveQueue", "Combat numeric buff value change", async () => {
-      await sheet.actor.setPeasantCombatHaltBuffValue?.(index, normalizedValue, { render: false });
+      await sheet.actor.setPeasantCombatHaltBuffValue?.(index, normalizedValue);
     });
     refreshCombatModifierHighlights();
-    sheet.render(false);
   });
 
   const handleCustomBuffNameCommit = async (ev, input) => {
@@ -204,9 +200,8 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     if (normalizedName !== input.value) input.value = normalizedName;
 
     await runQueuedInputUpdate?.(input, "_combatSaveQueue", "Combat custom buff name change", async () => {
-      await sheet.actor.setPeasantCombatCustomBuffName?.(index, normalizedName, { render: false });
+      await sheet.actor.setPeasantCombatCustomBuffName?.(index, normalizedName);
     });
-    sheet.render(false);
   };
   delegate(root, "change", ".combat-custom-buff-name", handleCustomBuffNameCommit);
   delegate(root, "blur", ".combat-custom-buff-name", handleCustomBuffNameCommit, true);
@@ -218,10 +213,9 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
     const selectedResourceType = sanitizeCombatCostResourceType(select.value);
 
     await runQueuedInputUpdate?.(select, "_combatSaveQueue", "Combat cost buff resource type change", async () => {
-      const result = await sheet.actor.setPeasantCombatCostBuffResource?.(index, selectedResourceType, { render: false });
+      const result = await sheet.actor.setPeasantCombatCostBuffResource?.(index, selectedResourceType);
       if (result?.reason === "duplicate-cost") ui.notifications?.info?.(`${result.resourceType || selectedResourceType} cost buff already exists.`);
     });
-    sheet.render(false);
   });
 
   setupReflexAoeSaveControls(sheet, root, runQueuedInputUpdate);
@@ -275,7 +269,7 @@ function setupHaltInputSanitizer(sheet, html, runQueuedInputUpdate) {
 
       const natural = field === "system.naturalHaltValues";
       const update = async () => {
-        await sheet.actor.setPeasantHaltValues?.(input.value, { natural, render: false });
+        await sheet.actor.setPeasantHaltValues?.(input.value, { natural });
       };
       if (typeof runQueuedInputUpdate === "function") {
         await runQueuedInputUpdate(input, "_combatSaveQueue", "HALT values change", update);
@@ -353,7 +347,7 @@ function setupReflexAoeSaveControls(sheet, html, runQueuedInputUpdate) {
     if (!raw) {
       input.value = "";
       const update = async () => {
-        await sheet.actor.setPeasantReflexAoeSave?.(true, "", { render: false });
+        await sheet.actor.setPeasantReflexAoeSave?.(true, "");
       };
       if (typeof runQueuedInputUpdate === "function") {
         await runQueuedInputUpdate(input, "_combatSaveQueue", "Reflex AoE save change", update);
@@ -366,7 +360,7 @@ function setupReflexAoeSaveControls(sheet, html, runQueuedInputUpdate) {
     const normalized = Number.isFinite(parsed) ? String(Math.max(2, parsed)) : "";
     if (normalized !== raw) input.value = normalized;
     const update = async () => {
-      await sheet.actor.setPeasantReflexAoeSave?.(true, normalized, { render: false });
+      await sheet.actor.setPeasantReflexAoeSave?.(true, normalized);
     };
     if (typeof runQueuedInputUpdate === "function") {
       await runQueuedInputUpdate(input, "_combatSaveQueue", "Reflex AoE save change", update);

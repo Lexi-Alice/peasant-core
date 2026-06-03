@@ -6,7 +6,8 @@ export async function rollAutomatedCombatDamage(actor, combat, {
   targetLabel = "",
   attackerToken = null,
   appliedDamageType = null,
-  aoeReflexSaveResult = null
+  aoeReflexSaveResult = null,
+  halveDamageForGlance = false
 } = {}) {
   if (!actor || !combat?.damage) return null;
 
@@ -48,11 +49,12 @@ export async function rollAutomatedCombatDamage(actor, combat, {
     ? aoeReflexSaveResult
     : null;
   const reflexSavePassed = !!reflexSaveResult?.passed;
-  const displayTotal = reflexSaveResult && reflexSavePassed
-    ? Math.floor(total / 2)
-    : total;
+  let displayTotal = total;
+  if (halveDamageForGlance) displayTotal = Math.floor(displayTotal / 2);
+  if (reflexSaveResult && reflexSavePassed) displayTotal = Math.floor(displayTotal / 2);
   const damageDetailsHtml = `${diceDetailLine}${flat !== 0 ? `
-        <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}${reflexSavePassed ? `
+        <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}${halveDamageForGlance ? `
+        <div>Damage Halved Due to Glance</div>` : ''}${reflexSavePassed ? `
         <div>Damage Halved Enemy Passed AoE Reflex Save</div>` : ''}`;
   const speaker = getActorRollSpeaker(actor, attackerToken);
   const typeDisplay = typeLabel ? `<span style="color: #aaa; font-size: 11px; margin-left: 6px;">${escapeHtml(typeLabel)}</span>` : "";

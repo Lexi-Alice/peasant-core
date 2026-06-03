@@ -66,6 +66,31 @@ function getAreaDamageHaltLocation(targetActor, targetingKey) {
   return getHighestHaltDamageLocation(targetActor);
 }
 
+function isGlancingSuccessAttack(attackRoll) {
+  const rollResult = attackRoll?.rollResult;
+  if (!rollResult || typeof rollResult !== "object") return false;
+  if (String(rollResult.resultText || "").trim() === "Glancing Success") return true;
+
+  const baseMoS = Number(rollResult.baseMoS);
+  const totalMoS = Number(rollResult.totalMoS);
+  return !!(
+    rollResult.isSuccess
+    && !String(rollResult.criticalType || "").trim()
+    && Number.isFinite(baseMoS)
+    && Number.isFinite(totalMoS)
+    && baseMoS < 0
+    && totalMoS >= 0
+  );
+}
+
+function getAppliedDamageRollTotal(damageRoll) {
+  const displayTotal = Number(damageRoll?.displayTotal);
+  if (Number.isFinite(displayTotal)) return displayTotal;
+
+  const total = Number(damageRoll?.total);
+  return Number.isFinite(total) ? total : 0;
+}
+
 export async function resolveSuccessfulAttackDamageForTarget({
   actor = null,
   attackerToken = null,
@@ -88,6 +113,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
   const weaponBlockFailure = isWeaponDefenseDamageBlock(attackRoll, defensePromptResult);
   const narrowSuccessWithoutDefense = isNarrowSuccessAttack(attackRoll)
     && !doesPromptResultCountAsActiveDefense(defensePromptResult);
+  const halveDamageForGlance = isGlancingSuccessAttack(attackRoll);
   if (
     !attackRoll?.rollResult?.isSuccess
     && !narrowSuccessWithoutDefense
@@ -113,9 +139,11 @@ export async function resolveSuccessfulAttackDamageForTarget({
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
       targetLabel,
       attackerToken,
-      appliedDamageType: resolvedDamageType
+      appliedDamageType: resolvedDamageType,
+      halveDamageForGlance
     });
-    if (!damageRoll || !Number.isFinite(Number(damageRoll.total)) || Number(damageRoll.total) <= 0) {
+    const damageAmount = getAppliedDamageRollTotal(damageRoll);
+    if (!damageRoll || damageAmount <= 0) {
       return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, shieldBlockFailure: true };
     }
 
@@ -130,7 +158,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
         useArmorCharge: false,
         appliedDamageType: resolvedDamageType
       },
-      damageAmountOverride: Number(damageRoll.total) || 0,
+      damageAmountOverride: damageAmount,
       ignoreHaltReduction: true,
       shieldBlock: {
         selectedCombatIndex: defensePromptResult?.selectedCombatIndex,
@@ -156,15 +184,17 @@ export async function resolveSuccessfulAttackDamageForTarget({
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
       targetLabel,
       attackerToken,
-      appliedDamageType: resolvedDamageType
+      appliedDamageType: resolvedDamageType,
+      halveDamageForGlance
     });
-    if (!damageRoll || !Number.isFinite(Number(damageRoll.total)) || Number(damageRoll.total) <= 0) {
+    const damageAmount = getAppliedDamageRollTotal(damageRoll);
+    if (!damageRoll || damageAmount <= 0) {
       return { handled: false, reason: "noDamageRolled", damageRoll, weaponBlockFailure: true };
     }
 
-    const originalDamageAmount = Number(damageRoll.total) || 0;
-    const weaponHp = Math.max(0, Number.parseInt(weaponDefense.hp, 10) || 0);
-    const weaponOverflowDamage = Math.max(0, originalDamageAmount - weaponHp);
+    const originalDamageAmount = damageAmount;
+    const weaponHardness = Math.max(0, Number.parseInt(weaponDefense.hardness, 10) || 0);
+    const weaponOverflowDamage = Math.max(0, originalDamageAmount - weaponHardness);
     let locationRoll = createWeaponBlockLocationRoll();
 
     if (weaponOverflowDamage > 0) {
@@ -210,7 +240,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       damageRoll,
       locationRoll,
       originalDamageAmount,
-      weaponHp,
+      weaponHardness,
       weaponOverflowDamage,
       application
     };
@@ -231,14 +261,16 @@ export async function resolveSuccessfulAttackDamageForTarget({
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
       targetLabel,
       attackerToken,
-      appliedDamageType: resolvedDamageType
+      appliedDamageType: resolvedDamageType,
+      halveDamageForGlance
     });
-    if (!damageRoll || !Number.isFinite(Number(damageRoll.total)) || Number(damageRoll.total) <= 0) {
+    const damageAmount = getAppliedDamageRollTotal(damageRoll);
+    if (!damageRoll || damageAmount <= 0) {
       return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, mageBlockFailure: true };
     }
 
     const absorbedByMage = Math.max(0, Number(mageDefense.hp) || 0);
-    const redirectedDamage = Math.max(0, (Number(damageRoll.total) || 0) - absorbedByMage);
+    const redirectedDamage = Math.max(0, damageAmount - absorbedByMage);
     if (redirectedDamage <= 0) {
       return {
         handled: true,
@@ -289,17 +321,19 @@ export async function resolveSuccessfulAttackDamageForTarget({
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
-      aoeReflexSaveResult: reflexSaveResult
+      aoeReflexSaveResult: reflexSaveResult,
+      halveDamageForGlance
     });
     if (!damageRoll || !Number.isFinite(Number(damageRoll.total)) || Number(damageRoll.total) <= 0) {
       return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, reflexSaveResult, aoe: true };
     }
 
     const baseDamageAmount = Number(damageRoll.total) || 0;
-    const resolvedDamageAmount = reflexSaveResult?.passed
-      ? Math.floor(baseDamageAmount / 2)
-      : baseDamageAmount;
+    const resolvedDamageAmount = getAppliedDamageRollTotal(damageRoll);
     if (resolvedDamageAmount <= 0) {
+      const reducedDamageReason = reflexSaveResult?.passed
+        ? "reflexSaveReducedDamageToZero"
+        : (halveDamageForGlance ? "glanceReducedDamageToZero" : "damageReducedToZero");
       return {
         handled: true,
         aoe: true,
@@ -308,7 +342,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
         reflexSaveResult,
         baseDamageAmount,
         resolvedDamageAmount,
-        application: { handled: true, applied: false, reason: "reflexSaveReducedDamageToZero" }
+        application: { handled: true, applied: false, reason: reducedDamageReason }
       };
     }
 
@@ -384,9 +418,11 @@ export async function resolveSuccessfulAttackDamageForTarget({
   const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
     targetLabel,
     attackerToken,
-    appliedDamageType: resolvedDamageType
+    appliedDamageType: resolvedDamageType,
+    halveDamageForGlance
   });
-  if (!damageRoll || !Number.isFinite(Number(damageRoll.total)) || Number(damageRoll.total) <= 0) {
+  const damageAmount = getAppliedDamageRollTotal(damageRoll);
+  if (!damageRoll || damageAmount <= 0) {
     return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, resolution };
   }
 
@@ -398,6 +434,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
     damageRoll,
     locationRoll,
     incomingHitResolution: resolution,
+    damageAmountOverride: damageAmount,
     ignoreHaltReduction: overkill
   });
 

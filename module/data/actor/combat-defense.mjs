@@ -120,6 +120,9 @@ export function normalizeCombatDefense(rawDefense) {
   const blockType = normalizeCombatDefenseBlockType(safe.blockType);
   const hardnessRaw = Number.parseInt(safe.hardness, 10);
   const hpRaw = Number.parseInt(safe.hp, 10);
+  const weaponLegacyHardness = blockType === "Weapon" && Number.isFinite(hpRaw) && !Number.isFinite(hardnessRaw)
+    ? hpRaw
+    : hardnessRaw;
   const debuffToHitRaw = Number.parseInt(safe.debuffToHit, 10) || 0;
   const appliesDebuff = typeof safe.appliesDebuff === "boolean"
     ? !!safe.appliesDebuff
@@ -132,8 +135,10 @@ export function normalizeCombatDefense(rawDefense) {
     block,
     blockType,
     shieldArm: normalizeCombatDefenseShieldArm(safe.shieldArm),
-    hardness: block && blockType === "Shield" ? Math.max(0, Number.isFinite(hardnessRaw) ? hardnessRaw : 0) : 0,
-    hp: block ? Math.max(0, Number.isFinite(hpRaw) ? hpRaw : 0) : 0,
+    hardness: block && (blockType === "Shield" || blockType === "Weapon")
+      ? Math.max(0, Number.isFinite(weaponLegacyHardness) ? weaponLegacyHardness : 0)
+      : 0,
+    hp: block && blockType !== "Weapon" ? Math.max(0, Number.isFinite(hpRaw) ? hpRaw : 0) : 0,
     masteryBonus: block && blockType === "Weapon" ? !!safe.masteryBonus : false,
     appliesDebuff,
     debuffToHit: appliesDebuff ? debuffToHitRaw : 0,
