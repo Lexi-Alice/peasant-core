@@ -1,0 +1,83 @@
+<div class="pc-inventory-section" data-pc-inventory-section data-item-type="{{section.type}}">
+  <header class="pc-inventory-section-header">
+    <h3 class="pc-inventory-section-title">
+      <i class="{{section.icon}}" aria-hidden="true"></i>
+      <span>{{section.label}}</span>
+    </h3>
+    <div class="pc-inventory-column pc-inventory-column-sunder">Sunder</div>
+    <div class="pc-inventory-column pc-inventory-column-quantity">Quantity</div>
+    <div class="pc-inventory-column pc-inventory-column-charges">Charges</div>
+    <div class="pc-inventory-column pc-inventory-column-controls"></div>
+  </header>
+
+  <ol class="pc-inventory-items">
+    {{#each section.items as |item|}}
+      <li class="pc-inventory-item" data-pc-inventory-item data-item-id="{{item.id}}" data-item-type="{{item.type}}" data-search="{{item.searchText}}" data-sort-manual="{{item.sort}}" data-sort-alpha="{{item.sortName}}">
+        <div class="pc-inventory-item-row">
+          <button type="button" class="pc-inventory-item-summary" data-tooltip="{{item.name}}" aria-label="Open {{item.name}}" data-pc-inventory-open-item>
+            <img class="pc-inventory-item-image" src="{{item.img}}" alt="">
+            <span class="pc-inventory-item-name-stack">
+              <span class="pc-inventory-item-name">{{item.name}}</span>
+              <span class="pc-inventory-item-subtitle">{{item.subtitle}}</span>
+            </span>
+          </button>
+
+          <div class="pc-inventory-row-field pc-inventory-sunder-control" aria-label="{{item.sunder.label}}">
+            {{#if item.sunder.hasValue}}
+              {{#if ../owner}}
+                <input type="number" class="pc-inventory-number pc-input" value="{{item.sunder.currentInput}}" min="0" step="1" inputmode="numeric" data-pc-inventory-resource-current data-resource-kind="{{item.sunder.kind}}" aria-label="{{item.sunder.label}} Current">
+                <span class="pc-inventory-resource-separator">/</span>
+                <span class="pc-inventory-static-value pc-inventory-resource-max">{{item.sunder.max}}</span>
+              {{else}}
+                <span class="pc-inventory-static-value">{{item.sunder.current}}</span>
+                <span class="pc-inventory-resource-separator">/</span>
+                <span class="pc-inventory-static-value">{{item.sunder.max}}</span>
+              {{/if}}
+            {{else}}
+              <span class="pc-inventory-static-value">-</span>
+            {{/if}}
+          </div>
+
+          <div class="pc-inventory-row-field pc-inventory-quantity-control" aria-label="Quantity">
+            {{#if ../owner}}
+              <button type="button" class="pc-inventory-stepper" data-pc-inventory-quantity-step="-1" data-tooltip="Decrease Quantity" aria-label="Decrease Quantity">
+                <i class="fa-solid fa-minus" aria-hidden="true"></i>
+              </button>
+              <input type="number" class="pc-inventory-number pc-input" value="{{item.quantityInput}}" min="0" step="1" inputmode="numeric" data-pc-inventory-quantity aria-label="Quantity">
+              <button type="button" class="pc-inventory-stepper" data-pc-inventory-quantity-step="1" data-tooltip="Increase Quantity" aria-label="Increase Quantity">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+              </button>
+            {{else}}
+              <span class="pc-inventory-static-value">{{item.quantity}}</span>
+            {{/if}}
+          </div>
+
+          <div class="pc-inventory-row-field pc-inventory-charges-control" aria-label="{{item.charges.label}}">
+            {{#if item.charges.hasValue}}
+              {{#if ../owner}}
+                <input type="number" class="pc-inventory-number pc-input" value="{{item.charges.currentInput}}" min="0" step="1" inputmode="numeric" data-pc-inventory-resource-current data-resource-kind="{{item.charges.kind}}" aria-label="{{item.charges.label}} Current">
+                <span class="pc-inventory-resource-separator">/</span>
+                <span class="pc-inventory-static-value pc-inventory-resource-max">{{item.charges.max}}</span>
+              {{else}}
+                <span class="pc-inventory-static-value">{{item.charges.current}}</span>
+                <span class="pc-inventory-resource-separator">/</span>
+                <span class="pc-inventory-static-value">{{item.charges.max}}</span>
+              {{/if}}
+            {{else}}
+              <span class="pc-inventory-static-value">-</span>
+            {{/if}}
+          </div>
+
+          <div class="pc-inventory-row-controls">
+            {{#if item.hasEquippedMarker}}
+              <button type="button" class="pc-inventory-equipped-marker header-control icon fa-solid fa-shield-halved{{#if item.equipped}} active{{/if}}" data-tooltip="{{item.equippedTooltip}}" aria-label="{{item.equippedTooltip}}" aria-pressed="{{#if item.equipped}}true{{else}}false{{/if}}" data-pc-inventory-equipped-marker></button>
+            {{/if}}
+            {{#if ../owner}}
+              <button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Item Options" aria-label="Item Options" data-pc-inventory-menu></button>
+            {{/if}}
+          </div>
+        </div>
+      </li>
+    {{/each}}
+  </ol>
+</div>

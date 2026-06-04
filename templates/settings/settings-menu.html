@@ -7,13 +7,13 @@
         {{#if group.tagGroup}}
           <div class="current-tags-list pc-settings-tag-list" role="list">
             {{#each group.tags as |tag|}}
-              <div class="current-tag-item combat-tag combat-tag-compact combat-tag-button pc-settings-tag" role="listitem" data-entry-key="{{tag.key}}" title="Right-click to edit {{tag.label}}" draggable="true">
+              <div class="current-tag-item combat-tag combat-tag-compact combat-tag-button pc-settings-tag" role="listitem" data-entry-key="{{tag.key}}" data-tooltip="Right-click to edit {{tag.label}}" aria-label="Right-click to edit {{tag.label}}" draggable="true">
                 <span class="current-tag-label">{{tag.label}}</span>
                 <input type="text" class="pc-settings-tag-label-input pc-input" value="{{tag.label}}" aria-label="Edit {{tag.label}}" autocomplete="off" draggable="false" hidden>
-                <button type="button" class="remove-tag-btn" title="Remove {{tag.label}}" aria-label="Remove {{tag.label}}" draggable="false">&times;</button>
+                <button type="button" class="remove-tag-btn" data-tooltip="Remove {{tag.label}}" aria-label="Remove {{tag.label}}" draggable="false">&times;</button>
               </div>
             {{/each}}
-            <button type="button" class="pc-settings-add-tag" title="Add {{group.addLabel}}" aria-label="Add {{group.addLabel}}">
+            <button type="button" class="pc-settings-add-tag" data-tooltip="Add {{group.addLabel}}" aria-label="Add {{group.addLabel}}">
               +
             </button>
           </div>

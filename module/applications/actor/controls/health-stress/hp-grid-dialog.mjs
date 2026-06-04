@@ -1,6 +1,7 @@
 import { isSimplifiedHpActor } from "../../../../data/actor/helpers.mjs";
 import { performConsciousnessCheck } from "../../../../dice/rolls.mjs";
 import { qs, qsa, toElement } from "../../../dom.mjs";
+import { renderDialogModeToggle } from "./dialog-mode-toggle.mjs";
 
 const PC_CONSCIOUSNESS_SAVE_FLAG = "rollConsciousnessAsSaves";
 const hpGridControllers = new WeakMap();
@@ -43,6 +44,7 @@ export function openHpGridDialog(sheet, trigger = null) {
       root?.classList.add("pc-hp-grid-dialog-window");
       applyHpGridDialogSizing(sheet, root);
       for (const element of qsa(root, ".dialog-buttons, .form-footer, footer")) element.style.display = "none";
+      renderDialogModeToggle(sheet, root);
       bindHpGridDialog(sheet, root);
     }
   }, {
@@ -72,16 +74,28 @@ export function refreshOpenHpGridDialogsForActor(actor) {
   for (const registration of Array.from(openHpGridDialogs)) {
     const { sheet, dialog } = registration;
     if (!isSameDialogActor(sheet, actor)) continue;
-
-    const root = toElement(dialog);
-    if (!root?.isConnected) {
-      openHpGridDialogs.delete(registration);
-      if (sheet._hpGridDialog === dialog) delete sheet._hpGridDialog;
-      continue;
-    }
-
-    refreshHpGridDialog(sheet, root);
+    refreshHpGridDialogRegistration(registration);
   }
+}
+
+export function refreshOpenHpGridDialogsForSheet(sheet) {
+  if (!sheet) return;
+  for (const registration of Array.from(openHpGridDialogs)) {
+    if (registration.sheet !== sheet) continue;
+    refreshHpGridDialogRegistration(registration);
+  }
+}
+
+function refreshHpGridDialogRegistration(registration) {
+  const { sheet, dialog } = registration;
+  const root = toElement(dialog);
+  if (!root?.isConnected) {
+    openHpGridDialogs.delete(registration);
+    if (sheet._hpGridDialog === dialog) delete sheet._hpGridDialog;
+    return;
+  }
+
+  refreshHpGridDialog(sheet, root);
 }
 
 function getHpGridDialogSize(sheet) {
@@ -172,15 +186,15 @@ function renderHpGridDialogBody(sheet) {
     <div class="pc-hp-grid-popup-controls">
       <div class="pc-hp-grid-popup-stepper">
         <label>Columns</label>
-        <button type="button" class="hp-col-minus sheet-stepper-btn" title="Decrease HP columns">&minus;</button>
+        <button type="button" class="hp-col-minus sheet-stepper-btn" data-tooltip="Decrease HP columns" aria-label="Decrease HP columns">&minus;</button>
         <span>${cols}</span>
-        <button type="button" class="hp-col-plus sheet-stepper-btn" title="Increase HP columns">+</button>
+        <button type="button" class="hp-col-plus sheet-stepper-btn" data-tooltip="Increase HP columns" aria-label="Increase HP columns">+</button>
       </div>
       <div class="pc-hp-grid-popup-stepper">
         <label>Rows</label>
-        <button type="button" class="hp-row-minus sheet-stepper-btn" title="Decrease HP rows">&minus;</button>
+        <button type="button" class="hp-row-minus sheet-stepper-btn" data-tooltip="Decrease HP rows" aria-label="Decrease HP rows">&minus;</button>
         <span>${rows}</span>
-        <button type="button" class="hp-row-plus sheet-stepper-btn" title="Increase HP rows">+</button>
+        <button type="button" class="hp-row-plus sheet-stepper-btn" data-tooltip="Increase HP rows" aria-label="Increase HP rows">+</button>
       </div>
     </div>` : "";
 
@@ -225,6 +239,7 @@ function refreshHpGridDialog(sheet, root) {
   const body = qs(rootElement, ".pc-hp-grid-dialog-body");
   if (!body) return;
   body.innerHTML = renderHpGridDialogBody(sheet);
+  renderDialogModeToggle(sheet, rootElement);
   bindHpGridDialog(sheet, rootElement);
 }
 

@@ -40,136 +40,130 @@ const getCombatantInitiativeScore = function(combatant) {
   return getActorInitiativeScore(combatant?.actor);
 };
 
-export class PeasantCombat extends Combat {}
-
 const PC_INITIATIVE_SAVE_FLAG = "rollInitiativeAsSaves";
 
-function installPeasantCombatMethods() {
-  if (PeasantCombat.prototype._peasantCoreMethodsInstalled) return;
-  Object.defineProperty(PeasantCombat.prototype, "_peasantCoreMethodsInstalled", {
-    value: true,
-    configurable: false
+const getCombatState = function(combat) {
+  if (!combat) return null;
+  if (combat.turn === null || combat.turn === undefined) return null;
+  return {
+    round: Number(combat.round ?? 0),
+    turn: Number(combat.turn ?? 0),
+    phase: Number(combat.getFlag("peasant-core", "combatPhase") || 0),
+    combatantId: combat.combatant?.id ?? null,
+    combatantName: combat.combatant?.name ?? null
+  };
+};
+
+const normalizeHistoryState = function(state) {
+  if (!state) return null;
+  if (state.turn === null || state.turn === undefined) return null;
+  return {
+    round: Number(state.round ?? 0),
+    turn: Number(state.turn ?? 0),
+    phase: Number(state.phase ?? 0),
+    combatantId: state.combatantId ?? null,
+    combatantName: state.combatantName ?? null
+  };
+};
+
+const statesEqual = function(a, b) {
+  if (!a || !b) return false;
+  return Number(a.round) === Number(b.round)
+    && Number(a.turn) === Number(b.turn)
+    && Number(a.phase ?? 0) === Number(b.phase ?? 0)
+    && (a.combatantId ?? null) === (b.combatantId ?? null);
+};
+
+// Undo matching should prioritize positional state (round/turn/phase).
+// Combatant id is checked only when both sides provide one.
+const statesMatchForUndo = function(recordedTo, currentState) {
+  if (!recordedTo || !currentState) return false;
+  const samePosition = Number(recordedTo.round) === Number(currentState.round)
+    && Number(recordedTo.turn) === Number(currentState.turn)
+    && Number(recordedTo.phase ?? 0) === Number(currentState.phase ?? 0);
+  if (!samePosition) return false;
+
+  const recordedId = recordedTo.combatantId ?? null;
+  const currentId = currentState.combatantId ?? null;
+  if (recordedId && currentId && recordedId !== currentId) return false;
+  return true;
+};
+
+const getUndoStateFromHistoryEntry = function(entry, currentState = null) {
+  if (!entry || typeof entry !== "object") return null;
+  if (entry.type === "transition" && entry.from) {
+    const fromState = normalizeHistoryState(entry.from);
+    if (!fromState) return null;
+    if (currentState) {
+      const toState = normalizeHistoryState(entry.to);
+      if (toState && !statesMatchForUndo(toState, currentState)) return null;
+    }
+    return fromState;
+  }
+  if (entry.round !== undefined || entry.turn !== undefined) return normalizeHistoryState(entry);
+  return null;
+};
+
+const MAX_TURN_HISTORY_ENTRIES = 500;
+const TURN_UNDO_ACTIONS = new Set(["nextTurn", "seizeTurn"]);
+
+// Append a transition-style history entry to support deterministic reverse traversal.
+const addTurnTransition = async function(combat, action, fromState, meta = {}) {
+  const start = normalizeHistoryState(fromState);
+  const end = getCombatState(combat);
+  if (!start || !end) return false;
+  if (statesEqual(start, end)) return false;
+
+  const turnHistory = Array.isArray(combat.getFlag("peasant-core", "turnHistory"))
+    ? [...combat.getFlag("peasant-core", "turnHistory")]
+    : [];
+  const prevSeq = Number(combat.getFlag("peasant-core", "turnHistorySeq")) || 0;
+  const seq = prevSeq + 1;
+
+  turnHistory.push({
+    type: "transition",
+    seq,
+    action: String(action || "unknown"),
+    from: start,
+    to: end,
+    timestamp: Date.now(),
+    meta
   });
+  if (turnHistory.length > MAX_TURN_HISTORY_ENTRIES) {
+    turnHistory.splice(0, turnHistory.length - MAX_TURN_HISTORY_ENTRIES);
+  }
 
-  const getCombatState = function(combat) {
-    if (!combat) return null;
-    if (combat.turn === null || combat.turn === undefined) return null;
-    return {
-      round: Number(combat.round ?? 0),
-      turn: Number(combat.turn ?? 0),
-      phase: Number(combat.getFlag("peasant-core", "combatPhase") || 0),
-      combatantId: combat.combatant?.id ?? null,
-      combatantName: combat.combatant?.name ?? null
-    };
-  };
+  await combat.setFlag("peasant-core", "turnHistory", turnHistory);
+  await combat.setFlag("peasant-core", "turnHistorySeq", seq);
 
-  const normalizeHistoryState = function(state) {
-    if (!state) return null;
-    if (state.turn === null || state.turn === undefined) return null;
-    return {
-      round: Number(state.round ?? 0),
-      turn: Number(state.turn ?? 0),
-      phase: Number(state.phase ?? 0),
-      combatantId: state.combatantId ?? null,
-      combatantName: state.combatantName ?? null
-    };
-  };
+  const fromPhase = start.phase === 0 ? "Move" : "Std";
+  const toPhase = end.phase === 0 ? "Move" : "Std";
+  pcLog.debug(
+    `Peasant Core | Transition[${seq}] ${action}: `
+    + `${start.combatantName || start.combatantId || "?"} R${start.round} T${start.turn} ${fromPhase} -> `
+    + `${end.combatantName || end.combatantId || "?"} R${end.round} T${end.turn} ${toPhase}`
+  );
+  return true;
+};
 
-  const statesEqual = function(a, b) {
-    if (!a || !b) return false;
-    return Number(a.round) === Number(b.round)
-      && Number(a.turn) === Number(b.turn)
-      && Number(a.phase ?? 0) === Number(b.phase ?? 0)
-      && (a.combatantId ?? null) === (b.combatantId ?? null);
-  };
+const resolveTurnIndex = function(combat, state) {
+  if (!combat || !state) return combat?.turn ?? 0;
+  if (!combat.turns || combat.turns.length === 0) combat.setupTurns();
 
-  // Undo matching should prioritize positional state (round/turn/phase).
-  // Combatant id is checked only when both sides provide one.
-  const statesMatchForUndo = function(recordedTo, currentState) {
-    if (!recordedTo || !currentState) return false;
-    const samePosition = Number(recordedTo.round) === Number(currentState.round)
-      && Number(recordedTo.turn) === Number(currentState.turn)
-      && Number(recordedTo.phase ?? 0) === Number(currentState.phase ?? 0);
-    if (!samePosition) return false;
+  if (state.combatantId) {
+    const idx = combat.turns.findIndex(c => c.id === state.combatantId);
+    if (idx !== -1) return idx;
+  }
 
-    const recordedId = recordedTo.combatantId ?? null;
-    const currentId = currentState.combatantId ?? null;
-    if (recordedId && currentId && recordedId !== currentId) return false;
-    return true;
-  };
+  return Number.isNumeric(state.turn) ? state.turn : (combat.turn ?? 0);
+};
 
-  const getUndoStateFromHistoryEntry = function(entry, currentState = null) {
-    if (!entry || typeof entry !== "object") return null;
-    if (entry.type === "transition" && entry.from) {
-      const fromState = normalizeHistoryState(entry.from);
-      if (!fromState) return null;
-      if (currentState) {
-        const toState = normalizeHistoryState(entry.to);
-        if (toState && !statesMatchForUndo(toState, currentState)) return null;
-      }
-      return fromState;
-    }
-    if (entry.round !== undefined || entry.turn !== undefined) return normalizeHistoryState(entry);
-    return null;
-  };
+export class PeasantCombat extends Combat {
+  _sortCombatants(a, b) {
+    return sortCombatantsAscending(a, b);
+  }
 
-  const MAX_TURN_HISTORY_ENTRIES = 500;
-  const TURN_UNDO_ACTIONS = new Set(["nextTurn", "seizeTurn"]);
-
-  // Append a transition-style history entry to support deterministic reverse traversal.
-  const addTurnTransition = async function(combat, action, fromState, meta = {}) {
-    const start = normalizeHistoryState(fromState);
-    const end = getCombatState(combat);
-    if (!start || !end) return false;
-    if (statesEqual(start, end)) return false;
-
-    const turnHistory = Array.isArray(combat.getFlag("peasant-core", "turnHistory"))
-      ? [...combat.getFlag("peasant-core", "turnHistory")]
-      : [];
-    const prevSeq = Number(combat.getFlag("peasant-core", "turnHistorySeq")) || 0;
-    const seq = prevSeq + 1;
-
-    turnHistory.push({
-      type: "transition",
-      seq,
-      action: String(action || "unknown"),
-      from: start,
-      to: end,
-      timestamp: Date.now(),
-      meta
-    });
-    if (turnHistory.length > MAX_TURN_HISTORY_ENTRIES) {
-      turnHistory.splice(0, turnHistory.length - MAX_TURN_HISTORY_ENTRIES);
-    }
-
-    await combat.setFlag("peasant-core", "turnHistory", turnHistory);
-    await combat.setFlag("peasant-core", "turnHistorySeq", seq);
-
-    const fromPhase = start.phase === 0 ? "Move" : "Std";
-    const toPhase = end.phase === 0 ? "Move" : "Std";
-    pcLog.debug(
-      `Peasant Core | Transition[${seq}] ${action}: `
-      + `${start.combatantName || start.combatantId || "?"} R${start.round} T${start.turn} ${fromPhase} -> `
-      + `${end.combatantName || end.combatantId || "?"} R${end.round} T${end.turn} ${toPhase}`
-    );
-    return true;
-  };
-
-  PeasantCombat.prototype._sortCombatants = sortCombatantsAscending;
-
-  const resolveTurnIndex = function(combat, state) {
-    if (!combat || !state) return combat?.turn ?? 0;
-    if (!combat.turns || combat.turns.length === 0) combat.setupTurns();
-
-    if (state.combatantId) {
-      const idx = combat.turns.findIndex(c => c.id === state.combatantId);
-      if (idx !== -1) return idx;
-    }
-
-    return Number.isNumeric(state.turn) ? state.turn : (combat.turn ?? 0);
-  };
-
-  PeasantCombat.prototype.rollInitiative = async function(ids, options = {}) {
+  async rollInitiative(ids, options = {}) {
     pcLog.debug('Peasant Core | Custom rollInitiative called');
     const historyStartState = getCombatState(this);
     
@@ -425,11 +419,11 @@ function installPeasantCombatMethods() {
     }
     
     return this;
-  };
+
+  }
 
   // Override nextTurn for two-phase system with Seizure support
-  const originalNextTurn = Combat.prototype.nextTurn;
-  PeasantCombat.prototype.nextTurn = async function(options = {}) {
+  async nextTurn(options = {}) {
     // Prevent infinite recursion
     const depth = options._recursionDepth || 0;
     if (!game.user?.isGM && !options._pcRemoteTurnAdvance) {
@@ -499,7 +493,7 @@ function installPeasantCombatMethods() {
         ui.notifications.info(`${this.combatant?.name || "Combatant"} - Standard Phase`);
       } else {
         // Move to next
-        await originalNextTurn.call(this);
+        await Combat.prototype.nextTurn.call(this);
         
         // Check if this new combatant has seized this Movement phase
         if (this.combatant && isSeized(this.combatant.id, 0)) {
@@ -531,9 +525,10 @@ function installPeasantCombatMethods() {
     }
     
     return finalize(this);
-  };
 
-  PeasantCombat.prototype.seizeTurn = async function(combatantId, phase) {
+  }
+
+  async seizeTurn(combatantId, phase) {
       pcLog.debug(`Peasant Core | Seizing Turn: ${combatantId} Phase ${phase}`);
       const historyStartState = getCombatState(this);
       
@@ -572,11 +567,11 @@ function installPeasantCombatMethods() {
       const phaseName = phase === 0 ? "Movement" : "Standard";
       const combatant = this.combatants.get(combatantId);
       ui.notifications.warn(`${combatant?.name} SEIZED THE TURN! (${phaseName})`);
-  };
+
+  }
 
   // Override nextRound to save initiatives and reset them
-  const originalNextRound = Combat.prototype.nextRound;
-  PeasantCombat.prototype.nextRound = async function() {
+  async nextRound() {
     pcLog.debug("Peasant Core | Starting New Round");
     const historyStartState = getCombatState(this);
     
@@ -600,7 +595,7 @@ function installPeasantCombatMethods() {
     await this.setFlag("peasant-core", "roundTiebreakers", roundTiebreakers);
     
     // Advance round (this also resets turn to 0)
-    await originalNextRound.call(this);
+    await Combat.prototype.nextRound.call(this);
     
     // Check if next round already has history
     const nextRound = this.round;
@@ -657,11 +652,11 @@ function installPeasantCombatMethods() {
     });
     
     return this;
-  };
+
+  }
 
   // Override previousRound to restore initiatives
-  const originalPreviousRound = Combat.prototype.previousRound;
-  PeasantCombat.prototype.previousRound = async function() {
+  async previousRound() {
     pcLog.debug("Peasant Core | Going to Previous Round");
     const historyStartState = getCombatState(this);
     
@@ -689,7 +684,7 @@ function installPeasantCombatMethods() {
     await this.setFlag("peasant-core", "roundTiebreakers", roundTiebreakers);
 
     // Go back one round
-    await originalPreviousRound.call(this);
+    await Combat.prototype.previousRound.call(this);
     
     const newRound = this.round;
     const savedInitiatives = roundInitiatives[newRound];
@@ -735,9 +730,10 @@ function installPeasantCombatMethods() {
     });
     
     return this;
-  };
-  
-  PeasantCombat.prototype.previousTurn = async function() {
+
+  }
+
+  async previousTurn() {
     pcLog.debug("Peasant Core | Going to Previous Turn (History Undo)");
     
     // Get the history
@@ -909,13 +905,16 @@ function installPeasantCombatMethods() {
     ui.notifications.info(`${name} - ${phaseName} Phase (History Restored)`);
     
     return this;
-  };
-}
 
+  }
+}
 
 export function configurePeasantCombat() {
   CONFIG.Combat.documentClass = PeasantCombat;
-  installPeasantCombatMethods();
+  CONFIG.Combat.initiativeIcon = {
+    icon: "../systems/peasant-core/ui/initiative-2d6.svg",
+    hover: "../systems/peasant-core/ui/initiative-2d6-highlight.svg"
+  };
 
   // Configure initiative - formula unused since PeasantCombat overrides rollInitiative.
   CONFIG.Combat.initiative = {
@@ -923,4 +922,3 @@ export function configurePeasantCombat() {
     decimals: 0
   };
 }
-

@@ -4,6 +4,7 @@ import { configureChatListeners } from "./applications/chat-listeners.mjs";
 import { configureCombatTracker } from "./applications/combat-tracker.mjs";
 import { drawLocationTableLikeMacro } from "./applications/actor/location-table.mjs";
 import { registerPeasantCombatApi } from "./applications/combat/api.mjs";
+import { PC_INVENTORY_MIGRATION_STATE_SETTING, exportCurrentWorldInventoryBackup, migrateWorldLegacyInventoryData } from "./migration/inventory.mjs";
 import { PC_WORLD_MIGRATION_VERSION_SETTING, migrateWorldNotableCombatData } from "./migration/world.mjs";
 import { registerPeasantCoreSettingsMenus } from "./settings.mjs";
 import { initializePeasantSockets, registerPeasantSocketHandler } from "./socket/remote-prompts.mjs";
@@ -28,6 +29,13 @@ Hooks.once('init', () => {
     default: 0
   });
 
+  game.settings.register("peasant-core", PC_INVENTORY_MIGRATION_STATE_SETTING, {
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {}
+  });
+
   // Register Handlebars helpers
   Handlebars.registerHelper('multiply', function(a, b) {
     return a * b;
@@ -37,10 +45,16 @@ Hooks.once('init', () => {
 Hooks.once('ready', () => {
   console.log('Peasant Core | Setting up combat system');
   initializePeasantSockets();
-  registerPeasantCoreApi({ drawLocationTable: drawLocationTableLikeMacro });
+  registerPeasantCoreApi({
+    drawLocationTable: drawLocationTableLikeMacro,
+    exportCurrentWorldInventory: exportCurrentWorldInventoryBackup
+  });
   registerPeasantCombatApi();
   registerPeasantSocketHandler();
-  void migrateWorldNotableCombatData();
+  void (async () => {
+    await migrateWorldLegacyInventoryData();
+    await migrateWorldNotableCombatData();
+  })();
   if (game?.combats) {
     game.combats.forEach(combat => combat.setupTurns());
     if (ui?.combat) ui.combat.render(true);

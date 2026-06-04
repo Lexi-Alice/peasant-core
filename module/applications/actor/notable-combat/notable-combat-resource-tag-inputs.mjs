@@ -34,7 +34,7 @@ export function renderResourceCostTagInputs(area, combatData) {
           <option value="Lethal" ${cost.damageType === "Lethal" ? "selected" : ""}>Lethal</option>
           <option value="Critical" ${cost.damageType === "Critical" ? "selected" : ""}>Critical</option>
         </select>
-        <button type="button" class="remove-cost-row peasant-tag-cancel" title="Remove cost row">-</button>
+        <button type="button" class="remove-cost-row peasant-tag-cancel" data-tooltip="Remove cost row" aria-label="Remove cost row">-</button>
       </div>
     `;
   });
@@ -82,7 +82,7 @@ export function renderResourceCostTagInputs(area, combatData) {
           <option value="Lethal">Lethal</option>
           <option value="Critical">Critical</option>
         </select>
-        <button type="button" class="remove-cost-row peasant-tag-cancel" title="Remove cost row">-</button>
+        <button type="button" class="remove-cost-row peasant-tag-cancel" data-tooltip="Remove cost row" aria-label="Remove cost row">-</button>
       </div>
     `);
   }, { signal });

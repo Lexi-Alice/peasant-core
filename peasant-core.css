@@ -991,8 +991,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .pc-foundry-section .skills-list-view,
 .pc-foundry-section .notable-combats-list-view,
-.pc-foundry-section .advantages-list-view,
-.pc-foundry-section .inventory-view {
+.pc-foundry-section .advantages-list-view {
     background: transparent !important;
 }
 
@@ -1350,14 +1349,32 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .peasant-core.peasant-actor-sheet:not(.minimized) > header > slide-toggle.mode-slider,
 .application.peasant-core.peasant-actor-sheet:not(.minimized) > header > slide-toggle.mode-slider,
-.window-app.peasant-core.peasant-actor-sheet:not(.minimized) > header > slide-toggle.mode-slider {
+.window-app.peasant-core.peasant-actor-sheet:not(.minimized) > header > slide-toggle.mode-slider,
+.peasant-core.peasant-item-sheet:not(.minimized) > header > slide-toggle.mode-slider,
+.application.peasant-core.peasant-item-sheet:not(.minimized) > header > slide-toggle.mode-slider,
+.window-app.peasant-core.peasant-item-sheet:not(.minimized) > header > slide-toggle.mode-slider,
+.peasant-core.pc-hp-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
+.application.peasant-core.pc-hp-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
+.window-app.peasant-core.pc-hp-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
+.peasant-core.pc-stress-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
+.application.peasant-core.pc-stress-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
+.window-app.peasant-core.pc-stress-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider {
     flex: none;
     margin-inline: 4px;
 }
 
 .peasant-core.peasant-actor-sheet.minimized slide-toggle.mode-slider,
 .application.peasant-core.peasant-actor-sheet.minimized slide-toggle.mode-slider,
-.window-app.peasant-core.peasant-actor-sheet.minimized slide-toggle.mode-slider {
+.window-app.peasant-core.peasant-actor-sheet.minimized slide-toggle.mode-slider,
+.peasant-core.peasant-item-sheet.minimized slide-toggle.mode-slider,
+.application.peasant-core.peasant-item-sheet.minimized slide-toggle.mode-slider,
+.window-app.peasant-core.peasant-item-sheet.minimized slide-toggle.mode-slider,
+.peasant-core.pc-hp-grid-dialog.minimized slide-toggle.mode-slider,
+.application.peasant-core.pc-hp-grid-dialog.minimized slide-toggle.mode-slider,
+.window-app.peasant-core.pc-hp-grid-dialog.minimized slide-toggle.mode-slider,
+.peasant-core.pc-stress-grid-dialog.minimized slide-toggle.mode-slider,
+.application.peasant-core.pc-stress-grid-dialog.minimized slide-toggle.mode-slider,
+.window-app.peasant-core.pc-stress-grid-dialog.minimized slide-toggle.mode-slider {
     display: none;
 }
 
@@ -3160,32 +3177,85 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     overflow: visible;
 }
 
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tabs,
+.application.pc-stress-grid-dialog .pc-stress-grid-tabs,
 .pc-stress-grid-tabs {
     display: flex;
-    gap: 6px;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: space-around;
+    gap: 0;
+    line-height: 2.5;
     margin-bottom: 10px;
-    border-bottom: 1px solid rgba(159, 146, 117, 0.35);
+    border-top: 0;
+    border-bottom: 1px solid var(--color-tabs-border, rgba(159, 132, 117, 0.75));
 }
 
-.pc-stress-grid-tab {
-    --button-size: 28px;
-    margin: 0 0 -1px;
-    padding: 0 12px;
-    border: 1px solid rgba(159, 146, 117, 0.45);
-    border-bottom-color: transparent;
-    border-radius: 4px 4px 0 0;
-    background: rgba(4, 4, 7, 0.72);
-    color: #b9ad93;
-    font-size: 11px;
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tab,
+.application.pc-stress-grid-dialog .pc-stress-grid-tab,
+nav.pc-stress-grid-tabs .pc-stress-grid-tab {
+    --button-size: auto;
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-text-color: var(--color-light-4, #d0b8a3);
+    --button-focus-outline-color: transparent;
+    --button-hover-background-color: transparent;
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-light-2, #efe6d8);
+    display: inline-flex;
+    flex: 1 1 0;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+    color: var(--button-text-color);
+    font-size: var(--font-size-12, 12px);
     font-weight: 800;
-    text-transform: uppercase;
+    line-height: inherit;
+    text-align: center;
+    text-transform: none;
+    white-space: nowrap;
 }
 
-.pc-stress-grid-tab.active {
-    background: rgba(36, 40, 48, 0.94);
-    color: #f2e6c8;
-    border-color: rgba(203, 191, 154, 0.76);
-    border-bottom-color: rgba(36, 40, 48, 0.94);
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tab > *,
+.application.pc-stress-grid-dialog .pc-stress-grid-tab > *,
+nav.pc-stress-grid-tabs .pc-stress-grid-tab > * {
+    pointer-events: none;
+}
+
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tab span,
+.application.pc-stress-grid-dialog .pc-stress-grid-tab span,
+nav.pc-stress-grid-tabs .pc-stress-grid-tab span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tab:hover,
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tab:focus,
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tab:focus-visible,
+.window-app.pc-stress-grid-dialog .pc-stress-grid-tab.active,
+.application.pc-stress-grid-dialog .pc-stress-grid-tab:hover,
+.application.pc-stress-grid-dialog .pc-stress-grid-tab:focus,
+.application.pc-stress-grid-dialog .pc-stress-grid-tab:focus-visible,
+.application.pc-stress-grid-dialog .pc-stress-grid-tab.active,
+nav.pc-stress-grid-tabs .pc-stress-grid-tab:hover,
+nav.pc-stress-grid-tabs .pc-stress-grid-tab:focus,
+nav.pc-stress-grid-tabs .pc-stress-grid-tab:focus-visible,
+nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
+    background: transparent;
+    box-shadow: none !important;
+    outline: none !important;
+    color: var(--color-light-2, #efe6d8);
+    text-shadow: 0 0 10px var(--color-shadow-primary, #ff0000);
 }
 
 .pc-stress-grid-pane {
@@ -5267,150 +5337,540 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 /* Inventory Section */
-.inventory-title {
-    color: #e0e0e0;
-    font-size: 18px;
-    font-weight: bold;
-    margin: 0 0 15px 0;
+.pc-inventory-browser {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
 }
 
-.inventory-container {
-    background: transparent;
-    border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
+.pc-inventory-currency-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.pc-inventory-currency-box {
+    position: relative;
+    display: block;
+    width: 88px;
+    min-width: 88px;
+    height: 32px;
+    margin: 0;
+}
+
+.pc-inventory-currency-icon-frame {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    pointer-events: auto;
+}
+
+.pc-inventory-currency-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+.pc-inventory-currency-input.pc-input,
+.pc-inventory-currency-value {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: right;
+}
+
+.pc-inventory-currency-input.pc-input {
+    padding: 0 10px 0 18px;
+}
+
+.pc-inventory-currency-value {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 10px 0 18px;
+    border: 1px solid var(--input-border-color, #555);
+    border-radius: 3px;
+    background: var(--input-background-color, #2a2a2a);
+    color: #e0e0e0;
+}
+
+.pc-inventory-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pc-inventory-useless-collection-box {
+    position: relative;
+    display: block;
+    width: 88px;
+    min-width: 88px;
+    height: 32px;
+    margin: 0;
+}
+
+.pc-inventory-useless-collection-box > i {
+    position: absolute;
+    top: 7px;
+    left: 8px;
+    z-index: 1;
+    color: #c9b9a8;
+    font-size: 13px;
+    line-height: 1;
+    opacity: 0.92;
+    pointer-events: none;
+}
+
+.pc-inventory-useless-collection-input.pc-input,
+.pc-inventory-useless-collection-value {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: right;
+}
+
+.pc-inventory-useless-collection-input.pc-input {
+    padding: 0 10px 0 28px;
+}
+
+.pc-inventory-useless-collection-value {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 10px 0 28px;
+    border: 1px solid var(--input-border-color, #555);
+    border-radius: 3px;
+    background: var(--input-background-color, #2a2a2a);
+    color: #e0e0e0;
+}
+
+.pc-inventory-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 34px;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 28px 30px 30px;
+    align-items: center;
+    border: 1px solid rgba(159, 132, 117, 0.34);
     border-radius: 4px;
-    padding: 15px;
+    background: rgba(48, 39, 50, 0.92);
+    color: #cdbbab;
 }
 
-.inventory-container .editor {
-    min-height: 200px;
+.pc-inventory-search > i {
+    justify-self: center;
+    color: #c9b9a8;
+    opacity: 0.88;
 }
 
-.inventory-container .editor-content {
-    background: transparent;
-    color: #e0e0e0;
-    border: none;
-    border-radius: 0;
-    padding: 10px;
-    min-height: 200px;
+.pc-inventory-search-input.pc-input {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    border: 0 !important;
+    background: transparent !important;
+    color: #efe1cf;
+    box-shadow: none !important;
+    padding: 0 4px;
 }
 
-.inventory-container .editor-content:focus {
+.pc-inventory-search-input.pc-input:focus {
+    box-shadow: none;
     outline: none;
-    border-color: var(--pc-foundry-input-focus-border);
-    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
+}
+
+.pc-inventory-search-clear,
+.pc-inventory-stepper {
+    display: inline-grid;
+    place-items: center;
+    border: 0;
     background: transparent;
+    color: #cdbbab;
+    box-shadow: none;
+    padding: 0;
 }
 
-.inventory-container .editor-container {
-    background: transparent;
+.pc-inventory-search-clear {
+    width: 28px;
+    height: 28px;
 }
 
-.inventory-container .tox-tinymce {
-    border: none !important;
+.pc-inventory-toolbar-button {
+    --button-size: 28px;
+    --button-text-color: #c9b9a8;
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-hover-background-color: transparent;
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-light-2, #efe6d8);
+    --button-focus-outline-color: transparent;
+    display: inline-flex;
+    flex: 0 0 var(--button-size);
+    align-items: center;
+    justify-content: center;
+    width: var(--button-size);
+    height: var(--button-size);
+    min-width: var(--button-size);
+    min-height: var(--button-size);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--button-background-color);
+    color: var(--button-text-color);
+    box-shadow: none;
+    font-size: 14px;
+    line-height: 1;
 }
 
-.inventory-container .tox .tox-edit-area {
-    background: transparent !important;
+.pc-inventory-toolbar-button:hover,
+.pc-inventory-toolbar-button:focus,
+.pc-inventory-toolbar-button.active {
+    background: var(--button-hover-background-color);
+    border-color: var(--button-hover-border-color);
+    color: var(--button-hover-text-color);
+    outline: none;
+    box-shadow: none;
+    text-shadow: 0 0 10px var(--color-shadow-primary, #ff0000);
 }
 
-.inventory-container .tox .tox-edit-area__iframe {
-    background: transparent !important;
+.pc-inventory-toolbar-button > * {
+    pointer-events: none;
 }
 
-/* Dark mode for editor toolbar and dropdowns */
-.inventory-container .tox .tox-toolbar,
-.inventory-container .tox .tox-toolbar__primary {
-    background: #2a2a2a !important;
+.pc-inventory-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.inventory-container .tox .tox-tbtn {
-    color: #e0e0e0 !important;
+.pc-inventory-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.inventory-container .tox .tox-tbtn:hover {
-    background: #3a3a3a !important;
-}
-
-.inventory-container .tox .tox-tbtn svg {
-    fill: #e0e0e0 !important;
-}
-
-/* Dropdown menus */
-.tox .tox-menu,
-.tox .tox-collection,
-.tox .tox-dialog {
-    background-color: #2a2a2a !important;
-    border-color: #555 !important;
-}
-
-.tox .tox-collection__item,
-.tox .tox-menu__item {
-    color: #e0e0e0 !important;
-}
-
-.tox .tox-collection__item:hover,
-.tox .tox-menu__item:hover {
-    background-color: #3a3a3a !important;
-}
-
-.tox .tox-collection__item--active {
-    background-color: #3a3a3a !important;
-}
-
-.tox .tox-selectfield select,
-.tox .tox-listboxfield .tox-listbox--select,
-.tox .tox-textarea {
-    background-color: #252525 !important;
-    color: #e0e0e0 !important;
-    border-color: #555 !important;
-}
-
-.tox .tox-dialog__header {
-    background-color: #2a2a2a !important;
-    color: #e0e0e0 !important;
-}
-
-.tox .tox-dialog__body {
-    background-color: #252525 !important;
-    color: #e0e0e0 !important;
-}
-
-.tox .tox-label,
-.tox .tox-toolbar-label {
-    color: #e0e0e0 !important;
-}
-
-/* ProseMirror editor dark mode */
-.inventory-container .editor .editor-container {
-    background: transparent;
-    border: none;
-}
-
-/* Hide save button from inventory editor toolbar */
-.inventory-container .editor-menu button[data-action="save"],
-.inventory-container .pm-toolbar button[data-action="save"],
-.inventory-container button.save,
-.inventory-container [data-tooltip="Save"],
-.inventory-container .editor-menu .save-button,
-.inventory-container button[title="Save"] {
+.pc-inventory-view[hidden] {
     display: none !important;
 }
 
+.pc-inventory-section {
+    overflow: visible;
+    border: 1px solid rgba(159, 132, 117, 0.26);
+    border-radius: 4px;
+    background: rgba(6, 7, 12, 0.78);
+}
 
-.inventory-container .inventory-view {
-    background: transparent;
+.pc-inventory-section-header,
+.pc-inventory-item-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) 96px 118px 96px 78px;
+    align-items: center;
+    gap: 8px;
+}
+
+.pc-inventory-section-header {
+    min-height: 28px;
+    padding: 0 8px;
+    background: rgba(48, 39, 50, 0.95);
+    color: #f1dfcd;
+    text-transform: uppercase;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.pc-inventory-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1;
+    color: #f1dfcd;
+    text-transform: none;
+}
+
+.pc-inventory-column {
+    justify-self: stretch;
+    text-align: center;
+    letter-spacing: 0;
+}
+
+.pc-inventory-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.pc-inventory-item {
+    border-top: 1px solid rgba(159, 132, 117, 0.16);
+}
+
+.pc-inventory-item[hidden],
+.pc-inventory-section[hidden] {
+    display: none !important;
+}
+
+.pc-inventory-item-row {
+    min-height: 46px;
+    padding: 5px 8px;
+    background: rgba(8, 9, 15, 0.88);
+    cursor: default;
+}
+
+.pc-inventory-item.pc-inventory-sortable .pc-inventory-item-row {
+    cursor: grab;
+}
+
+.pc-inventory-item.dragging .pc-inventory-item-row {
+    cursor: grabbing;
+    opacity: 0.55;
+}
+
+.pc-inventory-item.drag-over-top .pc-inventory-item-row {
+    box-shadow: inset 0 2px 0 var(--color-shadow-primary, #ff0000);
+}
+
+.pc-inventory-item.drag-over-bottom .pc-inventory-item-row {
+    box-shadow: inset 0 -2px 0 var(--color-shadow-primary, #ff0000);
+}
+
+.pc-inventory-item-summary {
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-hover-background-color: transparent;
+    --button-hover-border-color: transparent;
+    --button-focus-outline-color: transparent;
+    min-width: 0;
+    width: fit-content;
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: center;
+    justify-self: start;
+    gap: 8px;
+    min-height: 36px;
+    margin: 0;
+    border: 0;
     border-radius: 3px;
-}
-/* ProseMirror content area */
-.inventory-container .ProseMirror {
-    background: transparent !important;
-    color: #e0e0e0 !important;
-    min-height: 200px;
-    border: none !important;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: normal;
+    box-shadow: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
 }
 
-.inventory-container .ProseMirror:focus {
+.pc-inventory-item.pc-inventory-sortable .pc-inventory-row-field,
+.pc-inventory-item.pc-inventory-sortable .pc-inventory-row-controls {
+    cursor: default;
+}
+
+.pc-inventory-item-summary:hover,
+.pc-inventory-item-summary:focus,
+.pc-inventory-item-summary:focus-visible {
+    background: transparent;
+    color: var(--color-light-2, #efe6d8);
     outline: none;
+    box-shadow: none;
+}
+
+.pc-inventory-item-summary:hover .pc-inventory-item-image,
+.pc-inventory-item-summary:focus .pc-inventory-item-image,
+.pc-inventory-item-summary:focus-visible .pc-inventory-item-image {
+    border-color: rgba(239, 230, 216, 0.72);
+}
+
+.pc-inventory-item-summary:hover .pc-inventory-item-name,
+.pc-inventory-item-summary:focus .pc-inventory-item-name,
+.pc-inventory-item-summary:focus-visible .pc-inventory-item-name {
+    color: var(--color-light-2, #efe6d8);
+    text-shadow: 0 0 10px var(--color-shadow-primary, #ff0000);
+}
+
+.pc-inventory-item-summary:hover .pc-inventory-item-subtitle,
+.pc-inventory-item-summary:focus .pc-inventory-item-subtitle,
+.pc-inventory-item-summary:focus-visible .pc-inventory-item-subtitle {
+    color: #d6c6b4;
+}
+
+.pc-inventory-item-image {
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+    border: 1px solid rgba(238, 216, 185, 0.28);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.34);
+}
+
+.pc-inventory-item-name-stack {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pc-inventory-item-name {
+    overflow: hidden;
+    color: #f3e7d8;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pc-inventory-item-subtitle {
+    overflow: hidden;
+    color: #bda996;
+    font-size: 11px;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pc-inventory-row-field,
+.pc-inventory-row-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    cursor: default;
+}
+
+.pc-inventory-number.pc-input {
+    width: 42px;
+    height: 26px;
+    padding: 2px 4px;
+    text-align: center;
+}
+
+.pc-inventory-stepper {
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-text-color: var(--color-light-1);
+    --button-hover-background-color: var(--color-warm-2);
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-light-1);
+    --button-focus-outline-color: transparent;
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    background: var(--button-background-color);
+    border-color: var(--button-border-color);
+    color: var(--button-text-color);
+}
+
+.pc-inventory-search-clear:hover {
+    background: rgba(238, 216, 185, 0.12);
+    color: #fff2df;
+}
+
+.pc-inventory-stepper:hover,
+.pc-inventory-stepper:focus {
+    background: var(--button-hover-background-color);
+    border-color: var(--button-hover-border-color);
+    color: var(--button-hover-text-color);
+    outline: none;
+    box-shadow: none;
+}
+
+.pc-inventory-static-value,
+.pc-inventory-resource-separator {
+    color: #e8d8c8;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.pc-inventory-resource-max,
+.pc-inventory-muted {
+    color: #bda996;
+}
+
+.pc-inventory-equipped-marker.header-control,
+.pc-inventory-menu-toggle.header-control {
+    --button-size: 1.5rem;
+    --button-text-color: var(--color-light-1);
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-hover-background-color: var(--color-warm-2);
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-light-1);
+    --button-focus-outline-color: transparent;
+    display: flex;
+    flex: 0 0 var(--button-size);
+    align-items: center;
+    justify-content: center;
+    width: var(--button-size);
+    min-width: var(--button-size);
+    height: var(--button-size);
+    min-height: var(--button-size);
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: var(--button-background-color);
+    color: var(--button-text-color);
+    box-shadow: none;
+    font-size: var(--font-size-14, 14px);
+    line-height: normal;
+}
+
+.pc-inventory-equipped-marker.header-control {
+    --button-text-color: #c9b9a8;
+    --button-hover-background-color: transparent;
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-light-2, #efe6d8);
+    border-radius: 0;
+    color: var(--button-text-color);
+}
+
+.pc-inventory-equipped-marker.header-control:hover,
+.pc-inventory-equipped-marker.header-control:focus,
+.pc-inventory-equipped-marker.header-control:focus-visible,
+.pc-inventory-equipped-marker.header-control.active {
+    background: transparent;
+    border-color: transparent;
+    color: var(--button-hover-text-color);
+    outline: none;
+    box-shadow: none;
+    text-shadow: 0 0 10px var(--color-shadow-primary, #ff0000);
+}
+
+.pc-inventory-menu-toggle.header-control:hover,
+.pc-inventory-menu-toggle.header-control:focus,
+.pc-inventory-menu-toggle.header-control.context {
+    background: var(--button-hover-background-color);
+    border-color: var(--button-hover-border-color);
+    color: var(--button-hover-text-color);
+    outline: none;
+    box-shadow: none;
+}
+
+.pc-inventory-empty-state {
+    padding: 16px;
+    border: 1px dashed rgba(159, 132, 117, 0.32);
+    border-radius: 4px;
+    color: #bda996;
+    text-align: center;
+    background: rgba(13, 14, 19, 0.46);
+}
+
+.pc-inventory-browser.drag-over {
+    outline: 2px solid rgba(222, 123, 42, 0.72);
+    outline-offset: 2px;
 }
 
 /* Scoped dropdown styling - peasant system UI only */
@@ -5459,12 +5919,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 /* Ensure TinyMCE/ProseMirror editor chrome appears above the sheet/dialog overlays */
 .tox-tinymce, .tox, .tox .tox-toolbar, .tox .tox-editor-container, .tox .tox-dialog {
   z-index: 4100 !important;
-}
-
-/* Keep inventory view area transparent */
-.inventory-container .inventory-view {
-    background: transparent;
-    border-radius: 3px;
 }
 
 .pc-description-editor .window-content {
@@ -5535,25 +5989,33 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-description-editor .form-group {
   margin: 0 !important;
   background: transparent !important;
-  border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
-  border-radius: 4px !important;
-  padding: 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
 }
 
 /* ProseMirror custom-element styling for skill/combat popup editors */
 .pc-description-editor prose-mirror.peasant-desc-editor {
-  --min-height: 280px;
+  --min-height: 320px;
+  --menu-height: 34px;
   --button-text-color: var(--color-light-3);
-  min-height: 280px !important;
-  max-height: 360px !important;
+  min-height: var(--min-height) !important;
+  max-height: 440px !important;
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
 }
 
+.pc-description-editor prose-mirror.peasant-desc-editor .menu-container {
+  flex: 0 0 auto;
+  min-height: var(--menu-height);
+  overflow: visible;
+}
+
 .pc-description-editor prose-mirror.peasant-desc-editor .editor-container {
   background: transparent !important;
   border: none !important;
+  min-height: 220px;
 }
 
 .pc-description-editor prose-mirror.peasant-desc-editor .editor-content,
@@ -5561,15 +6023,21 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   background: transparent !important;
   color: #e0e0e0 !important;
   min-height: 220px !important;
-  max-height: 280px !important;
+  max-height: 320px !important;
   padding: 10px !important;
 }
 
-.pc-description-editor prose-mirror.peasant-desc-editor menu {
+.pc-description-editor prose-mirror.peasant-desc-editor menu.editor-menu {
+  position: relative !important;
+  inset: auto !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  height: auto !important;
+  min-height: var(--menu-height) !important;
   background: var(--color-cool-4, #302831) !important;
-  border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475)) !important;
+  border: 0 !important;
   border-radius: 4px !important;
-  padding: 4px 6px !important;
+  padding: 6px !important;
 }
 
 .pc-description-editor prose-mirror.peasant-desc-editor menu button,
@@ -5585,10 +6053,10 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown:hover,
 .pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown:focus-within,
 .pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown > span:hover {
-  background: var(--button-hover-background-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-  color: var(--button-hover-text-color) !important;
-  fill: var(--button-hover-text-color) !important;
+  background: var(--color-control-hover, var(--button-hover-background-color)) !important;
+  border-color: transparent !important;
+  color: var(--color-form-label-hover, var(--button-hover-text-color)) !important;
+  fill: var(--color-form-label-hover, var(--button-hover-text-color)) !important;
   outline: none !important;
   box-shadow: none !important;
 }
@@ -5601,10 +6069,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-description-editor prose-mirror.peasant-desc-editor menu .pm-dropdown i {
   color: var(--button-text-color) !important;
   fill: var(--button-text-color) !important;
-}
-
-.pc-description-editor prose-mirror.peasant-desc-editor menu [data-action="save"] {
-  display: none !important;
 }
 
 /* Chat messages: use the same base surface as the sheet window */
@@ -6141,44 +6605,14 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   text-decoration-color: #aadaff;
 }
 
-/* Custom tooltip for skill description - appended to body to escape all overflow */
-#peasant-skill-tooltip,
-.skill-tooltip {
-  visibility: hidden;
-  opacity: 0;
-  position: fixed;
-  z-index: 100000;
-  
-  background: var(--pc-sheet-surface);
-  color: #e0e0e0;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 10px 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  
-  font-size: 12px;
-  font-weight: normal;
-  line-height: 1.5;
+#tooltip .pc-rich-description-tooltip {
+  max-width: 350px;
   text-align: left;
   white-space: normal;
-  word-wrap: break-word;
-  
-  min-width: 200px;
-  max-width: 350px;
-  width: max-content;
-  
-  pointer-events: none;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
+  overflow-wrap: anywhere;
 }
 
-/* Tooltip is shown/positioned by JavaScript on mouseenter */
-#peasant-skill-tooltip.visible,
-.skill-tooltip.visible {
-  visibility: visible;
-  opacity: 1;
-}
-
-/* Tooltip header styling for skill name */
+/* Rich description tooltip content */
 .skill-tooltip-header {
   font-weight: bold;
   color: #e0e0e0;
@@ -6188,7 +6622,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   font-size: 13px;
 }
 
-/* Tooltip content styling */
 .skill-tooltip-content {
   color: #ccc;
 }
@@ -6555,46 +6988,9 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
   text-decoration-style: dotted;
 }
 
-/* Combat name wrapper for hover tooltip */
 .combat-name-wrapper {
     position: relative !important;
   display: inline;
-}
-
-.combat-description-tooltip {
-  display: none;
-  position: absolute;
-  left: 0;
-  top: 100%;
-  z-index: 100000;
-  
-  
-  background: var(--pc-sheet-surface);
-  color: #e0e0e0;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 10px 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  
-  font-size: 12px;
-  font-weight: normal;
-  line-height: 1.5;
-  text-align: left;
-  white-space: normal;
-  word-wrap: break-word;
-  text-decoration: none;
-  
-  min-width: 200px;
-  max-width: 350px;
-  width: max-content;
-  
-  pointer-events: none;
-}
-
-.combat-name-wrapper:hover .combat-description-tooltip,
-.combat-name-wrapper:focus .combat-description-tooltip,
-.combat-name-wrapper:focus-within .combat-description-tooltip {
-  display: block;
 }
 
 /* Combat roll clickable styling */
@@ -7058,7 +7454,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 /* BEGIN unified apply/add buttons */
 .add-combat-btn,
 .add-skill-btn,
-.add-advantage-btn {
+.add-advantage-btn,
+.add-item-btn {
   --button-size: 28px;
   min-width: max-content;
   min-height: var(--button-size) !important;
@@ -7078,7 +7475,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .add-combat-btn:hover,
 .add-skill-btn:hover,
-.add-advantage-btn:hover {
+.add-advantage-btn:hover,
+.add-item-btn:hover {
   background: var(--button-hover-background-color) !important;
   color: var(--button-hover-text-color) !important;
   border-color: var(--button-hover-border-color) !important;
@@ -7086,7 +7484,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .add-combat-btn:active,
 .add-skill-btn:active,
-.add-advantage-btn:active {
+.add-advantage-btn:active,
+.add-item-btn:active {
   background: var(--button-hover-background-color) !important;
   color: var(--button-hover-text-color) !important;
   border-color: var(--button-hover-border-color) !important;
@@ -7094,7 +7493,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .add-combat-btn,
 .add-skill-btn,
-.add-advantage-btn {
+.add-advantage-btn,
+.add-item-btn {
   width: 100%;
   font-size: 13px;
 }
@@ -9026,6 +9426,551 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .peasant-core .actor-sheet [hidden],
 .actor-sheet [hidden] {
   display: none !important;
+}
+
+.peasant-core.peasant-item-sheet:not(.minimized, .minimizing, .maximizing) {
+  min-width: 520px;
+  min-height: 0;
+  height: auto !important;
+  max-height: calc(100vh - 80px);
+}
+
+.window-app.peasant-core.peasant-item-sheet .window-content,
+.application.peasant-core.peasant-item-sheet .window-content {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.pc-item-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #e0e0e0;
+}
+
+.peasant-core.peasant-item-sheet [hidden] {
+  display: none !important;
+}
+
+.pc-item-header {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.pc-item-image-frame {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  overflow: hidden;
+  border: 1px solid var(--pc-accent-border, #9f8475);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.pc-item-image-frame.editing {
+  border-style: dashed;
+}
+
+.pc-item-image-frame.drag-over {
+  border-color: var(--color-border-highlight, #f0b16a);
+  box-shadow: 0 0 8px rgba(240, 177, 106, 0.45);
+}
+
+.pc-item-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.pc-item-image-frame.editing .pc-item-image {
+  touch-action: none;
+}
+
+.pc-item-image.draggable {
+  cursor: grab;
+}
+
+.pc-item-image.draggable:active {
+  cursor: grabbing;
+}
+
+.pc-item-image-controls {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+}
+
+.pc-item-image-control-btn {
+  --button-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--button-size);
+  min-width: var(--button-size);
+  height: var(--button-size);
+  min-height: var(--button-size);
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
+  font-size: var(--font-size-12, 12px);
+  line-height: 1;
+}
+
+.pc-item-image-control-btn > * {
+  pointer-events: none;
+}
+
+.pc-item-identity {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pc-item-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.pc-item-name {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.pc-item-quantity {
+  display: inline-grid;
+  grid-template-columns: 18px 54px;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  color: #f0e5d0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pc-item-quantity > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+}
+
+.pc-item-quantity-input {
+  width: 54px;
+  height: 40px;
+  padding-inline: 4px;
+  font-size: 20px;
+  text-align: center;
+}
+
+.pc-item-quality {
+  width: 150px;
+  max-width: 100%;
+  height: 30px;
+  font-size: 14px;
+}
+
+.pc-item-quality-stack {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pc-item-meta-row {
+  display: grid;
+  grid-template-columns: minmax(112px, 150px) minmax(140px, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.pc-item-sunder {
+  display: grid;
+  gap: 5px;
+  justify-items: stretch;
+  min-width: 0;
+  width: 100%;
+}
+
+.pc-item-sunder-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 30px;
+  color: #b9aa8f;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.pc-item-sunder-box.skill-uses-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+}
+
+.pc-item-sunder-box.skill-uses-box .skill-uses-current {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  min-height: 30px;
+  font-size: 14px;
+}
+
+.pc-item-sunder-box .uses-separator {
+  color: #888;
+  font-size: 14px;
+  line-height: 30px;
+}
+
+.pc-item-measure-fields {
+  display: grid;
+  gap: 4px;
+  justify-content: end;
+  min-width: 0;
+  margin-top: 17px;
+}
+
+.pc-item-measure-row {
+  display: grid;
+  grid-template-columns: 58px 48px;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+}
+
+.pc-item-measure-input,
+.pc-item-measure-unit {
+  height: 30px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.pc-item-measure-input {
+  width: 58px;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+.pc-item-measure-unit {
+  width: 48px;
+  padding-inline: 4px;
+}
+
+.pc-item-quantity-input::-webkit-outer-spin-button,
+.pc-item-quantity-input::-webkit-inner-spin-button,
+.pc-item-measure-input::-webkit-outer-spin-button,
+.pc-item-measure-input::-webkit-inner-spin-button {
+  margin: 0;
+}
+
+.window-app.peasant-core.peasant-item-sheet .pc-item-tabs,
+.application.peasant-core.peasant-item-sheet .pc-item-tabs,
+.pc-item-tabs {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: space-around;
+  gap: 0;
+  line-height: 2.5;
+  border-top: 0;
+  border-bottom: 1px solid var(--color-tabs-border, rgba(159, 132, 117, 0.75));
+}
+
+.window-app.peasant-core.peasant-item-sheet .pc-item-tab,
+.application.peasant-core.peasant-item-sheet .pc-item-tab,
+nav.pc-item-tabs .pc-item-tab {
+  --button-size: auto;
+  --button-background-color: transparent;
+  --button-border-color: transparent;
+  --button-text-color: var(--color-light-4, #d0b8a3);
+  --button-focus-outline-color: transparent;
+  --button-hover-background-color: transparent;
+  --button-hover-border-color: transparent;
+  --button-hover-text-color: var(--color-light-2, #efe6d8);
+  display: inline-flex;
+  flex: 1 1 0;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  color: var(--button-text-color);
+  font-size: var(--font-size-13, 13px);
+  font-weight: 700;
+  line-height: inherit;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.window-app.peasant-core.peasant-item-sheet .pc-item-tab > *,
+.application.peasant-core.peasant-item-sheet .pc-item-tab > *,
+nav.pc-item-tabs .pc-item-tab > * {
+  pointer-events: none;
+}
+
+.window-app.peasant-core.peasant-item-sheet .pc-item-tab span,
+.application.peasant-core.peasant-item-sheet .pc-item-tab span,
+nav.pc-item-tabs .pc-item-tab span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.window-app.peasant-core.peasant-item-sheet .pc-item-tab:hover,
+.window-app.peasant-core.peasant-item-sheet .pc-item-tab:focus,
+.window-app.peasant-core.peasant-item-sheet .pc-item-tab:focus-visible,
+.window-app.peasant-core.peasant-item-sheet .pc-item-tab.active,
+.application.peasant-core.peasant-item-sheet .pc-item-tab:hover,
+.application.peasant-core.peasant-item-sheet .pc-item-tab:focus,
+.application.peasant-core.peasant-item-sheet .pc-item-tab:focus-visible,
+.application.peasant-core.peasant-item-sheet .pc-item-tab.active,
+nav.pc-item-tabs .pc-item-tab:hover,
+nav.pc-item-tabs .pc-item-tab:focus,
+nav.pc-item-tabs .pc-item-tab:focus-visible,
+nav.pc-item-tabs .pc-item-tab.active {
+  background: transparent;
+  box-shadow: none !important;
+  outline: none !important;
+  color: #f0e5d0;
+  text-shadow: 0 0 10px var(--color-shadow-primary, #ff0000);
+}
+
+.pc-item-tab-content,
+.pc-item-tab-panel {
+  min-width: 0;
+}
+
+.pc-item-tab-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.pc-item-section {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.pc-item-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pc-item-form-grid label,
+.pc-item-range-rate {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pc-item-form-grid label span,
+.pc-item-range-rate > span:first-child {
+  color: #b9aa8f;
+  font-size: 12px;
+}
+
+.pc-item-form-grid-small {
+  grid-template-columns: repeat(2, minmax(0, 120px));
+}
+
+.pc-item-loot-details {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.pc-item-loot-type-row {
+  display: grid;
+  grid-template-columns: 120px minmax(180px, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.pc-item-loot-type-row > span {
+  color: #f0e5d0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pc-item-loot-type-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.pc-item-checkbox-row {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+}
+
+.pc-item-range-rate {
+  grid-template-columns: minmax(78px, auto) repeat(4, minmax(0, 54px) auto);
+  align-items: center;
+}
+
+.pc-item-range-rate > input {
+  min-width: 0;
+}
+
+.pc-item-damage-grid {
+  display: grid;
+  grid-template-columns: 54px auto 54px auto 54px auto 64px minmax(100px, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.pc-item-flag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pc-item-description-section {
+  min-height: 0;
+}
+
+.pc-item-description-editor {
+  --min-height: 230px;
+  --menu-height: 34px;
+  min-height: var(--min-height);
+}
+
+.peasant-core.peasant-item-sheet prose-mirror.pc-item-description-editor .menu-container {
+  flex: 0 0 auto;
+  min-height: var(--menu-height);
+  overflow: visible;
+}
+
+.peasant-core.peasant-item-sheet prose-mirror.pc-item-description-editor menu.editor-menu {
+  position: relative;
+  inset: auto;
+  flex-wrap: wrap;
+  align-items: center;
+  height: auto;
+  min-height: var(--menu-height);
+  padding: 6px;
+}
+
+.peasant-core.peasant-item-sheet prose-mirror.pc-item-description-editor .editor-container {
+  min-height: 170px;
+}
+
+.pc-item-description {
+  min-height: 0;
+}
+
+.pc-item-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
+  padding: 16px;
+  border: 1px dashed rgba(159, 132, 117, 0.5);
+  border-radius: 6px;
+  color: #b9aa8f;
+  text-align: center;
+}
+
+.pc-item-effects-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-item-effect {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgba(159, 132, 117, 0.45);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.pc-item-effect-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: 1px solid rgba(159, 132, 117, 0.45);
+  border-radius: 4px;
+}
+
+.pc-item-effect-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pc-item-effect-summary strong,
+.pc-item-effect-summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-item-effect-summary span {
+  color: #b9aa8f;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .pc-item-header,
+  .pc-item-form-grid,
+  .pc-item-form-grid-small {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pc-item-range-rate {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pc-item-damage-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .window-app.peasant-core .actor-sheet .pc-attributes-skills-section .tab:not(.active),

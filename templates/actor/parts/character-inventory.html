@@ -3,14 +3,70 @@
   <fieldset class="pc-foundry-section pc-inventory-foundry-section">
     <legend>Inventory</legend>
 
-    <div class="inventory-container">
-      {{#if @root.editable}}
-        <prose-mirror name="system.inventory" class="inventory-editor" value="{{actor.system.inventory}}" data-document-uuid="{{actor.uuid}}"></prose-mirror>
-      {{else}}
-        <div class="inventory-view" style="min-height: 100px; padding: 0; color: #e0e0e0;">
-          {{{inventoryHTML}}}
+    <section class="pc-inventory-browser{{#if inventoryDropEnabled}} pc-inventory-drop-enabled{{/if}}" aria-label="Inventory" data-pc-inventory-browser>
+      <div class="pc-inventory-currency-strip" aria-label="Currency">
+        {{#each inventoryCurrency as |currency|}}
+          <label class="pc-inventory-currency-box" aria-label="{{currency.tooltip}}">
+            <span class="pc-inventory-currency-icon-frame" data-tooltip="{{currency.tooltip}}" aria-label="{{currency.tooltip}}">
+              <img class="pc-inventory-currency-icon" src="{{currency.icon}}" alt="">
+            </span>
+            {{#if @root.owner}}
+              <input type="number" name="system.currency.{{currency.key}}" value="{{currency.value}}" class="pc-inventory-currency-input pc-input" min="0" step="1" inputmode="numeric" data-dtype="Number" aria-label="{{currency.tooltip}}">
+            {{else}}
+              <span class="pc-inventory-currency-value">{{currency.value}}</span>
+            {{/if}}
+          </label>
+        {{/each}}
+        <label class="pc-inventory-useless-collection-box" data-tooltip="Useless Collection" aria-label="Useless Collection">
+          <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+          {{#if @root.owner}}
+            <input type="number" name="system.uselessCollection" value="{{inventoryUselessCollection}}" class="pc-inventory-useless-collection-input pc-input" min="0" step="1" inputmode="numeric" data-dtype="Number" aria-label="Useless Collection">
+          {{else}}
+            <span class="pc-inventory-useless-collection-value">{{inventoryUselessCollection}}</span>
+          {{/if}}
+        </label>
+      </div>
+
+      <div class="pc-inventory-toolbar">
+        <div class="pc-inventory-search" role="search" aria-label="Search Inventory">
+          <i class="fa-solid fa-search" aria-hidden="true"></i>
+          <input type="search" class="pc-inventory-search-input pc-input" placeholder="Search inventory" autocomplete="off" aria-label="Search Inventory" data-pc-inventory-search>
+          <button type="button" class="pc-inventory-search-clear" data-tooltip="Clear Search" aria-label="Clear Search" data-pc-inventory-clear-search>
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="pc-inventory-toolbar-button pc-inventory-sort-toggle active" data-tooltip="{{inventorySortToggle.label}}" aria-label="{{inventorySortToggle.label}}" aria-pressed="true" data-sort-mode="{{inventorySortToggle.mode}}" data-pc-inventory-sort-toggle>
+            <i class="{{inventorySortToggle.icon}}" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="pc-inventory-toolbar-button pc-inventory-group-toggle{{#if inventoryGroupToggle.active}} active{{/if}}" data-tooltip="{{inventoryGroupToggle.label}}" aria-label="{{inventoryGroupToggle.label}}" aria-pressed="{{inventoryGroupToggle.pressed}}" data-pc-inventory-group-toggle>
+            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+          </button>
         </div>
+      </div>
+
+      <section class="pc-inventory-list" data-pc-inventory-list>
+        <div class="pc-inventory-view" data-pc-inventory-view="grouped">
+          {{#each inventorySections as |section|}}
+            {{#if section.visible}}
+              {{> "systems/peasant-core/templates/actor/parts/inventory-section.html" section=section owner=@root.owner}}
+            {{/if}}
+          {{/each}}
+        </div>
+
+        <div class="pc-inventory-view" data-pc-inventory-view="flat" hidden>
+          {{#if inventoryFlatSection.visible}}
+            {{> "systems/peasant-core/templates/actor/parts/inventory-section.html" section=inventoryFlatSection owner=@root.owner}}
+          {{/if}}
+        </div>
+
+        {{#unless hasInventoryItems}}
+          <div class="pc-inventory-empty-state">No items in inventory.</div>
+        {{/unless}}
+        <div class="pc-inventory-empty-state pc-inventory-search-empty" hidden>No matching items.</div>
+      </section>
+
+      {{#if @root.editable}}
+        <button type="button" class="add-item-btn" data-pc-inventory-add-item> + Add Item </button>
       {{/if}}
-    </div>
+    </section>
   </fieldset>
 </div>

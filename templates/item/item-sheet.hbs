@@ -1,0 +1,123 @@
+<section class="pc-item-sheet-body">
+  <header class="pc-item-header">
+    <div class="pc-item-image-frame {{#if editable}}editing{{/if}}" data-pc-item-image-frame>
+      <img class="pc-item-image" src="{{imageSrc}}" alt="{{item.name}}" style="{{imageStyle}}">
+      {{#if editable}}
+        <div class="pc-item-image-controls">
+          <button type="button" class="pc-item-image-control-btn" data-pc-item-image-picker data-tooltip="Change Image" aria-label="Change Image">
+            <i class="fa-solid fa-image" aria-hidden="true"></i>
+          </button>
+        </div>
+      {{/if}}
+    </div>
+    <div class="pc-item-identity">
+      <div class="pc-item-title-row">
+        <input type="text" name="name" value="{{item.name}}" class="pc-item-name pc-input" placeholder="Name" {{#unless editable}}disabled{{/unless}}>
+        <label class="pc-item-quantity" data-tooltip="Quantity" aria-label="Quantity">
+          <span aria-hidden="true">x</span>
+          <input type="number" name="system.quantity" value="{{quantityInput}}" class="pc-item-quantity-input pc-input" min="0" step="1" inputmode="numeric" {{#unless editable}}disabled{{/unless}}>
+        </label>
+      </div>
+      <div class="pc-item-meta-row">
+        <div class="pc-item-quality-stack">
+          <select name="system.quality" class="pc-item-quality pc-input" aria-label="Item Quality" {{#unless editable}}disabled{{/unless}}>
+            {{#each qualityOptions}}
+              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+          </select>
+          <select name="system.magicType" class="pc-item-quality pc-input" aria-label="Item Magic Type" {{#unless editable}}disabled{{/unless}}>
+            {{#each magicTypeOptions}}
+              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="pc-item-sunder" aria-label="Sunder">
+          <div class="pc-item-sunder-heading">Sunder</div>
+          <div class="pc-item-sunder-box skill-uses-box">
+            <input type="number" name="system.sunder.current" value="{{sunderCurrentInput}}" class="pc-item-sunder-current skill-uses-current pc-input-plain" min="0" step="1" inputmode="numeric" aria-label="Sunder Current" {{#unless canEdit}}disabled{{/unless}}>
+            <span class="uses-separator">/</span>
+            <input type="number" name="system.sunder.max" value="{{sunderMaxInput}}" class="pc-item-sunder-max skill-uses-current pc-input-plain" min="0" step="1" inputmode="numeric" aria-label="Sunder Maximum" {{#unless editable}}disabled{{/unless}}>
+          </div>
+        </div>
+        <div class="pc-item-measure-fields">
+          <label class="pc-item-measure-row" data-tooltip="Value" aria-label="Value">
+            <input type="number" name="system.value" value="{{valueInput}}" class="pc-item-measure-input pc-input" min="0" step="any" inputmode="decimal" {{#unless editable}}disabled{{/unless}}>
+            <select name="system.currency" class="pc-item-measure-unit pc-input" aria-label="Currency" {{#unless editable}}disabled{{/unless}}>
+              {{#each currencyOptions}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+              {{/each}}
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="pc-item-tabs tabs sheet-tabs" role="tablist" aria-label="Item sheet sections">
+    {{#each itemTabs}}
+      <button type="button" class="pc-item-tab {{cssClass}}" data-tab="{{tab}}" data-pc-item-tab="{{tab}}" role="tab" aria-selected="{{#if active}}true{{else}}false{{/if}}" {{#unless active}}tabindex="-1"{{/unless}}>
+        <i class="{{icon}}" aria-hidden="true"></i>
+        <span>{{label}}</span>
+      </button>
+    {{/each}}
+  </nav>
+
+  <section class="pc-item-tab-content">
+    <section class="pc-item-tab-panel {{#if activeTabs.description}}active{{/if}}" data-pc-item-tab-panel="description" role="tabpanel" aria-hidden="{{#if activeTabs.description}}false{{else}}true{{/if}}" {{#unless activeTabs.description}}hidden{{/unless}}>
+      <fieldset class="pc-foundry-section pc-item-section pc-item-description-section">
+        <legend>Description</legend>
+        {{#if editable}}
+          <prose-mirror name="system.description" class="pc-item-description-editor inventory-editor peasant-desc-editor" value="{{system.description}}" data-document-uuid="{{item.uuid}}"></prose-mirror>
+        {{else}}
+          <div class="pc-item-description">{{{descriptionHTML}}}</div>
+        {{/if}}
+      </fieldset>
+    </section>
+
+    <section class="pc-item-tab-panel {{#if activeTabs.details}}active{{/if}}" data-pc-item-tab-panel="details" role="tabpanel" aria-hidden="{{#if activeTabs.details}}false{{else}}true{{/if}}" {{#unless activeTabs.details}}hidden{{/unless}}>
+      {{#if isLoot}}
+        <fieldset class="pc-foundry-section pc-item-section">
+          <legend>Loot Details</legend>
+          <div class="pc-item-loot-details">
+            <label class="pc-item-loot-type-row">
+              <span>Loot Type</span>
+              <select name="system.category" class="pc-input pc-item-loot-type-select" aria-label="Loot Type" {{#unless editable}}disabled{{/unless}}>
+                {{#each lootCategoryOptions}}
+                  <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                {{/each}}
+              </select>
+            </label>
+          </div>
+        </fieldset>
+      {{/if}}
+    </section>
+
+    {{#if availableItemTabs.activities}}
+      <section class="pc-item-tab-panel {{#if activeTabs.activities}}active{{/if}}" data-pc-item-tab-panel="activities" role="tabpanel" aria-hidden="{{#if activeTabs.activities}}false{{else}}true{{/if}}" {{#unless activeTabs.activities}}hidden{{/unless}}>
+      </section>
+    {{/if}}
+
+    {{#if availableItemTabs.effects}}
+      <section class="pc-item-tab-panel {{#if activeTabs.effects}}active{{/if}}" data-pc-item-tab-panel="effects" role="tabpanel" aria-hidden="{{#if activeTabs.effects}}false{{else}}true{{/if}}" {{#unless activeTabs.effects}}hidden{{/unless}}>
+        <fieldset class="pc-foundry-section pc-item-section">
+          <legend>Effects</legend>
+          {{#if effects.length}}
+            <ol class="pc-item-effects-list">
+              {{#each effects}}
+                <li class="pc-item-effect">
+                  <img class="pc-item-effect-icon" src="{{icon}}" alt="">
+                  <div class="pc-item-effect-summary">
+                    <strong>{{name}}</strong>
+                    <span>{{status}}</span>
+                  </div>
+                </li>
+              {{/each}}
+            </ol>
+          {{else}}
+            <div class="pc-item-empty-state">No effects configured.</div>
+          {{/if}}
+        </fieldset>
+      </section>
+    {{/if}}
+  </section>
+</section>

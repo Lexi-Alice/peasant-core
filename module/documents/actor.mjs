@@ -16,6 +16,7 @@ import { createDefaultCombatDefense, normalizeCombatDefense } from "../data/acto
 import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, normalizeCombatTargetingType, normalizeRangeRateValue, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
 import { getDefaultEdgeLabelMode, normalizeEdgeResourceEntry, sanitizeEdgeLabelMode } from "../data/actor/edge-resources.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor, parseOptionalInteger } from "../data/actor/helpers.mjs";
+import { cloneActorList, cloneActorListForUpdate, ensureActorListEntryAt, patchActorListEntry, removeActorListEntry, reorderActorListEntry } from "../data/actor/list-helpers.mjs";
 import { parseHpValueCommand } from "../data/actor/hp-commands.mjs";
 import { applyCombatStressDamageForActor } from "../data/actor/stress.mjs";
 import { TARGETED_DAMAGE_HALT_INDEX_MAP, TARGETED_DAMAGE_HARD_FLAG_MAP, getArmorChargeMultiplier, getArmorChargeValue, getTargetedDamageConditionKey, getTargetedDamageLocationDisplay, getWoundThresholdMultipliers, normalizeAppliedDamageType } from "../data/actor/targeted-damage.mjs";
@@ -878,19 +879,15 @@ export class PeasantActor extends Actor {
   }
 
   getPeasantNotableCombatsForUpdate() {
-    return JSON.parse(JSON.stringify(Array.isArray(this.system?.notableCombats) ? this.system.notableCombats : []));
+    return cloneActorListForUpdate(this, "notableCombats");
   }
 
   ensurePeasantNotableCombatAt(combats, index) {
-    const numericIndex = Number.parseInt(index, 10);
-    if (!Number.isFinite(numericIndex) || numericIndex < 0) return null;
-    while (combats.length <= numericIndex) combats.push(PeasantActor.createDefaultPeasantCombatEntry());
-    combats[numericIndex] = PeasantActor.createDefaultPeasantCombatEntry(combats[numericIndex]);
-    return combats[numericIndex];
+    return ensureActorListEntryAt(combats, index, PeasantActor.createDefaultPeasantCombatEntry);
   }
 
   async setPeasantNotableCombats(combats, options = {}) {
-    const list = Array.isArray(combats) ? JSON.parse(JSON.stringify(combats)) : [];
+    const list = cloneActorList(combats);
     await this.update({ "system.notableCombats": list }, options);
     return { ok: true, changed: true, combats: list };
   }
@@ -902,33 +899,23 @@ export class PeasantActor extends Actor {
   }
 
   async removePeasantNotableCombat(index, options = {}) {
-    const numericIndex = Number.parseInt(index, 10);
-    if (!Number.isFinite(numericIndex) || numericIndex < 0) return { ok: false, changed: false };
     const combats = this.getPeasantNotableCombatsForUpdate();
-    if (numericIndex >= combats.length) return { ok: false, changed: false };
-    combats.splice(numericIndex, 1);
+    const result = removeActorListEntry(combats, index);
+    if (!result.changed) return { ok: false, changed: false };
     return this.setPeasantNotableCombats(combats, options);
   }
 
   async reorderPeasantNotableCombat(fromIndex, toIndex, options = {}) {
-    const from = Number.parseInt(fromIndex, 10);
-    let to = Number.parseInt(toIndex, 10);
-    if (!Number.isFinite(from) || !Number.isFinite(to)) return { ok: false, changed: false };
-
     const combats = this.getPeasantNotableCombatsForUpdate();
-    if (from < 0 || from >= combats.length) return { ok: false, changed: false };
-    const [moved] = combats.splice(from, 1);
-    if (from < to) to--;
-    to = Math.max(0, Math.min(to, combats.length));
-    combats.splice(to, 0, moved);
+    const result = reorderActorListEntry(combats, fromIndex, toIndex);
+    if (!result.changed) return { ok: false, changed: false };
     return this.setPeasantNotableCombats(combats, options);
   }
 
   async updatePeasantNotableCombat(index, patch, options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
-    const combat = this.ensurePeasantNotableCombatAt(combats, index);
-    if (!combat) return { ok: false, changed: false };
-    Object.assign(combat, patch && typeof patch === "object" ? patch : {});
+    const result = patchActorListEntry(combats, index, patch, PeasantActor.createDefaultPeasantCombatEntry);
+    if (!result.changed) return { ok: false, changed: false };
     return this.setPeasantNotableCombats(combats, options);
   }
 
@@ -2031,22 +2018,15 @@ export class PeasantActor extends Actor {
   }
 
   getPeasantSkillsForUpdate() {
-    const skills = JSON.parse(JSON.stringify(Array.isArray(this.system?.skills) ? this.system.skills : []));
-    return skills.map(skill => PeasantActor.createDefaultPeasantSkillEntry(skill));
+    return cloneActorListForUpdate(this, "skills", { normalizeEntry: PeasantActor.createDefaultPeasantSkillEntry });
   }
 
   ensurePeasantSkillEntryAt(skills, index) {
-    const numericIndex = Number.parseInt(index, 10);
-    if (!Number.isFinite(numericIndex) || numericIndex < 0) return null;
-    while (skills.length <= numericIndex) skills.push(PeasantActor.createDefaultPeasantSkillEntry());
-    skills[numericIndex] = PeasantActor.createDefaultPeasantSkillEntry(skills[numericIndex]);
-    return skills[numericIndex];
+    return ensureActorListEntryAt(skills, index, PeasantActor.createDefaultPeasantSkillEntry);
   }
 
   async setPeasantSkills(skills, options = {}) {
-    const list = Array.isArray(skills)
-      ? skills.map(skill => PeasantActor.createDefaultPeasantSkillEntry(skill))
-      : [];
+    const list = cloneActorList(skills, { normalizeEntry: PeasantActor.createDefaultPeasantSkillEntry });
     await this.update({ "system.skills": list }, options);
     return { ok: true, changed: true, skills: list };
   }
@@ -2058,33 +2038,23 @@ export class PeasantActor extends Actor {
   }
 
   async removePeasantSkill(index, options = {}) {
-    const numericIndex = Number.parseInt(index, 10);
-    if (!Number.isFinite(numericIndex) || numericIndex < 0) return { ok: false, changed: false };
     const skills = this.getPeasantSkillsForUpdate();
-    if (numericIndex >= skills.length) return { ok: false, changed: false };
-    skills.splice(numericIndex, 1);
+    const result = removeActorListEntry(skills, index);
+    if (!result.changed) return { ok: false, changed: false };
     return this.setPeasantSkills(skills, options);
   }
 
   async reorderPeasantSkill(fromIndex, toIndex, options = {}) {
-    const from = Number.parseInt(fromIndex, 10);
-    let to = Number.parseInt(toIndex, 10);
-    if (!Number.isFinite(from) || !Number.isFinite(to)) return { ok: false, changed: false };
-
     const skills = this.getPeasantSkillsForUpdate();
-    if (from < 0 || from >= skills.length) return { ok: false, changed: false };
-    const [moved] = skills.splice(from, 1);
-    if (from < to) to--;
-    to = Math.max(0, Math.min(to, skills.length));
-    skills.splice(to, 0, moved);
+    const result = reorderActorListEntry(skills, fromIndex, toIndex);
+    if (!result.changed) return { ok: false, changed: false };
     return this.setPeasantSkills(skills, options);
   }
 
   async updatePeasantSkill(index, patch, options = {}) {
     const skills = this.getPeasantSkillsForUpdate();
-    const skill = this.ensurePeasantSkillEntryAt(skills, index);
-    if (!skill) return { ok: false, changed: false };
-    Object.assign(skill, patch && typeof patch === "object" ? patch : {});
+    const result = patchActorListEntry(skills, index, patch, PeasantActor.createDefaultPeasantSkillEntry);
+    if (!result.changed) return { ok: false, changed: false };
     return this.setPeasantSkills(skills, options);
   }
 

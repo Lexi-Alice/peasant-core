@@ -1,4 +1,5 @@
 import { showReadonlyDescriptionDialog } from "../controls/description-dialogs.mjs";
+import { resolveRowIndex } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
@@ -98,11 +99,4 @@ export function setupAdvantageDeleteBackupHandler(sheet, html, { blurActiveEdita
       });
     });
   }
-}
-
-function resolveRowIndex(row, attr) {
-  const element = toElement(row);
-  let index = Number.parseInt(element?.getAttribute(attr), 10);
-  if (Number.isNaN(index) && element?.parentElement) index = Array.from(element.parentElement.children).indexOf(element);
-  return index;
 }

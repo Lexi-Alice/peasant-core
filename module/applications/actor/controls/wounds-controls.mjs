@@ -274,7 +274,7 @@ function renderActiveWounds(actor, { readOnly = false } = {}) {
   return entries.map((entry) => `
     <div class="pc-wound-tag"${readOnly ? ` tabindex="0"` : ""}>
       <span>${escapeHtml(entry.label)}</span>
-      ${readOnly ? "" : `<button type="button" class="pc-remove-condition" data-condition="${escapeHtml(entry.key)}" title="Remove ${escapeHtml(entry.label)}" aria-label="Remove ${escapeHtml(entry.label)}">&times;</button>`}
+      ${readOnly ? "" : `<button type="button" class="pc-remove-condition" data-condition="${escapeHtml(entry.key)}" data-tooltip="Remove ${escapeHtml(entry.label)}" aria-label="Remove ${escapeHtml(entry.label)}">&times;</button>`}
     </div>
   `).join("");
 }

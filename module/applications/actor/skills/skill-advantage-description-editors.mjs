@@ -1,8 +1,26 @@
 import { renderPeasantDescriptionEditor } from "../controls/description-editor-app.mjs";
+import { resolveRowIndex } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
-export function setupSkillAdvantageDescriptionEditors(sheet, html) {
+function syncAdvantageDescriptionHiddenInput(sheet, root, index, description) {
+  const value = String(description ?? "");
+  const roots = new Set([
+    root,
+    sheet?._getSheetJQ?.()?.[0],
+    sheet?.element
+  ].filter(Boolean));
+
+  for (const currentRoot of roots) {
+    const row = currentRoot.querySelector?.(`.advantage-item[data-advantage-index="${index}"]`);
+    const hidden = row?.querySelector?.(".advantage-description-hidden");
+    if (!hidden) continue;
+    hidden.value = value;
+    hidden.defaultValue = value;
+  }
+}
+
+export function setupSkillAdvantageDescriptionEditors(sheet, html, { enqueueSheetUpdate } = {}) {
   const root = toElement(html);
   if (!root) return;
 
@@ -79,9 +97,24 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html) {
         errorLogMessage: "Failed to save flexible advantage description:",
         errorMessage: "Failed to save flexible advantage description. See console for details.",
         save: async (newContent) => {
-          const result = await sheet.actor.setPeasantFlexibleAdvantageDescription?.(index, newContent);
-          if (result?.flexibleAdvantageDescriptions) {
-            sheet._lastFlexibleAdvantageDescriptionsSnapshot = JSON.parse(JSON.stringify(result.flexibleAdvantageDescriptions));
+          const description = String(newContent ?? "");
+          syncAdvantageDescriptionHiddenInput(sheet, root, index, description);
+          const saveDescription = async () => {
+            const result = await sheet.actor.setPeasantFlexibleAdvantageDescription?.(index, description);
+            const current = sheet.actor.getPeasantFlexibleAdvantagesForUpdate?.() ?? null;
+            if (!current) return result;
+            syncAdvantageDescriptionHiddenInput(sheet, root, index, current.descriptions?.[index] ?? description);
+            return result;
+          };
+          const result = enqueueSheetUpdate
+            ? await enqueueSheetUpdate("_advantageSaveQueue", "Advantage description", saveDescription)
+            : await saveDescription();
+          const savedDescriptions = Array.isArray(result?.descriptions)
+            ? result.descriptions
+            : sheet.actor.system.flexibleAdvantageDescriptions;
+          syncAdvantageDescriptionHiddenInput(sheet, root, index, savedDescriptions?.[index] ?? description);
+          if (savedDescriptions) {
+            sheet._lastFlexibleAdvantageDescriptionsSnapshot = JSON.parse(JSON.stringify(savedDescriptions));
           }
         }
       });
@@ -103,11 +136,4 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html) {
       pcLog.debug("advantage-desc-btn handler failed", e);
     }
   });
-}
-
-function resolveRowIndex(row, attr) {
-  const element = toElement(row);
-  let index = Number.parseInt(element?.getAttribute(attr), 10);
-  if (Number.isNaN(index) && element?.parentElement) index = Array.from(element.parentElement.children).indexOf(element);
-  return index;
 }

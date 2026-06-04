@@ -1,4 +1,45 @@
+import { sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
 import { qsa, qs, toElement } from "../../dom.mjs";
+
+export function resolveRowIndex(row, attr) {
+  const element = toElement(row);
+  let index = Number.parseInt(element?.getAttribute(attr), 10);
+  if (Number.isNaN(index) && element?.parentElement) index = Array.from(element.parentElement.children).indexOf(element);
+  return index;
+}
+
+export function resolveItemIndex(source, { dataKey = "index", rowSelector = null, rowAttr = null } = {}) {
+  const element = toElement(source);
+  let index = Number.parseInt(element?.dataset?.[dataKey], 10);
+  if (!Number.isNaN(index)) return index;
+
+  if (rowSelector) {
+    const row = element?.closest?.(rowSelector);
+    if (row) {
+      if (rowAttr) {
+        index = Number.parseInt(row.getAttribute(rowAttr), 10);
+        if (!Number.isNaN(index)) return index;
+      }
+      index = row.parentElement ? Array.from(row.parentElement.children).indexOf(row) : -1;
+      if (!Number.isNaN(index)) return index;
+    }
+  }
+
+  return -1;
+}
+
+export function sanitizeOptionalIntegerInputElement(input, options = {}) {
+  if (!input) return;
+  const before = String(input.value ?? "");
+  const normalized = sanitizeOptionalIntegerInputValue(before, options);
+  if (normalized === before) return;
+
+  const pos = input.selectionStart ?? before.length;
+  const normalizedBeforeCursor = sanitizeOptionalIntegerInputValue(before.slice(0, pos), options);
+  input.value = normalized;
+  const nextPos = Math.max(0, Math.min(normalized.length, normalizedBeforeCursor.length));
+  try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
+}
 
 export function initializeSheetSaveQueues(sheet) {
   if (sheet._skillsSaveQueue === undefined) sheet._skillsSaveQueue = Promise.resolve();
@@ -6,6 +47,7 @@ export function initializeSheetSaveQueues(sheet) {
   if (sheet._advantageSaveQueue === undefined) sheet._advantageSaveQueue = Promise.resolve();
   if (sheet._edgeResourceSaveQueue === undefined) sheet._edgeResourceSaveQueue = Promise.resolve();
   if (sheet._portraitLozengeSaveQueue === undefined) sheet._portraitLozengeSaveQueue = Promise.resolve();
+  if (sheet._inventorySaveQueue === undefined) sheet._inventorySaveQueue = Promise.resolve();
 }
 
 export function createSheetUpdateQueue(sheet) {

@@ -48,11 +48,11 @@ function openDamageDialog(sheet, trigger) {
           </label>
         </div>
         <div class="pc-resource-checks">
-          <label title="Ignore HALT and Hard Location (unless Natural)">
+          <label data-tooltip="Ignore HALT and Hard Location (unless Natural)" aria-label="Ignore HALT and Hard Location unless Natural">
             <input type="checkbox" name="damageAP">
             <span>Armor Pen?</span>
           </label>
-          <label title="Multiply armor HALT using the actor's Armor Charge multiplier">
+          <label data-tooltip="Multiply armor HALT using the actor's Armor Charge multiplier" aria-label="Multiply armor HALT using the actor's Armor Charge multiplier">
             <input type="checkbox" name="damageArmorCharge">
             <span>Armor Charge?</span>
           </label>

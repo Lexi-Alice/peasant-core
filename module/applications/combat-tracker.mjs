@@ -123,7 +123,8 @@ export function configureCombatTracker() {
         const moveBtn = document.createElement("button");
         moveBtn.type = "button";
         moveBtn.className = "seize-btn seize-move";
-        moveBtn.title = "Seize Movement Phase";
+        moveBtn.dataset.tooltip = "Seize Movement Phase";
+        moveBtn.setAttribute("aria-label", "Seize Movement Phase");
         moveBtn.textContent = "Seize Move";
         lockSeizeButtonSize(moveBtn);
         moveBtn.addEventListener("click", (event) => handleSeizeClick(event, combat, id, 0));
@@ -134,7 +135,8 @@ export function configureCombatTracker() {
         const stdBtn = document.createElement("button");
         stdBtn.type = "button";
         stdBtn.className = "seize-btn seize-std";
-        stdBtn.title = "Seize Standard Phase";
+        stdBtn.dataset.tooltip = "Seize Standard Phase";
+        stdBtn.setAttribute("aria-label", "Seize Standard Phase");
         stdBtn.textContent = "Seize Standard";
         lockSeizeButtonSize(stdBtn);
         stdBtn.addEventListener("click", (event) => handleSeizeClick(event, combat, id, 1));

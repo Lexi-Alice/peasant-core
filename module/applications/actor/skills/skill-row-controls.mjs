@@ -1,5 +1,6 @@
 import { showReadonlyDescriptionDialog } from "../controls/description-dialogs.mjs";
-import { formatOptionalIntegerInput, parseOptionalInteger, sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
+import { formatOptionalIntegerInput, parseOptionalInteger } from "../../../data/actor/helpers.mjs";
+import { resolveItemIndex, resolveRowIndex, sanitizeOptionalIntegerInputElement } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, qs, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
@@ -320,19 +321,6 @@ function normalizeRankValue(raw) {
   return match ? match[0] : "";
 }
 
-function sanitizeOptionalIntegerInputElement(input, options = {}) {
-  if (!input) return;
-  const before = String(input.value ?? "");
-  const normalized = sanitizeOptionalIntegerInputValue(before, options);
-  if (normalized === before) return;
-
-  const pos = input.selectionStart ?? before.length;
-  const normalizedBeforeCursor = sanitizeOptionalIntegerInputValue(before.slice(0, pos), options);
-  input.value = normalized;
-  const nextPos = Math.max(0, Math.min(normalized.length, normalizedBeforeCursor.length));
-  try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
-}
-
 function collectSkillsFromDOMForSig(sheet) {
   const skillEls = qsa(toElement(sheet.element), ".skills-list .skill-item");
   const skills = [];
@@ -392,31 +380,4 @@ function collectSkillsFromDOMForSig(sheet) {
     }
   }
   return skills;
-}
-
-function resolveItemIndex(source, { dataKey = "index", rowSelector = null, rowAttr = null } = {}) {
-  const element = toElement(source);
-  let index = Number.parseInt(element?.dataset?.[dataKey], 10);
-  if (!Number.isNaN(index)) return index;
-
-  if (rowSelector) {
-    const row = element?.closest?.(rowSelector);
-    if (row) {
-      if (rowAttr) {
-        index = Number.parseInt(row.getAttribute(rowAttr), 10);
-        if (!Number.isNaN(index)) return index;
-      }
-      index = row.parentElement ? Array.from(row.parentElement.children).indexOf(row) : -1;
-      if (!Number.isNaN(index)) return index;
-    }
-  }
-
-  return -1;
-}
-
-function resolveRowIndex(row, attr) {
-  const element = toElement(row);
-  let index = Number.parseInt(element?.getAttribute(attr), 10);
-  if (Number.isNaN(index) && element?.parentElement) index = Array.from(element.parentElement.children).indexOf(element);
-  return index;
 }

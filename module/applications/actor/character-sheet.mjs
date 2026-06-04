@@ -1,13 +1,16 @@
 ﻿import { PeasantCharacterModel, PC_ACTOR_SETTING_DEFINITIONS, PC_ART_PANEL_COLLAPSED_FLAG, PC_SIMPLIFIED_HP_FLAG, isPeasantCharacterType, sanitizePeasantCoreSettingNumber } from "../../data/actor/_module.mjs";
 import { PC_CUSTOM_SIR_LOCATION_VALUES_FLAG } from "../../data/actor/identity-options.mjs";
-import { formatOptionalIntegerInput, parseOptionalInteger, sanitizeOptionalIntegerInputValue } from "../../data/actor/helpers.mjs";
+import { formatOptionalIntegerInput, parseOptionalInteger } from "../../data/actor/helpers.mjs";
 import { PeasantActor } from "../../documents/_module.mjs";
 import { setupBlessingControls } from "./controls/blessing-controls.mjs";
 import { setupCombatModifierControls } from "./controls/combat-modifier-controls.mjs";
 import { configurePeasantActorSheetHooks } from "./hooks.mjs";
 import { drawLocationTableLikeMacro } from "./location-table.mjs";
 import { setupDamageHealControls } from "./controls/damage-heal-controls.mjs";
+import { refreshOpenHpGridDialogsForSheet } from "./controls/health-stress/hp-grid-dialog.mjs";
 import { setupHealthStressControls } from "./controls/health-stress-controls.mjs";
+import { refreshOpenStressGridDialogsForSheet } from "./controls/health-stress/stress-grid-dialog.mjs";
+import { setupInventoryControls } from "./controls/inventory-controls.mjs";
 import { setupSheetKeyboardNavigation } from "./controls/keyboard-navigation.mjs";
 import { setupPortraitControls, teardownPortraitBindings } from "./controls/portrait-controls.mjs";
 import { closeSheetResourceDialogs } from "./controls/resource-dialogs.mjs";
@@ -15,9 +18,9 @@ import { closeSheetOwnedApplications } from "./controls/sheet-owned-apps.mjs";
 import { confirmPeasantResourceRefresh, confirmPeasantRest } from "./controls/rest-controls.mjs";
 import { setupResourceControls } from "./controls/resource-controls.mjs";
 import { rollAttributeSaveFromElement, rollAttributeToHitFromElement, rollCombatFromElement, rollCombatTagFromElement, rollConsciousnessFromElement, rollInitiativeFromElement, rollSkillFromElement } from "./controls/roll-actions.mjs";
-import { blurActiveEditableInSheet as blurActiveEditableInSheetHelper, collectAdvantagesFromSheet, createSheetUpdateQueue, initializeSheetSaveQueues, runQueuedInputUpdate as runQueuedInputUpdateHelper } from "./controls/sheet-listener-helpers.mjs";
+import { blurActiveEditableInSheet as blurActiveEditableInSheetHelper, collectAdvantagesFromSheet, createSheetUpdateQueue, initializeSheetSaveQueues, runQueuedInputUpdate as runQueuedInputUpdateHelper, sanitizeOptionalIntegerInputElement } from "./controls/sheet-listener-helpers.mjs";
 import { setupWoundsControls } from "./controls/wounds-controls.mjs";
-import { prepareActorAdvantageContext, prepareActorAttributeContext, prepareActorEdgeContext, prepareActorHealthResourceContext, prepareActorIdentityContext, prepareActorNotableCombatContext, prepareActorSheetBaseContext, prepareActorSkillContext, prepareActorStressContext } from "./context/sheet-context.mjs";
+import { prepareActorAdvantageContext, prepareActorAttributeContext, prepareActorEdgeContext, prepareActorHealthResourceContext, prepareActorIdentityContext, prepareActorInventoryContext, prepareActorNotableCombatContext, prepareActorSheetBaseContext, prepareActorSkillContext, prepareActorStressContext } from "./context/sheet-context.mjs";
 import { setupNotableCombatControls } from "./notable-combat/notable-combat-controls.mjs";
 import { setupNotableCombatDragDropControls } from "./notable-combat/notable-combat-drag-drop.mjs";
 import { setupNotableCombatTagEditorControls } from "./notable-combat/notable-combat-tag-editor.mjs";
@@ -199,7 +202,8 @@ export class PeasantActorSheet extends ActorSheetBase {
       "_combatSaveQueue",
       "_advantageSaveQueue",
       "_edgeResourceSaveQueue",
-      "_portraitLozengeSaveQueue"
+      "_portraitLozengeSaveQueue",
+      "_inventorySaveQueue"
     ];
 
     for (const key of queueKeys) {
@@ -275,7 +279,10 @@ export class PeasantActorSheet extends ActorSheetBase {
 
   static get SHEET_PARTIALS() {
     const tabPartials = this.TAB_DEFINITIONS.map(({ partial }) => `${this.SHEET_PARTIAL_PATH}/${partial}`);
-    return tabPartials;
+    return [
+      ...tabPartials,
+      `${this.SHEET_PARTIAL_PATH}/inventory-section.html`
+    ];
   }
 
   static get TABS() {
@@ -320,7 +327,6 @@ export class PeasantActorSheet extends ActorSheetBase {
     const label = target.checked ? "Enter View Mode" : "Enter Edit Mode";
     target.dataset.tooltip = label;
     target.setAttribute("aria-label", label);
-    target.title = label;
     const nextMode = target.checked ? MODES.EDIT : MODES.PLAY;
 
     if (this.isEditMode && nextMode !== this._mode) {
@@ -335,7 +341,10 @@ export class PeasantActorSheet extends ActorSheetBase {
     this._mode = nextMode;
 
     if (typeof this.submit === "function") await this.submit();
-    this.render();
+    const renderResult = this.render();
+    refreshOpenHpGridDialogsForSheet(this);
+    refreshOpenStressGridDialogsForSheet(this);
+    return renderResult;
   }
 
   static async _onRefreshResourcesAction() {
@@ -825,7 +834,6 @@ export class PeasantActorSheet extends ActorSheetBase {
       const label = toggle.checked ? "Enter View Mode" : "Enter Edit Mode";
       toggle.dataset.tooltip = label;
       toggle.setAttribute("aria-label", label);
-      toggle.title = label;
     };
     if (this.isEditable && !toggle) {
       const toggle = header.ownerDocument.createElement("slide-toggle");
@@ -903,9 +911,18 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     prepareActorSkillContext(data, this.actor, { logger: pcLog });
 
-    // Enrich Inventory HTML for View Mode - use namespaced API (Foundry v13+)
     const TextEditorImpl = TextEditorImplementation;
-    data.inventoryHTML = await TextEditorImpl.enrichHTML(this.actor.system.inventory, { async: true });
+    const escapeHtml = foundry.utils.escapeHTML ?? ((value) => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])));
+    const buildDescriptionTooltipHtml = async (entry, fallbackName) => {
+      if (!entry?.hasDescription) return "";
+      const enrichedDescription = await TextEditorImpl.enrichHTML(entry.description ?? "", { async: true });
+      const entryName = escapeHtml(entry.name || fallbackName);
+      return `<div class="pc-rich-description-tooltip"><div class="skill-tooltip-header">${entryName}</div><div class="skill-tooltip-content">${enrichedDescription ?? ""}</div></div>`;
+    };
+    for (const skill of data.skills ?? []) {
+      skill.descriptionTooltipHtml = await buildDescriptionTooltipHtml(skill, "Skill");
+    }
+
     const biographyRaw = String(this.actor.system.biography ?? "");
     data.hasBiographyText = biographyRaw.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim().length > 0;
     data.biographyHTML = data.hasBiographyText
@@ -913,12 +930,29 @@ export class PeasantActorSheet extends ActorSheetBase {
       : "";
 
     prepareActorAdvantageContext(data, this.actor);
+    for (const advantage of data.flexibleAdvantages ?? []) {
+      advantage.descriptionTooltipHtml = await buildDescriptionTooltipHtml(advantage, "Advantage");
+    }
 
     prepareActorNotableCombatContext(data, this.actor);
+    for (const combat of data.notableCombats ?? []) {
+      combat.descriptionTooltipHtml = await buildDescriptionTooltipHtml(combat, "Combat");
+    }
 
-    // Pass inventory HTML content
-    data.inventory = this.actor.system.inventory || "";
     data.biography = this.actor.system.biography || "";
+    await prepareActorInventoryContext(data, this.actor);
+    const inventorySortMode = this._pcInventorySortMode === "alpha" ? "alpha" : "manual";
+    data.inventorySortToggle = {
+      mode: inventorySortMode,
+      label: inventorySortMode === "alpha" ? "Sort Alphabetically" : "Sort Manually",
+      icon: inventorySortMode === "alpha" ? "fa-solid fa-arrow-down-a-z" : "fa-solid fa-arrow-down-short-wide"
+    };
+    const inventoryGroupedByCategory = this._pcInventoryGroupedByCategory !== false;
+    data.inventoryGroupToggle = {
+      active: inventoryGroupedByCategory,
+      pressed: inventoryGroupedByCategory ? "true" : "false",
+      label: "Group by Category"
+    };
 
     prepareActorHealthResourceContext(data, this.actor, { isEditMode: this.isEditMode });
 
@@ -1009,7 +1043,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       chromeAction.removeAttribute("aria-disabled");
     }
 
-    const allowButton = (button) => button.matches(".pc-sheet-tab-button, .pc-hp-grid-open, .pc-stress-grid-open, .toggle-wounds-menu");
+    const allowButton = (button) => button.matches(".pc-sheet-tab-button, .pc-hp-grid-open, .pc-stress-grid-open, .toggle-wounds-menu, [data-pc-inventory-clear-search]");
     const markReadOnlyAction = (element) => {
       element.dataset.pcReadonlyAction = "true";
       element.setAttribute("aria-disabled", "true");
@@ -1039,6 +1073,7 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     forEachScoped("input, textarea", (input) => {
       if (input.type === "hidden" || input.hidden || input.hasAttribute("hidden")) return;
+      if (input.matches(".pc-inventory-search-input")) return;
       input.disabled = false;
       input.removeAttribute("disabled");
       input.readOnly = true;
@@ -1076,7 +1111,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       ".halt-section",
       ".skills-list-view",
       ".notable-combats-list-view",
-      ".inventory-view",
+      ".pc-inventory-browser",
       ".advantages-list-view",
       ".pc-biography-detail-strip",
       ".pc-biography-notes-grid"
@@ -1134,6 +1169,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       setupPortraitControls(this, html, { readOnly: true });
       setupWoundsControls(this, html, { readOnly: true });
       setupHealthStressControls(this, html, { readOnly: true });
+      setupInventoryControls(this, html, { readOnly: true });
       return;
     }
 
@@ -1228,27 +1264,16 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     setupBasicSkillAdvantageControls(this, html, { blurActiveEditableInSheet, collectAdvantagesFromDOM, enqueueSheetUpdate, runQueuedInputUpdate });
     setupSkillAdvantageDragDropControls(this, html, { sheetDocument, sheetBody, blurActiveEditableInSheet, collectAdvantagesFromDOM, enqueueSheetUpdate });
-    setupSkillAdvantageDescriptionEditors(this, html, { sheetDocument, sheetBody });
+    setupSkillAdvantageDescriptionEditors(this, html, { enqueueSheetUpdate });
     setupNotableCombatControls(this, html, { blurActiveEditableInSheet, enqueueSheetUpdate, runQueuedInputUpdate });
     setupNotableCombatDragDropControls(this, html, { sheetDocument });
     setupNotableCombatTagEditorControls(this, html, { sheetDocument, sheetBody });
+    setupInventoryControls(this, html, { runQueuedInputUpdate });
 
   }
 
 }
 
-function sanitizeOptionalIntegerInputElement(input, options = {}) {
-  if (!input) return;
-  const before = String(input.value ?? "");
-  const normalized = sanitizeOptionalIntegerInputValue(before, options);
-  if (normalized === before) return;
-
-  const pos = input.selectionStart ?? before.length;
-  const normalizedBeforeCursor = sanitizeOptionalIntegerInputValue(before.slice(0, pos), options);
-  input.value = normalized;
-  const nextPos = Math.max(0, Math.min(normalized.length, normalizedBeforeCursor.length));
-  try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
-}
 configurePeasantActorSheetHooks({
   sheetClass: PeasantActorSheet,
   actorClass: PeasantActor,

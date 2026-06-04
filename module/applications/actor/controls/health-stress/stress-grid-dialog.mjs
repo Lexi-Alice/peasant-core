@@ -1,4 +1,5 @@
 import { qs, qsa, toElement } from "../../../dom.mjs";
+import { renderDialogModeToggle } from "./dialog-mode-toggle.mjs";
 
 const stressGridControllers = new WeakMap();
 const openStressGridDialogs = new Set();
@@ -27,6 +28,7 @@ export function openStressGridDialog(sheet, activeType = "physical", trigger = n
       const root = toElement(html);
       root?.classList.add("pc-stress-grid-dialog-window");
       for (const element of qsa(root, ".dialog-buttons, .form-footer, footer")) element.style.display = "none";
+      renderDialogModeToggle(sheet, root);
       bindStressGridDialog(sheet, root);
     }
   }, {
@@ -57,16 +59,28 @@ export function refreshOpenStressGridDialogsForActor(actor) {
   for (const registration of Array.from(openStressGridDialogs)) {
     const { sheet, dialog } = registration;
     if (!isSameDialogActor(sheet, actor)) continue;
-
-    const root = toElement(dialog);
-    if (!root?.isConnected) {
-      openStressGridDialogs.delete(registration);
-      if (sheet._stressGridDialog === dialog) delete sheet._stressGridDialog;
-      continue;
-    }
-
-    refreshStressGridDialog(sheet, root);
+    refreshStressGridDialogRegistration(registration);
   }
+}
+
+export function refreshOpenStressGridDialogsForSheet(sheet) {
+  if (!sheet) return;
+  for (const registration of Array.from(openStressGridDialogs)) {
+    if (registration.sheet !== sheet) continue;
+    refreshStressGridDialogRegistration(registration);
+  }
+}
+
+function refreshStressGridDialogRegistration(registration) {
+  const { sheet, dialog } = registration;
+  const root = toElement(dialog);
+  if (!root?.isConnected) {
+    openStressGridDialogs.delete(registration);
+    if (sheet._stressGridDialog === dialog) delete sheet._stressGridDialog;
+    return;
+  }
+
+  refreshStressGridDialog(sheet, root);
 }
 
 export async function setStressGridSize(sheet, stressType, count = 0) {
@@ -88,9 +102,9 @@ export function normalizeStressType(stressType) {
 
 function getStressGridTypes() {
   return [
-    { key: "physical", label: "Physical" },
-    { key: "mental", label: "Mental" },
-    { key: "general", label: "General" }
+    { key: "physical", label: "Physical", icon: "fa-solid fa-heart-pulse" },
+    { key: "mental", label: "Mental", icon: "fa-solid fa-brain" },
+    { key: "general", label: "General", icon: "fa-solid fa-shield-heart" }
   ];
 }
 
@@ -111,8 +125,9 @@ function renderStressGridDialogBody(sheet, activeType = "physical") {
   const stateClass = (cell) => cell === 1 ? "blunt" : cell === 2 ? "lethal" : cell === 3 ? "critical" : "regular";
 
   const tabs = types.map(type => `
-    <button type="button" class="pc-stress-grid-tab${type.key === active ? " active" : ""}" data-stress-tab="${type.key}" role="tab" aria-selected="${type.key === active ? "true" : "false"}">
-      ${sheet._escapeHtml(type.label)}
+    <button type="button" class="pc-stress-grid-tab${type.key === active ? " active" : ""}" data-tab="${type.key}" data-stress-tab="${type.key}" role="tab" aria-selected="${type.key === active ? "true" : "false"}">
+      <i class="${sheet._escapeHtml(type.icon)}" aria-hidden="true"></i>
+      <span>${sheet._escapeHtml(type.label)}</span>
     </button>
   `).join("");
 
@@ -124,12 +139,12 @@ function renderStressGridDialogBody(sheet, activeType = "physical") {
     const controls = editMode ? `
       <div class="pc-hp-grid-popup-stepper pc-stress-grid-popup-stepper">
         <label>Boxes</label>
-        <button type="button" class="stress-remove sheet-stepper-btn" data-stress-type="${type.key}" title="Remove ${sheet._escapeHtml(type.label)} stress box">&minus;</button>
+        <button type="button" class="stress-remove sheet-stepper-btn" data-stress-type="${type.key}" data-tooltip="Remove ${sheet._escapeHtml(type.label)} stress box" aria-label="Remove ${sheet._escapeHtml(type.label)} stress box">&minus;</button>
         <span>${states.length}</span>
-        <button type="button" class="stress-add sheet-stepper-btn" data-stress-type="${type.key}" title="Add ${sheet._escapeHtml(type.label)} stress box">+</button>
+        <button type="button" class="stress-add sheet-stepper-btn" data-stress-type="${type.key}" data-tooltip="Add ${sheet._escapeHtml(type.label)} stress box" aria-label="Add ${sheet._escapeHtml(type.label)} stress box">+</button>
       </div>
     ` : canModify ? `
-      <button type="button" class="pc-portrait-hp-action pc-stress-grid-refresh" data-stress-type="${type.key}" title="Reset ${sheet._escapeHtml(type.label)} Stress" aria-label="Reset ${sheet._escapeHtml(type.label)} Stress">
+      <button type="button" class="pc-portrait-hp-action pc-stress-grid-refresh" data-stress-type="${type.key}" data-tooltip="Reset ${sheet._escapeHtml(type.label)} Stress" aria-label="Reset ${sheet._escapeHtml(type.label)} Stress">
         <i class="fas fa-sync-alt" aria-hidden="true"></i>
       </button>
     ` : "";
@@ -150,7 +165,7 @@ function renderStressGridDialogBody(sheet, activeType = "physical") {
   }).join("");
 
   return `
-    <div class="pc-stress-grid-tabs" role="tablist">${tabs}</div>
+    <nav class="pc-stress-grid-tabs tabs sheet-tabs" role="tablist">${tabs}</nav>
     <div class="pc-stress-grid-panes">${panes}</div>
     ${canModify ? `<p class="pc-hp-grid-popup-help">Left-click cycles stress damage. Right-click clears a cell.</p>` : ""}
   `;
@@ -167,6 +182,7 @@ function refreshStressGridDialog(sheet, root, activeType = null) {
   const body = qs(rootElement, ".pc-stress-grid-dialog-body");
   if (!body) return;
   body.innerHTML = renderStressGridDialogBody(sheet, active);
+  renderDialogModeToggle(sheet, rootElement);
   bindStressGridDialog(sheet, rootElement);
 }
 

@@ -40,6 +40,12 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
     if (hasOwn(data, "naturalHaltValues")) data.naturalHaltValues = normalizeHaltValues(data.naturalHaltValues);
     if (hasOwn(data, "reflexAoeSaveTarget")) data.reflexAoeSaveTarget = parseOptionalInteger(data.reflexAoeSaveTarget, { min: 1 });
     if (hasOwn(data, "initiative")) data.initiative = parseOptionalInteger(data.initiative, { allowSign: true });
+    if (hasOwn(data, "uselessCollection")) {
+      const sourceValue = (data.uselessCollection && typeof data.uselessCollection === "object")
+        ? data.uselessCollection.value
+        : data.uselessCollection;
+      data.uselessCollection = Math.max(0, Number.parseInt(sourceValue, 10) || 0);
+    }
 
     if (Array.isArray(data?.skills)) {
       data.skills = data.skills.map(migrateSkillOptionalNumbers);
@@ -237,6 +243,12 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       flexibleAdvantages: new fields.ArrayField(new fields.StringField(), { initial: [] }),
       flexibleAdvantageDescriptions: new fields.ArrayField(new fields.HTMLField({ initial: "" }), { initial: [] }),
       // Inventory
+      currency: new fields.SchemaField({
+        gp: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
+        pp: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
+        rs: new fields.NumberField({ integer: true, min: 0, initial: 0 })
+      }),
+      uselessCollection: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
       inventory: new fields.HTMLField({ initial: "" }),
       // Stress counts (how many boxes to show)
       physicalStressCount: new fields.NumberField({ integer: true, min: 0, initial: 4 }),

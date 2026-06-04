@@ -30,7 +30,7 @@
               class="combat-mod-input halt-input combat-halt-buff-input pc-input"
               data-buff-index="{{buff.index}}"
               tabindex="0">
-            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" data-tooltip="Remove {{buff.label}}" aria-label="Remove {{buff.label}}">-</button>
           </div>
         {{/if}}
         {{#if buff.isFlat}}
@@ -45,7 +45,7 @@
               inputmode="numeric"
               pattern="[+=\-]?\d*"
               tabindex="0">
-            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" data-tooltip="Remove {{buff.label}}" aria-label="Remove {{buff.label}}">-</button>
           </div>
         {{/if}}
         {{#if buff.isCost}}
@@ -70,7 +70,7 @@
               inputmode="numeric"
               pattern="[+=\-]?\d*"
               tabindex="0">
-            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.label}}">-</button>
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" data-tooltip="Remove {{buff.label}}" aria-label="Remove {{buff.label}}">-</button>
           </div>
         {{/if}}
         {{#if buff.isCustom}}
@@ -92,12 +92,12 @@
               inputmode="numeric"
               pattern="[+=\-]?\d*"
               tabindex="0">
-            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" title="Remove {{buff.customName}}">-</button>
+            <button type="button" class="remove-combat-halt-buff" data-buff-index="{{buff.index}}" data-tooltip="Remove {{buff.customName}}" aria-label="Remove {{buff.customName}}">-</button>
           </div>
         {{/if}}
       {{/each}}
 
-      <button type="button" class="add-combat-halt-buff" title="Add Buff">+</button>
+      <button type="button" class="add-combat-halt-buff" data-tooltip="Add Buff" aria-label="Add Buff">+</button>
     </div>
   </fieldset>
 </div>

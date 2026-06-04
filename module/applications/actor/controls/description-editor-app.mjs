@@ -11,6 +11,47 @@ const DescriptionEditorBase = HandlebarsApplicationMixin(ApplicationV2);
 const DESCRIPTION_EDITOR_BODY_TEMPLATE = "systems/peasant-core/templates/actor/apps/description-editor-body.hbs";
 const DESCRIPTION_EDITOR_FOOTER_TEMPLATE = "systems/peasant-core/templates/actor/apps/description-editor-footer.hbs";
 
+let DescriptionEditorMenuClass = null;
+let descriptionEditorPluginListenerRegistered = false;
+
+function getDescriptionEditorMenuClass() {
+  const BaseMenu = foundry?.prosemirror?.plugins?.ProseMirrorMenu;
+  if (!BaseMenu) return null;
+  if (DescriptionEditorMenuClass) return DescriptionEditorMenuClass;
+
+  DescriptionEditorMenuClass = class PeasantExpandedDescriptionMenu extends BaseMenu {
+    _onResize() {
+      // Description editor toolbars wrap instead of collapsing controls into dropdowns.
+    }
+  };
+  return DescriptionEditorMenuClass;
+}
+
+function configureExpandedDescriptionEditorPlugins(event) {
+  const editor = event.target;
+  if (!editor?.matches?.("prose-mirror.peasant-desc-editor")) return;
+  if (!editor.closest?.(".pc-description-editor")) return;
+
+  const prosemirror = foundry?.prosemirror;
+  const MenuClass = getDescriptionEditorMenuClass();
+  const plugins = event.plugins ?? event.detail;
+  if (!prosemirror?.defaultSchema || !MenuClass || !plugins) return;
+
+  plugins.menu = MenuClass.build(prosemirror.defaultSchema, {
+    destroyOnSave: editor.hasAttribute("toggled")
+  });
+}
+
+function registerExpandedDescriptionEditor() {
+  if (descriptionEditorPluginListenerRegistered) return;
+  const document = globalThis.document;
+  if (!document?.addEventListener) return;
+  document.addEventListener("plugins", configureExpandedDescriptionEditorPlugins, { capture: true });
+  descriptionEditorPluginListenerRegistered = true;
+}
+
+registerExpandedDescriptionEditor();
+
 export class PeasantDescriptionEditorApp extends DescriptionEditorBase {
   constructor(config, options = {}) {
     const appOptions = foundry.utils.mergeObject({
@@ -74,6 +115,9 @@ export class PeasantDescriptionEditorApp extends DescriptionEditorBase {
   _getEditorContent() {
     const editor = this.element?.querySelector?.(`prose-mirror[name="${this.config.editorName}"]`);
     if (!editor) throw new Error("Description editor did not render.");
+    if (typeof editor.save === "function" && (typeof editor.isDirty !== "function" || editor.isDirty())) {
+      editor.save();
+    }
     return String(editor.value ?? "");
   }
 

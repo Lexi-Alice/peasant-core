@@ -82,10 +82,10 @@
       <div class="pc-banner-rest-actions sheet-header-buttons" aria-label="Rest actions">
         {{#if owner}}
         <div class="pc-banner-rest-button-row">
-          <button type="button" class="pc-banner-rest-button short-rest gold-button" data-action="rest" data-type="short" data-rest-type="short" data-tooltip="Short Rest" title="Short Rest" aria-label="Short Rest">
+          <button type="button" class="pc-banner-rest-button short-rest gold-button" data-action="rest" data-type="short" data-rest-type="short" data-tooltip="Short Rest" aria-label="Short Rest">
             <i class="fa-solid fa-utensils" inert aria-hidden="true"></i>
           </button>
-          <button type="button" class="pc-banner-rest-button long-rest gold-button" data-action="rest" data-type="long" data-rest-type="long" data-tooltip="Long Rest" title="Long Rest" aria-label="Long Rest">
+          <button type="button" class="pc-banner-rest-button long-rest gold-button" data-action="rest" data-type="long" data-rest-type="long" data-tooltip="Long Rest" aria-label="Long Rest">
             <i class="fa-solid fa-campground" inert aria-hidden="true"></i>
           </button>
         </div>
@@ -112,7 +112,7 @@
 
   <div class="hp-section{{#if artPanelCollapsed}} pc-art-collapsed{{/if}}">
     <aside class="pc-art-panel{{#if artPanelCollapsed}} is-collapsed{{/if}}" aria-label="Character art panel">
-      <button type="button" class="pc-art-panel-toggle" title="{{#if artPanelCollapsed}}Show Character Art{{else}}Hide Character Art{{/if}}" aria-label="{{#if artPanelCollapsed}}Show Character Art{{else}}Hide Character Art{{/if}}" aria-expanded="{{#if artPanelCollapsed}}false{{else}}true{{/if}}">
+      <button type="button" class="pc-art-panel-toggle" data-tooltip="{{#if artPanelCollapsed}}Show Character Art{{else}}Hide Character Art{{/if}}" aria-label="{{#if artPanelCollapsed}}Show Character Art{{else}}Hide Character Art{{/if}}" aria-expanded="{{#if artPanelCollapsed}}false{{else}}true{{/if}}">
         <i class="fas fa-caret-{{#if artPanelCollapsed}}right{{else}}left{{/if}}" aria-hidden="true"></i>
       </button>
       <div class="pc-art-panel-frame">
@@ -121,7 +121,7 @@
             <img src="{{actor.img}}" alt="{{actor.name}}" style="transform: translate(-50%, -50%) translate({{actor.system.portraitOffsetX}}px, {{actor.system.portraitOffsetY}}px) scale({{actor.system.portraitScale}});" />
             {{#if @root.editable}}
               <div class="portrait-controls">
-                <button type="button" class="portrait-control-btn select-portrait-btn" title="Change Portrait" aria-label="Change Portrait">
+                <button type="button" class="portrait-control-btn select-portrait-btn" data-tooltip="Change Portrait" aria-label="Change Portrait">
                   <i class="fas fa-image" aria-hidden="true"></i>
                 </button>
               </div>
@@ -136,7 +136,7 @@
                 <span class="pc-portrait-lozenge-label">Initiative</span>
               </label>
             {{else}}
-              <button type="button" class="pc-portrait-lozenge pc-portrait-lozenge-button initiative-clickable" data-action="rollInitiative" title="Roll Initiative" aria-label="Roll Initiative">
+              <button type="button" class="pc-portrait-lozenge pc-portrait-lozenge-button initiative-clickable" data-action="rollInitiative" data-tooltip="Roll Initiative" aria-label="Roll Initiative">
                 <span class="pc-portrait-lozenge-frame">
                   <span class="pc-portrait-lozenge-value">{{portraitStats.initiative}}</span>
                 </span>
@@ -144,7 +144,7 @@
               </button>
             {{/if}}
             <div class="pc-portrait-lozenge pc-portrait-armor-charge" aria-label="Armor Charge">
-              <div class="pc-portrait-armor-charge-field" data-resource="armorCharge" role="meter" aria-valuemin="0" aria-valuenow="{{armorCharge.value}}" aria-valuemax="{{armorCharge.max}}" title="Armor Charge {{armorCharge.value}} / {{armorCharge.max}}">
+              <div class="pc-portrait-armor-charge-field" data-resource="armorCharge" role="meter" aria-valuemin="0" aria-valuenow="{{armorCharge.value}}" aria-valuemax="{{armorCharge.max}}" data-tooltip="Armor Charge {{armorCharge.value}} / {{armorCharge.max}}">
                 <span class="pc-portrait-armor-charge-frame">
                   <img src="systems/peasant-core/ui/armor-charge%20badge.webp" alt="" aria-hidden="true">
                 </span>
@@ -162,14 +162,14 @@
               <span class="pc-portrait-lozenge-label">Armor Charge</span>
             </div>
             {{#if @root.editable}}
-              <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" title="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
+              <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" data-tooltip="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
                 <span class="pc-portrait-lozenge-frame">
                   <input type="number" data-field="system.movement" class="pc-portrait-lozenge-input pc-input" value="{{actor.system.movement}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Movement">
                 </span>
                 <span class="pc-portrait-lozenge-label">Movement</span>
               </label>
             {{else}}
-              <div class="pc-portrait-lozenge" title="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
+              <div class="pc-portrait-lozenge" data-tooltip="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
                 <span class="pc-portrait-lozenge-frame">
                   <span class="pc-portrait-lozenge-value">{{portraitStats.movement}}</span>
                 </span>
@@ -183,16 +183,16 @@
                 <span>Hit Points</span>
                 <span class="pc-portrait-hp-actions" aria-label="Hit point actions">
                   {{#if owner}}
-                  <button type="button" class="pc-portrait-hp-action damage-toggle" title="Take Damage" aria-label="Take Damage">
+                  <button type="button" class="pc-portrait-hp-action damage-toggle" data-tooltip="Take Damage" aria-label="Take Damage">
                     <i class="fas fa-swords" aria-hidden="true"></i>
                   </button>
-                  <button type="button" class="pc-portrait-hp-action heal-toggle" title="Heal" aria-label="Heal">
+                  <button type="button" class="pc-portrait-hp-action heal-toggle" data-tooltip="Heal" aria-label="Heal">
                     <i class="fas fa-heart" aria-hidden="true"></i>
                   </button>
                   {{/if}}
                   {{#unless simplifiedHp}}
                     {{#if canObserve}}
-                    <button type="button" class="pc-portrait-hp-action pc-hp-grid-open" title="Open HP Grid" aria-label="Open HP Grid">
+                    <button type="button" class="pc-portrait-hp-action pc-hp-grid-open" data-tooltip="Open HP Grid" aria-label="Open HP Grid">
                       <i class="fas fa-th" aria-hidden="true"></i>
                     </button>
                     {{/if}}
@@ -221,17 +221,17 @@
                 {{/if}}
               </div>
               {{#if owner}}
-                <label class="pc-portrait-hp-side pc-portrait-hp-temp" title="Temporary HP">
+                <label class="pc-portrait-hp-side pc-portrait-hp-temp" data-tooltip="Temporary HP" aria-label="Temporary HP">
                   <input type="number" class="pc-portrait-hp-input pc-portrait-thp-input pc-input" value="{{#if hpBar.tempValue}}{{hpBar.tempValue}}{{/if}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Temporary HP">
                 </label>
-                <label class="pc-portrait-hp-side pc-portrait-hp-bolstered" title="Bolstered HP max {{hpBar.bolsteredMax}}">
+                <label class="pc-portrait-hp-side pc-portrait-hp-bolstered" data-tooltip="Bolstered HP max {{hpBar.bolsteredMax}}" aria-label="Bolstered HP">
                   <input type="number" class="pc-portrait-hp-input pc-portrait-bhp-input pc-input" value="{{#if hpBar.bolsteredValue}}{{hpBar.bolsteredValue}}{{/if}}" min="0" max="{{hpBar.bolsteredMax}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Bolstered HP">
                 </label>
               {{else}}
-                <div class="pc-portrait-hp-side pc-portrait-hp-temp" title="Temporary HP" aria-label="Temporary HP">
+                <div class="pc-portrait-hp-side pc-portrait-hp-temp" data-tooltip="Temporary HP" aria-label="Temporary HP">
                   <span>{{#if hpBar.tempValue}}{{hpBar.tempValue}}{{else}}0{{/if}}</span>
                 </div>
-                <div class="pc-portrait-hp-side pc-portrait-hp-bolstered" title="Bolstered HP max {{hpBar.bolsteredMax}}" aria-label="Bolstered HP">
+                <div class="pc-portrait-hp-side pc-portrait-hp-bolstered" data-tooltip="Bolstered HP max {{hpBar.bolsteredMax}}" aria-label="Bolstered HP">
                   <span>{{#if hpBar.bolsteredValue}}{{hpBar.bolsteredValue}}{{else}}0{{/if}}</span>
                 </div>
               {{/if}}
@@ -248,15 +248,15 @@
                     <span>Physical</span>
                     <span class="pc-portrait-stress-actions" aria-label="Physical stress actions">
                       {{#if owner}}
-                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="physical" title="Take Physical Stress" aria-label="Take Physical Stress">
+                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="physical" data-tooltip="Take Physical Stress" aria-label="Take Physical Stress">
                         <i class="fas fa-swords" aria-hidden="true"></i>
                       </button>
-                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="physical" title="Heal Physical Stress" aria-label="Heal Physical Stress">
+                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="physical" data-tooltip="Heal Physical Stress" aria-label="Heal Physical Stress">
                         <i class="fas fa-heart" aria-hidden="true"></i>
                       </button>
                       {{/if}}
                       {{#if canObserve}}
-                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="physical" title="Open Physical Stress Grid" aria-label="Open Physical Stress Grid">
+                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="physical" data-tooltip="Open Physical Stress Grid" aria-label="Open Physical Stress Grid">
                         <i class="fas fa-th" aria-hidden="true"></i>
                       </button>
                       {{/if}}
@@ -270,7 +270,7 @@
                     <span>{{stressBars.physical.totalSeverity}} / {{stressBars.physical.maxSeverity}}</span>
                   {{/if}}
                 </div>
-                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="physical" title="Left-click to take 1 physical stress. Right-click to heal 1 physical stress.">
+                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="physical" data-tooltip="Left-click to take 1 physical stress. Right-click to heal 1 physical stress.">
                   {{#each stressBars.physical.segments as |segment|}}
                     <div class="pc-stress-bar-section pc-stress-bar-section-{{segment.key}}" data-stress-type="physical" data-stress-section="{{segment.key}}">
                       <div class="pc-stress-bar-fill" style="width: {{segment.fillPct}}%;"></div>
@@ -286,15 +286,15 @@
                     <span>Mental</span>
                     <span class="pc-portrait-stress-actions" aria-label="Mental stress actions">
                       {{#if owner}}
-                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="mental" title="Take Mental Stress" aria-label="Take Mental Stress">
+                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="mental" data-tooltip="Take Mental Stress" aria-label="Take Mental Stress">
                         <i class="fas fa-swords" aria-hidden="true"></i>
                       </button>
-                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="mental" title="Heal Mental Stress" aria-label="Heal Mental Stress">
+                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="mental" data-tooltip="Heal Mental Stress" aria-label="Heal Mental Stress">
                         <i class="fas fa-heart" aria-hidden="true"></i>
                       </button>
                       {{/if}}
                       {{#if canObserve}}
-                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="mental" title="Open Mental Stress Grid" aria-label="Open Mental Stress Grid">
+                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="mental" data-tooltip="Open Mental Stress Grid" aria-label="Open Mental Stress Grid">
                         <i class="fas fa-th" aria-hidden="true"></i>
                       </button>
                       {{/if}}
@@ -308,7 +308,7 @@
                     <span>{{stressBars.mental.totalSeverity}} / {{stressBars.mental.maxSeverity}}</span>
                   {{/if}}
                 </div>
-                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="mental" title="Left-click to take 1 mental stress. Right-click to heal 1 mental stress.">
+                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="mental" data-tooltip="Left-click to take 1 mental stress. Right-click to heal 1 mental stress.">
                   {{#each stressBars.mental.segments as |segment|}}
                     <div class="pc-stress-bar-section pc-stress-bar-section-{{segment.key}}" data-stress-type="mental" data-stress-section="{{segment.key}}">
                       <div class="pc-stress-bar-fill" style="width: {{segment.fillPct}}%;"></div>
@@ -326,15 +326,15 @@
                     <span>General</span>
                     <span class="pc-portrait-stress-actions" aria-label="General stress actions">
                       {{#if owner}}
-                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="general" title="Take General Stress" aria-label="Take General Stress">
+                      <button type="button" class="pc-portrait-hp-action stress-damage-toggle" data-stress-type="general" data-tooltip="Take General Stress" aria-label="Take General Stress">
                         <i class="fas fa-swords" aria-hidden="true"></i>
                       </button>
-                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="general" title="Heal General Stress" aria-label="Heal General Stress">
+                      <button type="button" class="pc-portrait-hp-action stress-heal-toggle" data-stress-type="general" data-tooltip="Heal General Stress" aria-label="Heal General Stress">
                         <i class="fas fa-heart" aria-hidden="true"></i>
                       </button>
                       {{/if}}
                       {{#if canObserve}}
-                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="general" title="Open General Stress Grid" aria-label="Open General Stress Grid">
+                      <button type="button" class="pc-portrait-hp-action pc-stress-grid-open" data-stress-type="general" data-tooltip="Open General Stress Grid" aria-label="Open General Stress Grid">
                         <i class="fas fa-th" aria-hidden="true"></i>
                       </button>
                       {{/if}}
@@ -348,7 +348,7 @@
                     <span>{{stressBars.general.totalSeverity}} / {{stressBars.general.maxSeverity}}</span>
                   {{/if}}
                 </div>
-                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="general" title="Left-click to take 1 general stress. Right-click to heal 1 general stress.">
+                <div class="pc-stress-bar pc-portrait-stress-bar" data-stress-type="general" data-tooltip="Left-click to take 1 general stress. Right-click to heal 1 general stress.">
                   {{#each stressBars.general.segments as |segment|}}
                     <div class="pc-stress-bar-section pc-stress-bar-section-{{segment.key}}" data-stress-type="general" data-stress-section="{{segment.key}}">
                       <div class="pc-stress-bar-fill" style="width: {{segment.fillPct}}%;"></div>
@@ -368,7 +368,7 @@
                       <div class="pc-portrait-resource-heading">
                         <span>Stamina</span>
                       </div>
-                      <div class="pc-portrait-resource-bar" data-resource="stamina" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.stamina.value}}" aria-valuemax="{{resourceBars.stamina.max}}" title="Stamina {{resourceBars.stamina.value}} / {{resourceBars.stamina.max}}">
+                      <div class="pc-portrait-resource-bar" data-resource="stamina" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.stamina.value}}" aria-valuemax="{{resourceBars.stamina.max}}" data-tooltip="Stamina {{resourceBars.stamina.value}} / {{resourceBars.stamina.max}}">
                         <div class="pc-portrait-resource-fill pc-portrait-resource-fill-stamina" style="width: {{resourceBars.stamina.pct}}%;"></div>
                         <span class="pc-portrait-resource-bar-label">
                           <span class="pc-portrait-resource-value">{{resourceBars.stamina.value}}</span>
@@ -388,7 +388,7 @@
                       <div class="pc-portrait-resource-heading">
                         <span>Attunement</span>
                       </div>
-                      <div class="pc-portrait-resource-bar" data-resource="attunement" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.attunement.value}}" aria-valuemax="{{resourceBars.attunement.max}}" title="Attunement {{resourceBars.attunement.value}} / {{resourceBars.attunement.max}}">
+                      <div class="pc-portrait-resource-bar" data-resource="attunement" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.attunement.value}}" aria-valuemax="{{resourceBars.attunement.max}}" data-tooltip="Attunement {{resourceBars.attunement.value}} / {{resourceBars.attunement.max}}">
                         <div class="pc-portrait-resource-fill pc-portrait-resource-fill-attunement" style="width: {{resourceBars.attunement.pct}}%;"></div>
                         <span class="pc-portrait-resource-bar-label">
                           <span class="pc-portrait-resource-value">{{resourceBars.attunement.value}}</span>
@@ -412,7 +412,7 @@
                       <div class="pc-portrait-resource-heading">
                         <span>Capacity</span>
                       </div>
-                      <div class="pc-portrait-resource-bar" data-resource="capacity" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.capacity.value}}" aria-valuemax="{{resourceBars.capacity.max}}" title="Capacity {{resourceBars.capacity.value}} / {{resourceBars.capacity.max}}">
+                      <div class="pc-portrait-resource-bar" data-resource="capacity" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.capacity.value}}" aria-valuemax="{{resourceBars.capacity.max}}" data-tooltip="Capacity {{resourceBars.capacity.value}} / {{resourceBars.capacity.max}}">
                         <div class="pc-portrait-resource-fill pc-portrait-resource-fill-capacity" style="width: {{resourceBars.capacity.pct}}%;"></div>
                         <span class="pc-portrait-resource-bar-label">
                           <span class="pc-portrait-resource-value">{{resourceBars.capacity.value}}</span>
@@ -432,7 +432,7 @@
                       <div class="pc-portrait-resource-heading">
                         <span>{{resourceBars.edge.label}}</span>
                       </div>
-                      <div class="pc-portrait-resource-bar" data-resource="edge" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.edge.value}}" aria-valuemax="{{resourceBars.edge.max}}" title="{{resourceBars.edge.label}} {{resourceBars.edge.value}} / {{resourceBars.edge.max}}">
+                      <div class="pc-portrait-resource-bar" data-resource="edge" role="meter" aria-valuemin="0" aria-valuenow="{{resourceBars.edge.value}}" aria-valuemax="{{resourceBars.edge.max}}" data-tooltip="{{resourceBars.edge.label}} {{resourceBars.edge.value}} / {{resourceBars.edge.max}}">
                         <div class="pc-portrait-resource-fill pc-portrait-resource-fill-edge" style="width: {{resourceBars.edge.pct}}%;"></div>
                         <span class="pc-portrait-resource-bar-label">
                           <span class="pc-portrait-resource-value">{{resourceBars.edge.value}}</span>
@@ -454,10 +454,10 @@
           <div class="halt-section pc-portrait-halt-list {{#if simplifiedHp}}simplified-halt-section{{/if}}">
             <div class="halt-row">
               <div class="halt-label-group">
-                <span class="halt-letter {{#if actor.system.hardHead}}hard{{/if}}" data-loc="Head" data-type="halt" title="Head">H</span>
-                <span class="halt-letter {{#if actor.system.hardArms}}hard{{/if}}" data-loc="Arms" data-type="halt" title="Arms">A</span>
-                <span class="halt-letter {{#if actor.system.hardLegs}}hard{{/if}}" data-loc="Legs" data-type="halt" title="Legs">L</span>
-                <span class="halt-letter {{#if actor.system.hardTorso}}hard{{/if}}" data-loc="Torso" data-type="halt" title="Torso">T</span>
+                <span class="halt-letter {{#if actor.system.hardHead}}hard{{/if}}" data-loc="Head" data-type="halt" data-tooltip="Head" aria-label="Head">H</span>
+                <span class="halt-letter {{#if actor.system.hardArms}}hard{{/if}}" data-loc="Arms" data-type="halt" data-tooltip="Arms" aria-label="Arms">A</span>
+                <span class="halt-letter {{#if actor.system.hardLegs}}hard{{/if}}" data-loc="Legs" data-type="halt" data-tooltip="Legs" aria-label="Legs">L</span>
+                <span class="halt-letter {{#if actor.system.hardTorso}}hard{{/if}}" data-loc="Torso" data-type="halt" data-tooltip="Torso" aria-label="Torso">T</span>
                 :
               </div>
               {{#if @root.editable}}
@@ -484,10 +484,10 @@
               {{else}}
                 <div class="halt-label-group">
                   <span class="halt-title" style="margin-right: 4px;">Natural</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardHead}}hard{{/if}}" title="Head">H</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardArms}}hard{{/if}}" title="Arms">A</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardLegs}}hard{{/if}}" title="Legs">L</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardTorso}}hard{{/if}}" title="Torso">T</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardHead}}hard{{/if}}" data-tooltip="Head" aria-label="Head">H</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardArms}}hard{{/if}}" data-tooltip="Arms" aria-label="Arms">A</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardLegs}}hard{{/if}}" data-tooltip="Legs" aria-label="Legs">L</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardTorso}}hard{{/if}}" data-tooltip="Torso" aria-label="Torso">T</span>
                   <span style="margin-left: 2px;">:</span>
                 </div>
                 <span class="halt-value">{{#each naturalHaltDisplay as |part index|}}<span class="{{#if part.isHard}}hard-val{{/if}}">{{part.value}}</span>{{#unless @last}}/{{/unless}}{{/each}}</span>
@@ -513,7 +513,7 @@
       <div class="attributes-table pc-hex-attributes">
         <div class="pc-hex-row pc-hex-score-row" aria-label="Attributes">
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" title="Click to open Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" data-tooltip="Click to open Blessing menu" aria-label="Open Build Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.build" value="{{actor.system.build}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Build score">
@@ -526,7 +526,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" title="Click to open Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" data-tooltip="Click to open Blessing menu" aria-label="Open Reflex Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.reflex" value="{{actor.system.reflex}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Reflex score">
@@ -539,9 +539,9 @@
               {{#if @root.editable}}
                 {{#if reflexAoeSaveEnabled}}
                   <input type="text" data-field="system.reflexAoeSaveTarget" value="{{reflexAoeSaveTarget}}" class="attr-input-text reflex-aoe-save-input pc-input" placeholder="AoE" inputmode="numeric" pattern="\d*" aria-label="AoE Reflex Save">
-                  <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-remove" title="Remove AoE Reflex Save">-</button>
+                  <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-remove" data-tooltip="Remove AoE Reflex Save" aria-label="Remove AoE Reflex Save">-</button>
                 {{else}}
-                  <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-add" title="Add AoE Reflex Save">+</button>
+                  <button type="button" class="reflex-aoe-toggle-btn reflex-aoe-add" data-tooltip="Add AoE Reflex Save" aria-label="Add AoE Reflex Save">+</button>
                 {{/if}}
               {{else}}
                 {{#if reflexAoeSaveDisplay}}
@@ -555,7 +555,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" title="Click to open Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" data-tooltip="Click to open Blessing menu" aria-label="Open Intuition Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.intuition" value="{{actor.system.intuition}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Intuition score">
@@ -568,7 +568,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" title="Click to open Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" data-tooltip="Click to open Blessing menu" aria-label="Open Learn Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.learn" value="{{actor.system.learn}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Learn score">
@@ -581,7 +581,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" title="Click to open Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" data-tooltip="Click to open Blessing menu" aria-label="Open Charisma Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.charisma" value="{{actor.system.charisma}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Charisma score">

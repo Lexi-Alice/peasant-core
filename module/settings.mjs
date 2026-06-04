@@ -292,9 +292,10 @@ class PeasantCoreSettingsMenu extends SettingsApplicationBase {
     input.value = entry.label;
     input.hidden = true;
     chipEl.classList.remove("is-editing");
-    chipEl.title = `Right-click to edit ${entry.label}`;
+    chipEl.dataset.tooltip = `Right-click to edit ${entry.label}`;
+    chipEl.setAttribute("aria-label", `Right-click to edit ${entry.label}`);
     if (removeBtn) {
-      removeBtn.title = `Remove ${entry.label}`;
+      removeBtn.dataset.tooltip = `Remove ${entry.label}`;
       removeBtn.setAttribute("aria-label", `Remove ${entry.label}`);
     }
   }

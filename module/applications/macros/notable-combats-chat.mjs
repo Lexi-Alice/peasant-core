@@ -59,7 +59,7 @@ export async function renderNotableCombatsChat() {
       </span>`;
     }
     if (tag.rollable) {
-      return `<button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-rollable" data-combat-index="${combatIndex}" data-roll-type="${escapeHtml(tag.type)}" data-tag-type="${escapeHtml(tag.type)}" data-tag-index="${tagIdx}" title="Click to roll ${label}">${label}: ${value}</button>`;
+      return `<button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-rollable" data-combat-index="${combatIndex}" data-roll-type="${escapeHtml(tag.type)}" data-tag-type="${escapeHtml(tag.type)}" data-tag-index="${tagIdx}" data-tooltip="Click to roll ${label}" aria-label="Click to roll ${label}">${label}: ${value}</button>`;
     }
     if (value) {
       return `<span class="combat-tag combat-tag-compact">${label ? `${label}: ` : ''}${value}</span>`;
@@ -77,14 +77,11 @@ export async function renderNotableCombatsChat() {
 
     const nameSuffix = (combat.hasToHit || combat.hasAccuracy) ? ':' : '';
     const nameText = escapeHtml(combat.name ?? '');
+    const descriptionTooltipHtml = escapeHtml(combat.descriptionTooltipHtml ?? '');
 
     const nameHtml = combat.hasDescription
-      ? `<span class="combat-name-wrapper" data-index="${index}" tabindex="0">
+      ? `<span class="combat-name-wrapper" data-index="${index}" tabindex="0" data-tooltip-html="${descriptionTooltipHtml}">
           <span class="combat-name-view combat-has-desc" data-index="${index}">${nameText}${nameSuffix}</span>
-          <div class="combat-description-tooltip">
-            <div class="skill-tooltip-header">${nameText}</div>
-            <div class="skill-tooltip-content">${combat.description ?? ''}</div>
-          </div>
         </span>`
       : `<span class="combat-name-view">${nameText}${nameSuffix}</span>`;
 
@@ -94,7 +91,7 @@ export async function renderNotableCombatsChat() {
       if (combat.hasAccuracy) rollText += ` ${combat.accuracySign}${combat.accuracyNum} Acc`;
     }
     const rollHtml = rollText.trim()
-      ? `<span class="combat-roll-clickable" data-index="${index}" tabindex="0" title="Roll ${nameText}">${rollText.trim()}</span>`
+      ? `<span class="combat-roll-clickable" data-index="${index}" tabindex="0" data-tooltip="Roll ${nameText}" aria-label="Roll ${nameText}">${rollText.trim()}</span>`
       : '';
 
     const usesHtml = combat.sig ? `

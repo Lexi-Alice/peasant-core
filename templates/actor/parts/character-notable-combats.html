@@ -24,11 +24,11 @@
 
             {{#if combat.isStandard}}
               <div style="flex: 0 0 24px; text-align: center; display: flex; align-items: center; justify-content: center;">
-                <input type="checkbox" class="combat-sig-checkbox" {{#if combat.sig}}checked{{/if}} data-field="sig" title="Sig?">
+                <input type="checkbox" class="combat-sig-checkbox" {{#if combat.sig}}checked{{/if}} data-field="sig" data-tooltip="Sig?" aria-label="Sig?">
               </div>
               <input type="number" value="{{combat.class}}" class="combat-input combat-class pc-input" min="1" max="10" placeholder="C" data-field="class" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px;">
-              <input type="text" value="{{combat.rank}}" class="combat-input combat-rank pc-input" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" title="Enter 0-4 or 'U' for untrained">
-              <button type="button" class="combat-toggle-type" title="Switch to Special Type" style="flex: 0 0 12px; width: 12px; height: 12px; padding: 0; font-size: 10px; border: none; background: transparent; color: #666; cursor: pointer; align-self: center; margin: 0 2px 0 0; line-height: 1;">&times;</button>
+              <input type="text" value="{{combat.rank}}" class="combat-input combat-rank pc-input" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" data-tooltip="Enter 0-4 or 'U' for untrained" aria-label="Combat rank">
+              <button type="button" class="combat-toggle-type" data-tooltip="Switch to Special Type" aria-label="Switch to Special Type" style="flex: 0 0 12px; width: 12px; height: 12px; padding: 0; font-size: 10px; border: none; background: transparent; color: #666; cursor: pointer; align-self: center; margin: 0 2px 0 0; line-height: 1;">&times;</button>
             {{else}}
               <select class="combat-select pc-select" data-field="type" style="flex: 0 0 75px; height: 24px; font-size: 11px;">
                 <option value="standard">Standard</option>
@@ -54,7 +54,7 @@
             {{/if}}
 
             <input type="text" value="{{combat.name}}" class="combat-input combat-name pc-input" placeholder="Combat name" data-field="name" style="flex: 1; margin-left: 2px;">
-            <button type="button" class="combat-desc-btn" title="Edit Description" style="margin-left:6px; background:#666; color:#fff; border:none; border-radius:3px; width:20px; height:20px; line-height:16px; padding:0; cursor:pointer;">+</button>
+            <button type="button" class="combat-desc-btn" data-tooltip="Edit Description" aria-label="Edit Description" style="margin-left:6px; background:#666; color:#fff; border:none; border-radius:3px; width:20px; height:20px; line-height:16px; padding:0; cursor:pointer;">+</button>
             {{#if combat.allowToHitAcc}}
               <input type="text" value="{{combat.tohit}}" class="combat-input combat-tohit pc-input" placeholder="TH" data-field="tohit" inputmode="numeric" pattern="\d*" style="flex: 0 0 30px; margin-left: 2px;">
               <input type="text" value="{{combat.accuracy}}" class="combat-input combat-accuracy pc-input" placeholder="Acc" data-field="accuracy" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
@@ -63,9 +63,9 @@
               <input type="number" value="{{combat.usesMax}}" class="combat-input combat-uses-max pc-input" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
             {{/if}}
             <div class="combat-actions" style="display: flex; gap: 2px; flex: 0 0 auto;">
-              <button type="button" class="combat-indent" title="Indent" style="padding: 0 4px; font-size: 10px;">&rarr;</button>
-              <button type="button" class="combat-outdent" title="Outdent" style="padding: 0 4px; font-size: 10px;">&larr;</button>
-              <button type="button" class="combat-delete" title="Delete" style="padding: 0 4px; font-size: 10px;">&times;</button>
+              <button type="button" class="combat-indent" data-tooltip="Indent" aria-label="Indent" style="padding: 0 4px; font-size: 10px;">&rarr;</button>
+              <button type="button" class="combat-outdent" data-tooltip="Outdent" aria-label="Outdent" style="padding: 0 4px; font-size: 10px;">&larr;</button>
+              <button type="button" class="combat-delete" data-tooltip="Delete" aria-label="Delete" style="padding: 0 4px; font-size: 10px;">&times;</button>
             </div>
           </div>
         {{/each}}
@@ -85,19 +85,15 @@
                   {{/if}}
 
                   {{#if combat.hasDescription}}
-                    <span class="combat-name-wrapper" data-index="{{index}}" tabindex="0">
+                    <span class="combat-name-wrapper" data-index="{{index}}" tabindex="0" data-tooltip-html="{{combat.descriptionTooltipHtml}}">
                       <span class="combat-name-view combat-has-desc" data-index="{{index}}">{{combat.name}}{{#if combat.hasToHit}}:{{else}}{{#if combat.hasAccuracy}}:{{/if}}{{/if}}</span>
-                      <div class="combat-description-tooltip">
-                        <div class="skill-tooltip-header">{{combat.name}}</div>
-                        <div class="skill-tooltip-content">{{{combat.description}}}</div>
-                      </div>
                     </span>
                   {{else}}
                     <span class="combat-name-view">{{combat.name}}{{#if combat.hasToHit}}:{{else}}{{#if combat.hasAccuracy}}:{{/if}}{{/if}}</span>
                   {{/if}}
 
                   {{#if combat.allowToHitAcc}}
-                    <span class="combat-roll-clickable" data-action="rollCombat" data-index="{{index}}" role="button" tabindex="0" title="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
+                    <span class="combat-roll-clickable" data-action="rollCombat" data-index="{{index}}" role="button" tabindex="0" data-tooltip="Roll {{combat.name}}" aria-label="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
                   {{/if}}
 
                   {{#if combat.sig}}
@@ -134,7 +130,7 @@
                             <span>/{{tag.splitSecondMax}}</span>
                           </span>
                         {{else if tag.rollable}}
-                          <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-rollable" data-action="rollCombatTag" data-combat-index="{{@../index}}" data-roll-type="{{tag.type}}" data-tag-type="{{tag.type}}" data-tag-index="{{@index}}" title="Click to roll {{tag.label}}">{{tag.label}}: {{tag.value}}</button>
+                          <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-rollable" data-action="rollCombatTag" data-combat-index="{{@../index}}" data-roll-type="{{tag.type}}" data-tag-type="{{tag.type}}" data-tag-index="{{@index}}" data-tooltip="Click to roll {{tag.label}}" aria-label="Click to roll {{tag.label}}">{{tag.label}}: {{tag.value}}</button>
                         {{else if tag.value}}
                           <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">{{#if tag.label}}{{tag.label}}: {{/if}}{{tag.value}}</button>
                         {{else}}

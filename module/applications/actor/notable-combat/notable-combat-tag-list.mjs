@@ -14,9 +14,9 @@ export function renderNotableCombatTagList($list, activeTags) {
     const customIndexAttr = Number.isInteger(tag.customIndex) ? ` data-custom-index="${tag.customIndex}"` : '';
     const tagKey = tag.type === 'custom' && Number.isInteger(tag.customIndex) ? `custom:${tag.customIndex}` : tag.type;
     const $tagItem = $(`
-      <div class="current-tag-item editor-tag-draggable combat-tag combat-tag-compact combat-tag-button" data-tag-type="${tag.type}" data-tag-key="${tagKey}" data-tag-index="${idx}"${customIndexAttr} draggable="true" role="button" tabindex="0" title="Right-click to edit this tag" style="display:inline-flex !important; width:auto !important; max-width:max-content !important; flex:0 0 auto !important; margin:0 !important; align-self:flex-start !important; justify-content:flex-start !important;">
+      <div class="current-tag-item editor-tag-draggable combat-tag combat-tag-compact combat-tag-button" data-tag-type="${tag.type}" data-tag-key="${tagKey}" data-tag-index="${idx}"${customIndexAttr} draggable="true" role="button" tabindex="0" data-tooltip="Right-click to edit this tag" aria-label="Right-click to edit this tag" style="display:inline-flex !important; width:auto !important; max-width:max-content !important; flex:0 0 auto !important; margin:0 !important; align-self:flex-start !important; justify-content:flex-start !important;">
         <span class="${labelClass}">${escapeHtml(tag.display)}</span>
-        <button type="button" class="remove-tag-btn" data-tag-type="${tag.type}" data-tag-key="${tagKey}"${customIndexAttr} title="Remove tag" draggable="false" aria-label="Remove tag">&times;</button>
+        <button type="button" class="remove-tag-btn" data-tag-type="${tag.type}" data-tag-key="${tagKey}"${customIndexAttr} data-tooltip="Remove tag" draggable="false" aria-label="Remove tag">&times;</button>
       </div>
     `);
     const chipEl = $tagItem[0];

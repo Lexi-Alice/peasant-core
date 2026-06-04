@@ -8,11 +8,11 @@
         <ul class="advantages-list">
           {{#each flexibleAdvantages as |advantage index|}}
             <li class="advantage-item" data-advantage-index="{{index}}" draggable="true">
-              <span class="advantage-drag-handle" title="Drag to reorder">&bull;</span>
+              <span class="advantage-drag-handle" data-tooltip="Drag to reorder" aria-label="Drag to reorder">&bull;</span>
               <input type="text" value="{{advantage.name}}" class="advantage-input pc-input" data-index="{{index}}" placeholder="Enter advantage...">
               <input type="hidden" class="advantage-description-hidden" value="{{advantage.description}}">
-              <button type="button" class="advantage-desc-btn" title="Edit Description">+</button>
-              <button type="button" class="advantage-delete" title="Delete">&times;</button>
+              <button type="button" class="advantage-desc-btn" data-tooltip="Edit Description" aria-label="Edit Description">+</button>
+              <button type="button" class="advantage-delete" data-tooltip="Delete" aria-label="Delete">&times;</button>
             </li>
           {{/each}}
         </ul>
@@ -24,12 +24,8 @@
             {{#if advantage.name}}
               <li style="margin-bottom: 4px; color: #e0e0e0;">
                 {{#if advantage.hasDescription}}
-                  <span class="advantage-name-wrapper combat-name-wrapper" data-index="{{advantage.index}}" tabindex="0">
+                  <span class="advantage-name-wrapper combat-name-wrapper" data-index="{{advantage.index}}" tabindex="0" data-tooltip-html="{{advantage.descriptionTooltipHtml}}">
                     <span class="advantage-name-view advantage-has-desc" data-index="{{advantage.index}}">{{advantage.name}}</span>
-                    <div class="combat-description-tooltip">
-                      <div class="skill-tooltip-header">{{advantage.name}}</div>
-                      <div class="skill-tooltip-content">{{{advantage.description}}}</div>
-                    </div>
                   </span>
                 {{else}}
                   {{advantage.name}}
