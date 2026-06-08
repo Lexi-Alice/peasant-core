@@ -1,7 +1,7 @@
 import { getCombatCostModifiers } from "../../data/actor/combat-modifiers.mjs";
-import { applyDefensePenaltiesToRollResult } from "../../data/actor/defense-penalties.mjs";
-import { getFailureLabelFromDefensePromptResult } from "../../data/actor/defense-results.mjs";
-import { hasRangeRateValue } from "../../data/actor/combat-tags.mjs";
+import { applyDefensePenaltiesToRollResult, forceRollResultFailureDueToDefense } from "../../data/actor/defense-penalties.mjs";
+import { doesSuccessfulAreaDefenseDefendAttack, getFailureLabelFromDefensePromptResult } from "../../data/actor/defense-results.mjs";
+import { getCombatTargetingType, hasRangeRateValue } from "../../data/actor/combat-tags.mjs";
 import { normalizeAppliedDamageType } from "../../data/actor/targeted-damage.mjs";
 import { hasCombatDice } from "../../dice/combat-dice.mjs";
 import { pcLog } from "../../utils/logging.mjs";
@@ -40,6 +40,7 @@ export async function performNotableCombatRoll({
       promptForTargets
     });
 
+    const targetingType = getCombatTargetingType(combat);
     const attackerToken = getPreferredActorToken(actor);
     const activeTargets = promptForTargets ? getActiveNotableCombatTargets() : [];
     const shouldRollPerTarget = activeTargets.length > 1;
@@ -137,6 +138,7 @@ export async function performNotableCombatRoll({
         const defenseAccuracyPenalty = Number(promptEntry?.result?.appliedAccuracyPenalty) || 0;
         const defenseToHitPenalty = Number(promptEntry?.result?.appliedToHitPenalty) || 0;
         const defenseFailureLabel = getFailureLabelFromDefensePromptResult(promptEntry?.result);
+        const areaDefenseDefendedAttack = doesSuccessfulAreaDefenseDefendAttack(targetingType, promptEntry?.result);
         const penaltyApplication = applyDefensePenaltiesToRollResult(sharedAttackRoll?.rollResult, {
           defenseAccuracyPenalty,
           defenseToHitPenalty,
@@ -151,6 +153,15 @@ export async function performNotableCombatRoll({
           rollResult: penaltyApplication?.rollResult || sharedAttackRoll?.rollResult || null,
           sharedAttackRollId: sharedAttackRoll?.rollResult?.chatMessage?.id || null
         };
+        if (areaDefenseDefendedAttack && targetRoll.rollResult) {
+          const defendedApplication = forceRollResultFailureDueToDefense(targetRoll.rollResult, {
+            defenseFailureLabel,
+            preserveChatMessage: false
+          });
+          if (defendedApplication?.rollResult) {
+            targetRoll.rollResult = defendedApplication.rollResult;
+          }
+        }
         if (isChainCancelledResult(targetRoll)) {
           await consumeNotableCombatRollUse(actor, combatIndex, sheet);
           return {
@@ -223,7 +234,9 @@ export async function performNotableCombatRoll({
     } else {
       const defenseAccuracyPenalty = Number(defensePromptSummary?.totalAccuracyPenalty) || 0;
       const defenseToHitPenalty = Number(defensePromptSummary?.totalToHitPenalty) || 0;
-      const defenseFailureLabel = getFailureLabelFromDefensePromptResult(defensePromptSummary?.promptResults?.[0]?.result);
+      const defensePromptResult = defensePromptSummary?.promptResults?.[0]?.result || null;
+      const defenseFailureLabel = getFailureLabelFromDefensePromptResult(defensePromptResult);
+      const areaDefenseDefendedAttack = doesSuccessfulAreaDefenseDefendAttack(targetingType, defensePromptResult);
       const target = activeTargets[0] || null;
       const resolvedTargetLabel = target?.targetName || targetLabel || "";
       const singleRoll = await executeResolvedNotableCombatRoll({
@@ -266,10 +279,28 @@ export async function performNotableCombatRoll({
           singleRoll.defenseToHitPenalty = defenseToHitPenalty;
           try {
             await updateSkillRollChatCardFromResult(singleRoll.rollResult, {
-              label: penaltyApplication.failureDueToDefense ? defenseFailureLabel : null
+              label: penaltyApplication.narrowSuccessIntoDefense
+                ? singleRoll.rollResult.resultText
+                : (penaltyApplication.failureDueToDefense ? defenseFailureLabel : null)
             });
           } catch (e) {
             pcLog.debug("Peasant Core | Failed to update single-target roll after defense penalties", e);
+          }
+        }
+      }
+      if (singleRoll?.rollResult && areaDefenseDefendedAttack) {
+        const defendedApplication = forceRollResultFailureDueToDefense(singleRoll.rollResult, {
+          defenseFailureLabel,
+          preserveChatMessage: true
+        });
+        if (defendedApplication?.rollResult) {
+          singleRoll.rollResult = defendedApplication.rollResult;
+          try {
+            await updateSkillRollChatCardFromResult(singleRoll.rollResult, {
+              label: singleRoll.rollResult.resultText
+            });
+          } catch (e) {
+            pcLog.debug("Peasant Core | Failed to update single-target roll after area defense success", e);
           }
         }
       }
@@ -290,7 +321,7 @@ export async function performNotableCombatRoll({
           combat,
           target,
           attackRoll: singleRoll,
-          defensePromptResult: defensePromptSummary?.promptResults?.[0]?.result || null,
+          defensePromptResult,
           appliedDamageType: resolvedDamageType || null
         });
         if (isChainCancelledResult(incomingHitResolution)) {

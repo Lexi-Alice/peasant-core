@@ -40,6 +40,15 @@ export function canApplyPrimalEvasion(actor, targetingType) {
   return getActorPrimalEvasionValue(actor) >= 1;
 }
 
+export function doesSuccessfulAreaDefenseDefendAttack(targetingType, defensePromptResult) {
+  const responseKey = getCombatDefenseResponseKey(targetingType);
+  return !!(
+    ["aoe", "areaBlast", "tileBlast"].includes(responseKey)
+    && defensePromptResult?.selection === "defense"
+    && defensePromptResult?.defenseRoll?.rollResult?.isSuccess
+  );
+}
+
 export function createPrimalEvasionDefenseResult(actor, targetingType) {
   const penalty = canApplyPrimalEvasion(actor, targetingType) ? getActorPrimalEvasionValue(actor) : 0;
   return {

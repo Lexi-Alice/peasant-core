@@ -77,7 +77,7 @@ export async function updateSkillRollChatCardFromResult(rollResult, { label = nu
   await rollResult.chatMessage.update({ content: container.innerHTML });
 }
 
-export async function markRollForcedPass(rollResult, { stressCost = 0, spendType = "general" } = {}) {
+export async function markRollForcedPass(rollResult, { stressCost = 0, spendType = "general", noteLabel = "Forced Pass", setMoSToZero = true } = {}) {
   if (!rollResult?.chatMessage?.update) return;
 
   const content = String(rollResult.chatMessage.content || "");
@@ -88,7 +88,8 @@ export async function markRollForcedPass(rollResult, { stressCost = 0, spendType
 
   const mosButton = container.querySelector(".mos-toggle");
   if (mosButton instanceof HTMLElement) {
-    mosButton.textContent = "0";
+    const totalMoS = Number(rollResult?.totalMoS);
+    mosButton.textContent = setMoSToZero || !Number.isFinite(totalMoS) ? "0" : formatThresholdValue(totalMoS);
     mosButton.style.color = "#4ade80";
     mosButton.style.border = "2px solid #22c55e";
   }
@@ -103,13 +104,20 @@ export async function markRollForcedPass(rollResult, { stressCost = 0, spendType
 
   const rollDetails = container.querySelector(".roll-details");
   if (rollDetails instanceof HTMLElement) {
+    const detailLines = Array.from(rollDetails.children).filter((child) => child instanceof HTMLElement);
+    const baseMosLine = detailLines.find((child) => child.textContent?.trim().startsWith("Base MoS:"));
+    if (baseMosLine instanceof HTMLElement && Number.isFinite(Number(rollResult?.baseMoS))) {
+      const baseMoS = Number(rollResult.baseMoS);
+      baseMosLine.textContent = `Base MoS: ${baseMoS >= 0 ? "+" : ""}${baseMoS.toFixed(2)}`;
+    }
+
     let note = rollDetails.querySelector(".pc-force-pass-note");
     if (!(note instanceof HTMLElement)) {
       note = document.createElement("div");
       note.className = "pc-force-pass-note";
       rollDetails.appendChild(note);
     }
-    note.textContent = `Forced Pass: ${stressCost} ${getForcePassSpendTypeLabel(spendType)}`;
+    note.textContent = `${noteLabel}: ${stressCost} ${getForcePassSpendTypeLabel(spendType)}`;
     note.style.color = "#e0e0e0";
     note.style.marginTop = "0";
     note.style.fontWeight = "normal";

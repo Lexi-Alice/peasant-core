@@ -69,6 +69,7 @@ function getAreaDamageHaltLocation(targetActor, targetingKey) {
 function isGlancingSuccessAttack(attackRoll) {
   const rollResult = attackRoll?.rollResult;
   if (!rollResult || typeof rollResult !== "object") return false;
+  if (rollResult.forcedPass || rollResult.glancingSuccessUpgraded) return false;
   if (String(rollResult.resultText || "").trim() === "Glancing Success") return true;
 
   const baseMoS = Number(rollResult.baseMoS);

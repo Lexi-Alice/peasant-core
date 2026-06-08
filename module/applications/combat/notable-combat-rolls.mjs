@@ -128,9 +128,12 @@ export async function executeResolvedNotableCombatRoll({
     rollResult = penaltyApplication.rollResult;
   }
   const failureDueToDefense = !!penaltyApplication?.failureDueToDefense;
-  if (failureDueToDefense && rollResult) {
+  const defenseOutcomeLabel = (failureDueToDefense || penaltyApplication?.narrowSuccessIntoDefense)
+    ? String(rollResult?.resultText || defenseFailureLabel)
+    : "";
+  if (defenseOutcomeLabel && rollResult) {
     try {
-      await markRollFailureDueToDefense(rollResult, { label: defenseFailureLabel });
+      await markRollFailureDueToDefense(rollResult, { label: defenseOutcomeLabel });
     } catch (e) {
       pcLog.debug("Peasant Core | Failed to restyle attack roll as defense failure", e);
     }

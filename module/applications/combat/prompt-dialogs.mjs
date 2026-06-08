@@ -215,15 +215,17 @@ export async function showFlexibleDamageTypePrompt({
 export async function showForcePassPromptDialog({
   actor = null,
   rollLabel = "Skill Roll",
-  stressCost = 0
+  stressCost = 0,
+  promptText = ""
 } = {}) {
   if (!actor || stressCost <= 0) return { forced: false, selection: "no", spendType: "general" };
+  const resolvedPromptText = String(promptText || `Spend ${stressCost} stress to force pass?`).trim();
 
   const content = `
     <form class="pc-force-pass-form">
       <div class="form-group" style="margin-bottom: 10px;">
         <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:#b0b0b0;">
-          <span>Spend ${stressCost} stress to force pass?</span>
+          <span>${resolvedPromptText}</span>
           <select class="pc-defense-prompt-select pc-select pc-dialog-field-md" name="forcePassStressType">
             <option value="physical">Physical Stress</option>
             <option value="mental">Mental Stress</option>
