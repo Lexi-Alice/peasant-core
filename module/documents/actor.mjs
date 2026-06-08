@@ -229,7 +229,9 @@ export class PeasantActor extends Actor {
       isHard = true;
     } else {
       const flags = TARGETED_DAMAGE_HARD_FLAG_MAP[location] || { hard: "", naturalHard: "" };
-      isHard = !!this.system?.[flags.hard] || !!this.system?.[flags.naturalHard];
+      const armorHard = !!this.system?.[flags.hard];
+      const naturalHard = !!this.system?.[flags.naturalHard];
+      isHard = naturalHard || (!isAP && armorHard);
     }
 
     const rawCounts = splitDamageCounts(netDamage, normalizedType);
