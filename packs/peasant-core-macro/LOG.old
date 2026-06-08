@@ -1,8 +1,5 @@
-2026/06/07-13:12:32.818 71a0 Recovering log #1035
-2026/06/07-13:12:32.830 71a0 Delete type=0 #1035
-2026/06/07-13:12:32.830 71a0 Delete type=3 #1034
-2026/06/07-20:18:33.333 79a8 Level-0 table #1039: started
-2026/06/07-20:18:33.333 79a8 Level-0 table #1039: 0 bytes OK
-2026/06/07-20:18:33.337 79a8 Delete type=0 #1037
-2026/06/07-20:18:33.342 79a8 Manual compaction at level-0 from '!macros!MKmKtiutwF9bJLjx' @ 72057594037927935 : 1 .. '!macros!rVLHnD78CLBaWvqZ' @ 0 : 0; will stop at (end)
-2026/06/07-20:18:33.342 79a8 Manual compaction at level-1 from '!macros!MKmKtiutwF9bJLjx' @ 72057594037927935 : 1 .. '!macros!rVLHnD78CLBaWvqZ' @ 0 : 0; will stop at (end)
+2026/06/07-23:50:09.497 2c38 Log #1041: 0 ops saved to Table #1042 OK
+2026/06/07-23:50:09.499 2c38 Archiving C:\Users\smelo\AppData\Local\FoundryVTT\Data\systems\peasant-core\packs\peasant-core-macro/001041.log: OK
+2026/06/07-23:50:09.499 2c38 Table #837: 4 entries OK
+2026/06/07-23:50:09.505 2c38 Archiving C:\Users\smelo\AppData\Local\FoundryVTT\Data\systems\peasant-core\packs\peasant-core-macro/MANIFEST-001040: OK
+2026/06/07-23:50:09.512 2c38 **** Repaired leveldb C:\Users\smelo\AppData\Local\FoundryVTT\Data\systems\peasant-core\packs\peasant-core-macro; recovered 1 files; 1235 bytes. Some data may have been lost. ****
