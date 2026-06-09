@@ -37,10 +37,6 @@ export async function confirmPeasantShortRest(sheet) {
         callback: async () => {
           await performPeasantShortRest(sheet);
         }
-      },
-      cancel: {
-        icon: '<i class="fas fa-times"></i>',
-        label: "Cancel"
       }
     },
     default: "yes"
@@ -65,10 +61,6 @@ export async function confirmPeasantLongRest(sheet) {
         callback: async () => {
           await performPeasantLongRest(sheet);
         }
-      },
-      cancel: {
-        icon: '<i class="fas fa-times"></i>',
-        label: "Cancel"
       }
     },
     default: "yes"

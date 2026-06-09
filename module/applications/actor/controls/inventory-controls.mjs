@@ -51,14 +51,29 @@ function canReorderInventory(sheet) {
   return !!sheet?.canModifyActor && getInventorySortMode(sheet) === "manual";
 }
 
-function openItemSheet(item, { edit = false } = {}) {
+function openItemSheet(item, { mode = null } = {}) {
   const sheet = item?.sheet;
   if (!sheet || typeof sheet.render !== "function") return;
-  if (edit) {
-    const mode = sheet.constructor?.MODES?.EDIT;
-    if (mode !== undefined) return sheet.render({ force: true, mode });
-  }
+  const modes = sheet.constructor?.MODES ?? {};
+  if (mode === "edit" && modes.EDIT !== undefined) return sheet.render({ force: true, mode: modes.EDIT });
+  if (mode === "view" && modes.PLAY !== undefined) return sheet.render({ force: true, mode: modes.PLAY });
   return sheet.render({ force: true });
+}
+
+async function duplicateInventoryItem(sheet, item) {
+  if (!sheet?.canModifyActor || !item) return null;
+  const name = game.i18n?.format?.("DOCUMENT.CopyOf", { name: item.name })
+    ?? `Copy of ${item.name ?? "Item"}`;
+
+  if (typeof item.clone === "function") {
+    return item.clone({ name }, { save: true, addSource: true });
+  }
+
+  const itemData = toEmbeddedItemData(item);
+  if (!itemData) return null;
+  itemData.name = name;
+  const created = await sheet.actor?.createEmbeddedDocuments?.("Item", [itemData]);
+  return created?.[0] ?? null;
 }
 
 function sortInventoryRows(root, sheet) {
@@ -114,7 +129,6 @@ function applyInventorySearch(root) {
   if (!browser) return;
 
   const input = qs(browser, "[data-pc-inventory-search]");
-  const clear = qs(browser, "[data-pc-inventory-clear-search]");
   const query = String(input?.value ?? "").trim().toLowerCase();
   const activeView = qs(browser, "[data-pc-inventory-view]:not([hidden])") ?? browser;
   let matchingRows = 0;
@@ -135,7 +149,6 @@ function applyInventorySearch(root) {
     section.hidden = !!query && sectionMatches === 0;
   }
 
-  if (clear) clear.hidden = !query;
   const empty = qs(browser, ".pc-inventory-search-empty");
   if (empty) empty.hidden = !query || totalRows === 0 || matchingRows > 0;
 }
@@ -324,11 +337,27 @@ function getContextMenuClass() {
 function getInventoryContextMenuEntries(sheet) {
   return [
     {
+      label: "View Item",
+      icon: "fa-solid fa-eye",
+      onClick: (_event, target) => {
+        const item = getItemFromElement(sheet, target);
+        openItemSheet(item, { mode: "view" });
+      }
+    },
+    {
       label: "Edit",
       icon: "fa-solid fa-pen-to-square",
       onClick: (_event, target) => {
         const item = getItemFromElement(sheet, target);
-        openItemSheet(item, { edit: true });
+        openItemSheet(item, { mode: "edit" });
+      }
+    },
+    {
+      label: "Duplicate",
+      icon: "fa-solid fa-copy",
+      onClick: async (_event, target) => {
+        const item = getItemFromElement(sheet, target);
+        await duplicateInventoryItem(sheet, item);
       }
     },
     {
@@ -450,11 +479,6 @@ export function setupInventoryControls(sheet, html, { runQueuedInputUpdate = nul
 
   const search = qs(browser, "[data-pc-inventory-search]");
   search?.addEventListener("input", () => applyInventorySearch(root));
-  qs(browser, "[data-pc-inventory-clear-search]")?.addEventListener("click", (event) => {
-    event.preventDefault();
-    if (search) search.value = "";
-    applyInventorySearch(root);
-  });
 
   qs(browser, "[data-pc-inventory-group-toggle]")?.addEventListener("click", (event) => {
     event.preventDefault();

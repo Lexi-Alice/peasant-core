@@ -147,13 +147,6 @@ export async function showLocationBySkillPrompt({
             });
             return true;
           }
-        },
-        cancel: {
-          label: "Cancel",
-          callback: async () => {
-            finalize({ option: tableOption, selection: fallbackSelection, cancelled: true });
-            return true;
-          }
         }
       },
       default: "select",

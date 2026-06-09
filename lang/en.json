@@ -1,5 +1,6 @@
 {
   "TYPES.Actor.character": "Character",
+  "TYPES.ActiveEffect.enchantment": "Enchantment",
   "TYPES.Item.weapon": "Weapon",
   "TYPES.Item.equipment": "Equipment",
   "TYPES.Item.tool": "Tool",

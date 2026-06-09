@@ -2,6 +2,7 @@ export {
   prepareActorAdvantageContext,
   prepareActorAttributeContext,
   prepareActorEdgeContext,
+  prepareActorEffectContext,
   prepareActorHealthResourceContext,
   prepareActorIdentityContext,
   prepareActorInventoryContext,

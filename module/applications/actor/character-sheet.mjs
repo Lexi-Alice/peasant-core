@@ -20,7 +20,9 @@ import { setupResourceControls } from "./controls/resource-controls.mjs";
 import { rollAttributeSaveFromElement, rollAttributeToHitFromElement, rollCombatFromElement, rollCombatTagFromElement, rollConsciousnessFromElement, rollInitiativeFromElement, rollSkillFromElement } from "./controls/roll-actions.mjs";
 import { blurActiveEditableInSheet as blurActiveEditableInSheetHelper, collectAdvantagesFromSheet, createSheetUpdateQueue, initializeSheetSaveQueues, runQueuedInputUpdate as runQueuedInputUpdateHelper, sanitizeOptionalIntegerInputElement } from "./controls/sheet-listener-helpers.mjs";
 import { setupWoundsControls } from "./controls/wounds-controls.mjs";
-import { prepareActorAdvantageContext, prepareActorAttributeContext, prepareActorEdgeContext, prepareActorHealthResourceContext, prepareActorIdentityContext, prepareActorInventoryContext, prepareActorNotableCombatContext, prepareActorSheetBaseContext, prepareActorSkillContext, prepareActorStressContext } from "./context/sheet-context.mjs";
+import { openDefenseFavoritesWindow } from "./defense-favorites-window.mjs";
+import { prepareActorAdvantageContext, prepareActorAttributeContext, prepareActorEdgeContext, prepareActorEffectContext, prepareActorHealthResourceContext, prepareActorIdentityContext, prepareActorInventoryContext, prepareActorNotableCombatContext, prepareActorSheetBaseContext, prepareActorSkillContext, prepareActorStressContext } from "./context/sheet-context.mjs";
+import { setupActorEffectControls } from "./controls/effects-controls.mjs";
 import { setupNotableCombatControls } from "./notable-combat/notable-combat-controls.mjs";
 import { setupNotableCombatDragDropControls } from "./notable-combat/notable-combat-drag-drop.mjs";
 import { setupNotableCombatTagEditorControls } from "./notable-combat/notable-combat-tag-editor.mjs";
@@ -941,6 +943,7 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     data.biography = this.actor.system.biography || "";
     await prepareActorInventoryContext(data, this.actor);
+    await prepareActorEffectContext(data, this.actor);
     const inventorySortMode = this._pcInventorySortMode === "alpha" ? "alpha" : "manual";
     data.inventorySortToggle = {
       mode: inventorySortMode,
@@ -1043,7 +1046,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       chromeAction.removeAttribute("aria-disabled");
     }
 
-    const allowButton = (button) => button.matches(".pc-sheet-tab-button, .pc-hp-grid-open, .pc-stress-grid-open, .toggle-wounds-menu, [data-pc-inventory-clear-search]");
+    const allowButton = (button) => button.matches(".pc-sheet-tab-button, .pc-hp-grid-open, .pc-stress-grid-open, .toggle-wounds-menu");
     const markReadOnlyAction = (element) => {
       element.dataset.pcReadonlyAction = "true";
       element.setAttribute("aria-disabled", "true");
@@ -1073,7 +1076,7 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     forEachScoped("input, textarea", (input) => {
       if (input.type === "hidden" || input.hidden || input.hasAttribute("hidden")) return;
-      if (input.matches(".pc-inventory-search-input")) return;
+      if (input.matches(".pc-inventory-search-input, .pc-passive-effects-search-input")) return;
       input.disabled = false;
       input.removeAttribute("disabled");
       input.readOnly = true;
@@ -1111,6 +1114,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       ".halt-section",
       ".skills-list-view",
       ".notable-combats-list-view",
+      ".pc-passive-effects-browser",
       ".pc-inventory-browser",
       ".advantages-list-view",
       ".pc-biography-detail-strip",
@@ -1169,6 +1173,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       setupPortraitControls(this, html, { readOnly: true });
       setupWoundsControls(this, html, { readOnly: true });
       setupHealthStressControls(this, html, { readOnly: true });
+      setupActorEffectControls(this, html, { readOnly: true });
       setupInventoryControls(this, html, { readOnly: true });
       return;
     }
@@ -1192,6 +1197,13 @@ export class PeasantActorSheet extends ActorSheetBase {
 
     html.find(".pc-sheet-setting-input").off("change.peasantCoreSettings").on("change.peasantCoreSettings", async (event) => {
       await this._onPeasantCoreSettingChange(event);
+    });
+
+    html.find(".pc-setting-action-button[data-pc-setting-action]").off("click.peasantCoreSettings").on("click.peasantCoreSettings", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const action = event.currentTarget?.dataset?.pcSettingAction;
+      if (action === "defenseFavorites") openDefenseFavoritesWindow(this);
     });
 
     html.find(".pc-custom-sir-input").off("change.peasantCustomSir").on("change.peasantCustomSir", async (event) => {
@@ -1252,6 +1264,7 @@ export class PeasantActorSheet extends ActorSheetBase {
     setupWoundsControls(this, html);
 
     setupCombatModifierControls(this, html, { blurActiveEditableInSheet, enqueueSheetUpdate, runQueuedInputUpdate });
+    setupActorEffectControls(this, html);
 
     setupResourceControls(this, html, { runQueuedInputUpdate });
     setupHealthStressControls(this, html);

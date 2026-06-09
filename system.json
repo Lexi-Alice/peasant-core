@@ -75,6 +75,9 @@
   "background": "systems/peasant-core/ui/peasantcore-background.jpeg",
   "primaryTokenAttribute": "health",
   "documentTypes": {
+    "ActiveEffect": {
+      "enchantment": {}
+    },
     "Actor": {
       "character": {
         "htmlFields": [

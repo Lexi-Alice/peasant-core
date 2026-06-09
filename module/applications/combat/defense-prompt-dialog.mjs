@@ -6,11 +6,12 @@ import {
   getToHitPenaltyFromDefenseRoll
 } from "../../data/actor/defense-results.mjs";
 import {
-  clearPreferredDefenseMatch,
+  getDefenseFavoriteKey,
+  getDefenseFavorites,
   getMatchingDefenseNotables,
-  getPreferredDefenseMatch,
-  setPreferredDefenseMatch
+  getPreferredDefenseMatch
 } from "../../data/actor/defense-favorites.mjs";
+import { isSimplifiedHpActor } from "../../data/actor/helpers.mjs";
 import { escapeHtml } from "../../utils/chat.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { renderDialogV2 } from "../dialogs.mjs";
@@ -18,6 +19,14 @@ import { rollAoeReflexSaveForTarget } from "./aoe-reflex-save.mjs";
 import { resolveDefensePromptActor } from "./actor-targets.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
 import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remote-prompt-registry.mjs";
+
+const DEFENSE_FAVORITE_MODE_ALWAYS = "always";
+const DEFENSE_FAVORITE_MODE_WHEN_OVER = "whenOver";
+const DEFENSE_FAVORITE_MODE_WHEN_UNDER = "whenUnder";
+const DEFENSE_FAVORITE_THRESHOLD_MODES = new Set([
+  DEFENSE_FAVORITE_MODE_WHEN_OVER,
+  DEFENSE_FAVORITE_MODE_WHEN_UNDER
+]);
 
 export async function showDefensePromptDialog(payload = {}, { rollNotableCombat = null } = {}) {
   const defenderActor = await resolveDefensePromptActor(payload);
@@ -88,6 +97,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
   const previewByIndex = new Map(
     matchingDefenses.map(({ combat, index }) => [String(index), getNotableCombatRollPreview(defenderActor, combat)])
   );
+  const favoriteKey = getDefenseFavoriteKey(targetingType);
+  const favorite = favoriteKey ? getDefenseFavorites(defenderActor)?.[favoriteKey] : null;
   const preferredDefenseMatch = getPreferredDefenseMatch(defenderActor, targetingType, matchingDefenses);
   const preferredDefenseValue = preferredDefenseMatch ? String(preferredDefenseMatch.index) : "";
   const defaultDefenseValue = preferredDefenseValue || (hasReflexSaveOption ? "__reflex_save__" : "__none__");
@@ -95,6 +106,18 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     const defense = normalizeCombatDefense(defenseMatch?.defense);
     return !!(defense.block && defense.blockType === "Shield");
   };
+  if (preferredDefenseMatch && shouldAutoUseDefenseFavorite(defenderActor, favorite)) {
+    const automaticResult = await rollAutomaticFavoriteDefense({
+      defenderActor,
+      targetingType,
+      attackerName,
+      defenseMatch: preferredDefenseMatch,
+      isOverkillAttack,
+      isShieldBlockDefenseMatch,
+      rollNotableCombat
+    });
+    if (automaticResult) return automaticResult;
+  }
   const optionsHtml = [
     ...matchingDefenses.map(({ combat, index }) => {
       const label = String(combat?.name || `Defense ${index + 1}`).trim() || `Defense ${index + 1}`;
@@ -114,12 +137,6 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         <select class="pc-defense-prompt-select pc-select pc-dialog-field-full" name="defenseCombatIndex">
           ${optionsHtml}
         </select>
-      </div>
-      <div class="form-group pc-defense-favorite" style="display:none;">
-        <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; color:#b0b0b0;">
-          <span>Favorite as defensive reflex for targeting type?</span>
-          <input type="checkbox" name="defenseFavoriteForTargeting">
-        </label>
       </div>
       <div class="form-group pc-defense-brace" style="display:none;">
         <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; color:#b0b0b0;">
@@ -249,18 +266,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               return false;
             }
 
-            const favoriteChecked = !!html.find('[name="defenseFavoriteForTargeting"]').prop("checked");
             const shieldBlockBraced = isShieldBlockDefenseMatch(selectedDefenseMatch)
               && (isOverkillAttack || !!html.find('[name="shieldBlockBrace"]').prop("checked"));
-            try {
-              if (favoriteChecked) {
-                await setPreferredDefenseMatch(defenderActor, targetingType, selectedDefenseMatch);
-              } else if (preferredDefenseValue === selectedValue) {
-                await clearPreferredDefenseMatch(defenderActor, targetingType);
-              }
-            } catch (favoriteError) {
-              console.warn("Peasant Core | Failed to update defensive reflex favorite", favoriteError);
-            }
 
             if (typeof rollNotableCombat !== "function") {
               ui.notifications?.warn?.("Defense roll workflow is unavailable.");
@@ -314,19 +321,6 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
             });
             return true;
           }
-        },
-        cancel: {
-          label: "Cancel",
-          callback: async () => {
-            finalize({
-              selection: "cancel",
-              selectedCombatIndex: null,
-              defenseRoll: null,
-              appliedAccuracyPenalty: 0,
-              appliedToHitPenalty: 0
-            });
-            return true;
-          }
         }
       },
       default: "roll",
@@ -374,8 +368,6 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         }
 
         const $select = html.find('[name="defenseCombatIndex"]');
-        const $favorite = html.find('[name="defenseFavoriteForTargeting"]');
-        const $favoriteRow = html.find(".pc-defense-favorite");
         const $brace = html.find('[name="shieldBlockBrace"]');
         const $braceRow = html.find(".pc-defense-brace");
         const $toHit = html.find('[name="defensePreviewToHit"]');
@@ -388,8 +380,6 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
           if (selectedValue === "__none__" || selectedValue === "__reflex_save__") {
             $toHit.val("");
             $accuracy.val("");
-            $favorite.prop("checked", false);
-            $favoriteRow.hide();
             $brace.prop("checked", false);
             $brace.prop("disabled", false);
             $braceRow.hide();
@@ -404,8 +394,6 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
           if (!preview) {
             $toHit.val("");
             $accuracy.val("");
-            $favorite.prop("checked", false);
-            $favoriteRow.show();
             $brace.prop("disabled", isOverkillAttack && isShieldBlock);
             $brace.prop("checked", isOverkillAttack && isShieldBlock);
             $braceRow.toggle(isShieldBlock);
@@ -414,8 +402,6 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
             return;
           }
 
-          $favoriteRow.show();
-          $favorite.prop("checked", selectedValue === preferredDefenseValue);
           $braceRow.toggle(isShieldBlock);
           $brace.prop("disabled", isOverkillAttack && isShieldBlock);
           if (isOverkillAttack && isShieldBlock) $brace.prop("checked", true);
@@ -433,4 +419,160 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
       }
     }, { classes: ["pc-defense-prompt-dialog", "peasant-macro-dialog-force"] });
   });
+}
+
+async function rollAutomaticFavoriteDefense({
+  defenderActor,
+  targetingType,
+  attackerName,
+  defenseMatch,
+  isOverkillAttack,
+  isShieldBlockDefenseMatch,
+  rollNotableCombat
+} = {}) {
+  if (typeof rollNotableCombat !== "function" || !defenderActor || !defenseMatch) return null;
+
+  const preview = getNotableCombatRollPreview(defenderActor, defenseMatch.combat);
+  const overrideToHit = Number.parseInt(preview?.modifiedTohit, 10);
+  const rollOverrides = Number.isFinite(overrideToHit)
+    ? {
+      toHit: overrideToHit,
+      accuracy: preview?.hasAccuracy ? preview.accuracyNum : undefined
+    }
+    : null;
+
+  const defenseRoll = await rollNotableCombat({
+    actor: defenderActor,
+    combatIndex: defenseMatch.index,
+    promptForTargets: false,
+    targetLabel: attackerName,
+    cardClass: "pc-defense-roll-card",
+    rollOverrides
+  });
+  if (!defenseRoll) return null;
+  const selectedDefense = normalizeCombatDefense(defenseMatch.defense);
+
+  if (isChainCancelledResult(defenseRoll)) {
+    return {
+      handled: true,
+      selection: "close",
+      selectedCombatIndex: defenseMatch.index,
+      selectedDefense,
+      defenseRoll,
+      appliedAccuracyPenalty: 0,
+      appliedToHitPenalty: 0,
+      activeDefense: false,
+      primalEvasionPenalty: 0,
+      shieldBlockBraced: false,
+      chainCancelled: true,
+      automaticDefenseFavorite: true
+    };
+  }
+
+  return {
+    handled: true,
+    selection: "defense",
+    selectedCombatIndex: defenseMatch.index,
+    selectedDefense,
+    defenseRoll,
+    appliedAccuracyPenalty: getAccuracyPenaltyFromDefenseRoll(
+      defenseMatch.defense,
+      targetingType,
+      defenseRoll?.rollResult
+    ),
+    appliedToHitPenalty: getToHitPenaltyFromDefenseRoll(
+      defenseMatch.defense,
+      defenseRoll?.rollResult
+    ),
+    activeDefense: true,
+    primalEvasionPenalty: 0,
+    shieldBlockBraced: isShieldBlockDefenseMatch?.(defenseMatch) && isOverkillAttack,
+    automaticDefenseFavorite: true
+  };
+}
+
+function shouldAutoUseDefenseFavorite(actor, favorite) {
+  const mode = normalizeDefenseFavoriteAutoMode(favorite?.mode);
+  if (mode === DEFENSE_FAVORITE_MODE_ALWAYS) return true;
+  if (!DEFENSE_FAVORITE_THRESHOLD_MODES.has(mode)) return false;
+
+  const conditions = getDefenseFavoriteAutoConditions(favorite, mode);
+  return conditions.length > 0 && conditions.every((condition) => isDefenseFavoriteConditionMet(actor, condition));
+}
+
+function getDefenseFavoriteAutoConditions(favorite, fallbackMode) {
+  const rawConditions = Array.isArray(favorite?.conditions) ? favorite.conditions : [];
+  if (rawConditions.length > 0) {
+    return rawConditions.map((condition, index) => normalizeDefenseFavoriteAutoCondition(
+      condition,
+      index === 0 ? fallbackMode : DEFENSE_FAVORITE_MODE_WHEN_OVER
+    )).filter(Boolean);
+  }
+
+  const threshold = favorite?.threshold && typeof favorite.threshold === "object" ? favorite.threshold : {};
+  const fallbackCondition = normalizeDefenseFavoriteAutoCondition({
+    mode: fallbackMode,
+    value: threshold.value,
+    resourceType: threshold.resourceType
+  }, fallbackMode);
+  return fallbackCondition ? [fallbackCondition] : [];
+}
+
+function normalizeDefenseFavoriteAutoCondition(condition, fallbackMode) {
+  if (!condition || typeof condition !== "object") return null;
+
+  const mode = normalizeDefenseFavoriteAutoMode(condition.mode || fallbackMode);
+  if (!DEFENSE_FAVORITE_THRESHOLD_MODES.has(mode)) return null;
+
+  const value = Number.parseInt(condition.value, 10);
+  const resourceType = String(condition.resourceType || "").trim();
+  if (!Number.isFinite(value) || !resourceType) return null;
+
+  return {
+    mode,
+    value: Math.max(0, value),
+    resourceType
+  };
+}
+
+function normalizeDefenseFavoriteAutoMode(value) {
+  const normalized = String(value ?? "").trim();
+  return normalized === DEFENSE_FAVORITE_MODE_ALWAYS || DEFENSE_FAVORITE_THRESHOLD_MODES.has(normalized)
+    ? normalized
+    : "";
+}
+
+function isDefenseFavoriteConditionMet(actor, condition) {
+  const currentValue = getDefenseFavoriteConditionResourceValue(actor, condition.resourceType);
+  if (!Number.isFinite(currentValue)) return false;
+  if (condition.mode === DEFENSE_FAVORITE_MODE_WHEN_OVER) return currentValue > condition.value;
+  if (condition.mode === DEFENSE_FAVORITE_MODE_WHEN_UNDER) return currentValue < condition.value;
+  return false;
+}
+
+function getDefenseFavoriteConditionResourceValue(actor, resourceType) {
+  const key = String(resourceType || "").trim();
+  if (key === "health") return getCurrentHealthConditionValue(actor);
+
+  const value = Number(actor?.system?.[key]?.value);
+  return Number.isFinite(value) ? Math.max(0, value) : null;
+}
+
+function getCurrentHealthConditionValue(actor) {
+  if (!isSimplifiedHpActor(actor)) {
+    const hp = actor?.system?.hp;
+    if (Array.isArray(hp?.grid) && hp.grid.length > 0) {
+      let clearCells = 0;
+      for (const row of hp.grid) {
+        if (!Array.isArray(row)) continue;
+        for (const cell of row) {
+          if (cell === 0) clearCells += 1;
+        }
+      }
+      return clearCells;
+    }
+  }
+
+  const value = Number(actor?.system?.health?.value);
+  return Number.isFinite(value) ? Math.max(0, value) : null;
 }

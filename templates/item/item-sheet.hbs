@@ -75,6 +75,21 @@
     </section>
 
     <section class="pc-item-tab-panel {{#if activeTabs.details}}active{{/if}}" data-pc-item-tab-panel="details" role="tabpanel" aria-hidden="{{#if activeTabs.details}}false{{else}}true{{/if}}" {{#unless activeTabs.details}}hidden{{/unless}}>
+      {{#if isEquipment}}
+        <fieldset class="pc-foundry-section pc-item-section">
+          <legend>Equipment Details</legend>
+          <div class="pc-item-equipment-details">
+            <label class="pc-item-equipment-type-row">
+              <span>Equipment Type</span>
+              <select name="system.category" class="pc-input pc-item-equipment-type-select" aria-label="Equipment Type" {{#unless editable}}disabled{{/unless}}>
+                {{#each equipmentCategoryOptions}}
+                  <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                {{/each}}
+              </select>
+            </label>
+          </div>
+        </fieldset>
+      {{/if}}
       {{#if isLoot}}
         <fieldset class="pc-foundry-section pc-item-section">
           <legend>Loot Details</legend>
@@ -101,21 +116,111 @@
       <section class="pc-item-tab-panel {{#if activeTabs.effects}}active{{/if}}" data-pc-item-tab-panel="effects" role="tabpanel" aria-hidden="{{#if activeTabs.effects}}false{{else}}true{{/if}}" {{#unless activeTabs.effects}}hidden{{/unless}}>
         <fieldset class="pc-foundry-section pc-item-section">
           <legend>Effects</legend>
-          {{#if effects.length}}
-            <ol class="pc-item-effects-list">
-              {{#each effects}}
-                <li class="pc-item-effect">
-                  <img class="pc-item-effect-icon" src="{{icon}}" alt="">
-                  <div class="pc-item-effect-summary">
-                    <strong>{{name}}</strong>
-                    <span>{{status}}</span>
+          <section class="pc-inventory-browser pc-item-effects-browser" aria-label="Active Effects" data-pc-item-effects-browser data-pc-item-effects-grouped="{{#if effectsGroupedByType}}true{{else}}false{{/if}}">
+            <div class="pc-inventory-toolbar pc-item-effects-toolbar">
+              <div class="pc-inventory-search pc-item-effects-search" role="search" aria-label="Search Active Effects">
+                <i class="fa-solid fa-search" aria-hidden="true"></i>
+                <input type="search" class="pc-inventory-search-input pc-item-effects-search-input pc-input" placeholder="Search effects" autocomplete="off" aria-label="Search Active Effects" data-pc-item-effects-search>
+                <button type="button" class="pc-inventory-toolbar-button pc-item-effects-sort-toggle active" data-tooltip="{{effectSortToggle.label}}" aria-label="{{effectSortToggle.label}}" aria-pressed="true" data-sort-mode="{{effectSortToggle.mode}}" data-pc-item-effects-sort-toggle>
+                  <i class="{{effectSortToggle.icon}}" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="pc-inventory-toolbar-button pc-item-effects-group-toggle{{#if effectGroupToggle.active}} active{{/if}}" data-tooltip="{{effectGroupToggle.label}}" aria-label="{{effectGroupToggle.label}}" aria-pressed="{{effectGroupToggle.pressed}}" data-pc-item-effects-group-toggle>
+                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+
+            <section class="pc-inventory-list pc-item-effects-list" data-pc-item-effects-list>
+              <div class="pc-inventory-view pc-item-effects-view" data-pc-item-effects-view="grouped">
+                {{#each effectSections as |section|}}
+                  {{#if section.visible}}
+                    <div class="pc-inventory-section pc-item-effects-section" data-pc-item-effects-section data-effect-type="{{section.type}}">
+                      <header class="pc-inventory-section-header pc-item-effects-section-header">
+                        <h3 class="pc-inventory-section-title pc-item-effects-section-title">
+                          <i class="{{section.icon}}" aria-hidden="true"></i>
+                          <span>{{section.label}}</span>
+                        </h3>
+                        <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-status">Status</div>
+                        <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-controls"></div>
+                      </header>
+
+                      <ol class="pc-inventory-items pc-item-effects-items">
+                        {{#each section.effects as |effect|}}
+                          <li class="pc-inventory-item pc-item-effect" data-pc-item-effect data-effect-id="{{effect.id}}" data-effect-type="{{effect.type}}" data-search="{{effect.searchText}}" data-sort-manual="{{effect.sort}}" data-sort-alpha="{{effect.sortName}}">
+                            <div class="pc-inventory-item-row pc-item-effect-row">
+                              <button type="button" class="pc-inventory-item-summary pc-item-effect-summary" data-tooltip="{{effect.name}}" aria-label="Open {{effect.name}}" data-pc-item-open-effect>
+                                <img class="pc-inventory-item-image pc-item-effect-icon" src="{{effect.icon}}" alt="">
+                                <span class="pc-inventory-item-name-stack pc-item-effect-name-stack">
+                                  <span class="pc-inventory-item-name pc-item-effect-name">{{effect.name}}</span>
+                                  <span class="pc-inventory-item-subtitle pc-item-effect-subtitle">{{effect.subtitle}}</span>
+                                </span>
+                              </button>
+
+                              <div class="pc-inventory-row-field pc-item-effect-state">{{effect.status}}</div>
+
+                              <div class="pc-inventory-row-controls pc-item-effect-controls">
+                                {{#if @root.canEdit}}
+                                  <button type="button" class="pc-inventory-menu-toggle pc-item-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-item-effect-menu></button>
+                                {{/if}}
+                              </div>
+                            </div>
+                          </li>
+                        {{/each}}
+                      </ol>
+                    </div>
+                  {{/if}}
+                {{/each}}
+              </div>
+
+              <div class="pc-inventory-view pc-item-effects-view" data-pc-item-effects-view="flat" hidden>
+                {{#if effectFlatSection.visible}}
+                  <div class="pc-inventory-section pc-item-effects-section" data-pc-item-effects-section data-effect-type="{{effectFlatSection.type}}">
+                    <header class="pc-inventory-section-header pc-item-effects-section-header">
+                      <h3 class="pc-inventory-section-title pc-item-effects-section-title">
+                        <i class="{{effectFlatSection.icon}}" aria-hidden="true"></i>
+                        <span>{{effectFlatSection.label}}</span>
+                      </h3>
+                      <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-status">Status</div>
+                      <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-controls"></div>
+                    </header>
+
+                    <ol class="pc-inventory-items pc-item-effects-items">
+                      {{#each effectFlatSection.effects as |effect|}}
+                        <li class="pc-inventory-item pc-item-effect" data-pc-item-effect data-effect-id="{{effect.id}}" data-effect-type="{{effect.type}}" data-search="{{effect.searchText}}" data-sort-manual="{{effect.sort}}" data-sort-alpha="{{effect.sortName}}">
+                          <div class="pc-inventory-item-row pc-item-effect-row">
+                            <button type="button" class="pc-inventory-item-summary pc-item-effect-summary" data-tooltip="{{effect.name}}" aria-label="Open {{effect.name}}" data-pc-item-open-effect>
+                              <img class="pc-inventory-item-image pc-item-effect-icon" src="{{effect.icon}}" alt="">
+                              <span class="pc-inventory-item-name-stack pc-item-effect-name-stack">
+                                <span class="pc-inventory-item-name pc-item-effect-name">{{effect.name}}</span>
+                                <span class="pc-inventory-item-subtitle pc-item-effect-subtitle">{{effect.subtitle}}</span>
+                              </span>
+                            </button>
+
+                            <div class="pc-inventory-row-field pc-item-effect-state">{{effect.status}}</div>
+
+                            <div class="pc-inventory-row-controls pc-item-effect-controls">
+                              {{#if @root.canEdit}}
+                                <button type="button" class="pc-inventory-menu-toggle pc-item-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-item-effect-menu></button>
+                              {{/if}}
+                            </div>
+                          </div>
+                        </li>
+                      {{/each}}
+                    </ol>
                   </div>
-                </li>
-              {{/each}}
-            </ol>
-          {{else}}
-            <div class="pc-item-empty-state">No effects configured.</div>
-          {{/if}}
+                {{/if}}
+              </div>
+
+              {{#unless hasEffects}}
+                <div class="pc-inventory-empty-state">No effects configured.</div>
+              {{/unless}}
+              <div class="pc-inventory-empty-state pc-item-effects-search-empty" hidden>No matching effects.</div>
+            </section>
+
+            {{#if editable}}
+              <button type="button" class="add-effect-btn" data-pc-item-add-effect> + Add Effect </button>
+            {{/if}}
+          </section>
         </fieldset>
       </section>
     {{/if}}

@@ -41,6 +41,7 @@ const getCombatantInitiativeScore = function(combatant) {
 };
 
 const PC_INITIATIVE_SAVE_FLAG = "rollInitiativeAsSaves";
+export const PC_INITIATIVE_LOCKED_FLAG = "initiativeLocked";
 
 const getCombatState = function(combat) {
   if (!combat) return null;
@@ -605,7 +606,17 @@ export class PeasantCombat extends Combat {
     
     pcLog.debug(`Peasant Core | Advanced to Round ${nextRound}. History exists? ${!!existingNextRoundInits}`);
     
-    if (existingNextRoundInits) {
+    const initiativeLocked = !!this.getFlag("peasant-core", PC_INITIATIVE_LOCKED_FLAG);
+
+    if (initiativeLocked) {
+        this.setupTurns();
+
+        // Clear seized flags for the new round so nobody is skipped.
+        await this.setFlag("peasant-core", "seizedMovement", []);
+        await this.setFlag("peasant-core", "seizedStandard", []);
+
+        ui.notifications.info(`Round ${this.round} Started - Initiative Locked`);
+    } else if (existingNextRoundInits) {
         // Restore initiatives for the next round
         const updates = [];
         for (const [id, init] of Object.entries(existingNextRoundInits)) {

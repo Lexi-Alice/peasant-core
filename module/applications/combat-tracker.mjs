@@ -1,3 +1,4 @@
+import { PC_INITIATIVE_LOCKED_FLAG } from "../documents/combat.mjs";
 import { requestSeizeTurnFromGM } from "../socket/remote-prompts.mjs";
 import { qsa, qs, toElement } from "./dom.mjs";
 
@@ -80,7 +81,38 @@ async function handleSeizeClick(event, combat, combatantId, phase) {
   }
 }
 
+function isInitiativeLocked(combat) {
+  return !!combat?.getFlag("peasant-core", PC_INITIATIVE_LOCKED_FLAG);
+}
+
+async function toggleInitiativeLock(combat, locked) {
+  if (!combat || !game.user?.isGM) return;
+  await combat.setFlag("peasant-core", PC_INITIATIVE_LOCKED_FLAG, locked);
+  ui.notifications?.info?.(locked ? "Initiative locked." : "Initiative unlocked.");
+  ui.combat?.render?.(true);
+}
+
+function addInitiativeLockContextOptions(app, options) {
+  const resetIndex = options.findIndex(option => option.label === "COMBAT.InitiativeReset");
+  const insertAt = resetIndex >= 0 ? resetIndex + 1 : options.length;
+  const hasCombatants = () => game.user?.isGM && (app.viewed?.turns.length > 0);
+
+  options.splice(insertAt, 0, {
+    label: "Lock Initiative",
+    icon: "fa-solid fa-lock",
+    visible: () => hasCombatants() && !isInitiativeLocked(app.viewed),
+    onClick: () => toggleInitiativeLock(app.viewed, true)
+  }, {
+    label: "Unlock Initiative",
+    icon: "fa-solid fa-lock-open",
+    visible: () => hasCombatants() && isInitiativeLocked(app.viewed),
+    onClick: () => toggleInitiativeLock(app.viewed, false)
+  });
+}
+
 export function configureCombatTracker() {
+  Hooks.on("getCombatContextOptions", addInitiativeLockContextOptions);
+
   Hooks.on("renderCombatTracker", async (app, html, data) => {
     const combat = game.combat;
     if (!combat || !combat.round) return;

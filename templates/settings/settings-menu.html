@@ -19,16 +19,14 @@
           </div>
         {{else if group.settings.length}}
           {{#each group.settings as |setting|}}
-            <div class="pc-setting-row">
-              <div class="pc-setting-copy">
-                <label class="pc-setting-label" for="{{setting.id}}">{{setting.label}}</label>
-                <p class="pc-setting-hint">{{setting.hint}}</p>
-              </div>
-              <div class="pc-setting-control">
+            <div class="pc-setting-row form-group">
+              <label class="pc-setting-label" for="{{setting.id}}">{{setting.label}}</label>
+              <div class="pc-setting-control form-fields">
                 {{#if setting.controlLabel}}
                   <span class="pc-setting-control-text">{{setting.controlLabel}}</span>
                 {{/if}}
               </div>
+              <p class="pc-setting-hint hint">{{setting.hint}}</p>
             </div>
           {{/each}}
         {{else}}

@@ -10,13 +10,21 @@
         <legend>{{group.label}}</legend>
 
         {{#each group.settings as |setting|}}
-          <div class="pc-setting-row">
-            <div class="pc-setting-copy">
-              <label class="pc-setting-label" for="{{setting.id}}">{{setting.label}}</label>
-              <p class="pc-setting-hint">{{setting.hint}}</p>
-            </div>
-            <div class="pc-setting-control">
-              {{#if setting.isBoolean}}
+          <div class="pc-setting-row form-group{{#if setting.isAction}} pc-setting-action-row{{/if}}">
+            <label class="pc-setting-label" {{#unless setting.isAction}}for="{{setting.id}}"{{/unless}}>{{setting.label}}</label>
+            <div class="pc-setting-control form-fields">
+              {{#if setting.isAction}}
+                <button
+                  type="button"
+                  id="{{setting.id}}"
+                  class="pc-setting-action-button"
+                  data-pc-setting-action="{{setting.action}}"
+                  data-tooltip="{{setting.buttonLabel}} {{setting.label}}"
+                  aria-label="{{setting.buttonLabel}} {{setting.label}}">
+                  {{#if setting.hasButtonIcon}}<i class="{{setting.buttonIcon}}" aria-hidden="true"></i>{{/if}}
+                  <span>{{setting.buttonLabel}}</span>
+                </button>
+              {{else if setting.isBoolean}}
                 <input
                   type="checkbox"
                   id="{{setting.id}}"
@@ -57,6 +65,7 @@
                 {{/if}}
               {{/if}}
             </div>
+            <p class="pc-setting-hint hint">{{setting.hint}}</p>
           </div>
         {{/each}}
       </fieldset>

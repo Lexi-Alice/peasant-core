@@ -384,9 +384,18 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     text-transform: uppercase;
 }
 
+.pc-settings-tab-panel,
+.pc-settings-menu {
+    --pc-settings-form-label: var(--color-form-label, var(--color-light-4, #d0b8a3));
+    --pc-settings-form-label-hover: var(--color-form-label-hover, var(--color-light-2, #efe6d8));
+    --pc-settings-form-hint: var(--color-form-hint, var(--color-light-5, #9f8475));
+    --pc-settings-form-hint-hover: var(--color-form-hint-hover, var(--color-light-4, #d0b8a3));
+    --pc-settings-fieldset-border: var(--color-light-6, #816b66);
+}
+
 .pc-settings-tab-panel {
     padding: 16px;
-    color: #e0e0e0;
+    color: var(--color-light-2, #d7c7ad);
 }
 
 .pc-settings-header {
@@ -398,7 +407,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     align-items: center;
     gap: 8px;
     margin: 0;
-    color: var(--pc-dnd-gold, #9f9275);
+    color: var(--pc-settings-form-label-hover);
     font-size: 18px;
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -413,8 +422,8 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-settings-group {
     margin: 0;
     padding: 18px 16px 14px;
-    border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
-    border-radius: 6px;
+    border: 1px solid var(--pc-settings-fieldset-border);
+    border-radius: 8px;
     background: transparent;
     box-shadow: none;
 }
@@ -422,18 +431,18 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-settings-group legend {
     margin: 0;
     padding: 0 8px;
-    color: #efe6cf;
-    font-size: 15px;
+    color: var(--pc-settings-form-label-hover);
+    font-size: var(--font-size-15, 15px);
     font-weight: 700;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
 }
 
 .pc-setting-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(96px, 190px);
-    grid-template-areas: "copy control";
-    gap: 18px;
-    align-items: start;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
     padding: 10px 0;
 }
 
@@ -447,53 +456,74 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .pc-setting-label {
     display: block;
+    flex: 1 1 0;
     margin: 0;
-    color: #efe6cf;
+    min-width: 0;
+    color: var(--pc-settings-form-label);
+    font-size: var(--font-size-14, 14px);
     font-weight: 700;
-    line-height: 1.2;
+    line-height: var(--input-height, var(--form-field-height, 32px));
+    cursor: var(--cursor-default);
 }
 
 .pc-setting-hint {
-    margin: 7px 0 0;
-    color: #bca99a;
-    font-size: 13px;
+    flex: 0 0 100%;
+    margin: 0;
+    color: var(--pc-settings-form-hint);
+    font-size: var(--font-size-14, 14px);
     line-height: 1.35;
+}
+
+.pc-setting-row:hover .pc-setting-label {
+    color: var(--pc-settings-form-label-hover);
+}
+
+.pc-setting-row:hover .pc-setting-hint {
+    color: var(--pc-settings-form-hint-hover);
 }
 
 .pc-setting-control {
     display: flex;
+    flex: 1 1 0;
+    flex-wrap: nowrap;
     justify-content: flex-end;
     align-items: center;
-    grid-area: control;
-    min-height: 30px;
+    gap: 4px;
+    min-width: min(100%, 190px);
+    min-height: var(--input-height, var(--form-field-height, 32px));
+    width: 100%;
 }
 
 .pc-setting-copy {
-    grid-area: copy;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
 .pc-setting-control input[type="number"] {
+    flex: 0 0 82px !important;
     width: 82px;
-    height: 30px;
+    height: var(--input-height, var(--form-field-height, 32px));
     text-align: center;
-    color: #f4ead7;
-    background: var(--input-background-color, rgba(49, 40, 49, 0.88));
-    border: 1px solid var(--input-border-color, rgba(203, 191, 154, 0.72));
+    color: var(--input-text-color, var(--color-light-1, #f4ead7));
+    background: var(--input-background-color, #2a2a2a);
+    border: 1px solid var(--input-border-color, #555);
     border-radius: 4px;
+    font-size: var(--font-size-14, 14px);
     font-weight: 700;
 }
 
 .pc-setting-number-suffix-control {
     display: inline-flex;
+    flex: 0 0 82px !important;
     align-items: center;
     width: 82px;
-    height: 30px;
+    height: var(--input-height, var(--form-field-height, 32px));
     box-sizing: border-box;
-    color: #f4ead7;
-    background: rgba(9, 8, 14, 0.62);
-    border: 1px solid var(--input-border-color, rgba(85, 76, 96, 0.56));
+    color: var(--input-text-color, var(--color-light-1, #f4ead7));
+    background: var(--input-background-color, #2a2a2a);
+    border: 1px solid var(--input-border-color, #555);
     border-radius: 4px;
+    font-size: var(--font-size-14, 14px);
     font-weight: 700;
     box-shadow: none;
     outline: 1px solid transparent;
@@ -502,14 +532,14 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .pc-setting-number-suffix-control:hover:not(:focus-within) {
-    background: rgba(9, 8, 14, 0.62);
+    background: var(--input-background-color, #2a2a2a);
     border-color: var(--input-border-color, #555);
     box-shadow: none;
     outline-color: transparent;
 }
 
 .pc-setting-number-suffix-control:focus-within {
-    background: rgba(9, 8, 14, 0.62);
+    background: var(--input-background-color, #2a2a2a);
     border-color: var(--input-border-color, transparent);
     box-shadow: var(--input-box-shadow, none);
     outline: 2px solid var(--pc-foundry-input-focus-outline);
@@ -535,7 +565,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-setting-number-suffix {
     flex: 0 0 auto;
     padding: 0 8px 0 2px;
-    color: rgba(244, 234, 215, 0.58);
+    color: var(--color-light-4, #a9a095);
     pointer-events: none;
     user-select: none;
 }
@@ -560,6 +590,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .pc-setting-control input[type="checkbox"] {
+    flex: 0 0 auto !important;
     width: 16px;
     height: 16px;
     margin: 0;
@@ -568,6 +599,238 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .pc-setting-control input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.pc-setting-action-button {
+    --button-size: var(--input-height, var(--form-field-height, 32px));
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: var(--button-size) !important;
+    min-height: var(--button-size) !important;
+    padding: 0 0.5rem !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.25rem;
+    background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
+    border: 1px solid var(--button-border-color, #9a8462) !important;
+    border-radius: 4px !important;
+    color: var(--button-text-color, var(--color-light-3, #e7d1b1)) !important;
+    font-family: var(--font-sans, "Signika", sans-serif) !important;
+    font-size: var(--font-size-14, 14px) !important;
+    font-weight: 400 !important;
+    line-height: normal !important;
+    text-decoration: none !important;
+    white-space: nowrap;
+    cursor: var(--cursor-pointer) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    transition: 0.5s !important;
+}
+
+.pc-setting-action-button > * {
+    pointer-events: none;
+}
+
+.pc-setting-action-button:hover,
+.pc-setting-action-button:focus-visible {
+    background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
+    border-color: var(--button-hover-border-color, #c9b183) !important;
+    color: var(--button-hover-text-color, #f2dfbd) !important;
+}
+
+.pc-setting-action-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.pc-settings-tab-panel .pc-setting-row > .pc-setting-label,
+.pc-settings-menu .pc-setting-row > .pc-setting-label {
+    flex: 1 1 0;
+    color: var(--pc-settings-form-label);
+}
+
+.pc-settings-tab-panel .pc-setting-row:hover > .pc-setting-label,
+.pc-settings-menu .pc-setting-row:hover > .pc-setting-label {
+    color: var(--pc-settings-form-label-hover);
+}
+
+.pc-settings-tab-panel .pc-setting-row > .pc-setting-control.form-fields,
+.pc-settings-menu .pc-setting-row > .pc-setting-control.form-fields {
+    flex: 1 1 0;
+}
+
+.pc-settings-tab-panel .pc-setting-row > .pc-setting-hint.hint,
+.pc-settings-menu .pc-setting-row > .pc-setting-hint.hint {
+    flex: 0 0 100%;
+    color: var(--pc-settings-form-hint);
+}
+
+.pc-settings-tab-panel .pc-setting-row:hover > .pc-setting-hint.hint,
+.pc-settings-menu .pc-setting-row:hover > .pc-setting-hint.hint {
+    color: var(--pc-settings-form-hint-hover);
+}
+
+.pc-settings-tab-panel .pc-setting-action-row > .pc-setting-control.form-fields > .pc-setting-action-button {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+}
+
+.application.peasant-core.pc-defense-favorites-window:not(.minimized, .minimizing, .maximizing),
+.window-app.peasant-core.pc-defense-favorites-window:not(.minimized, .minimizing, .maximizing) {
+    min-width: 620px;
+    min-height: 340px;
+    background: var(--background) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+}
+
+.application.peasant-core.pc-defense-favorites-window .window-content,
+.window-app.peasant-core.pc-defense-favorites-window .window-content,
+.pc-defense-favorites-window .window-content {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #e0e0e0;
+}
+
+.pc-defense-favorites-window-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 6px 16px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.pc-defense-favorites-window-footer.form-footer {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 0;
+    padding: 0 16px 12px;
+}
+
+.pc-defense-favorites-grid {
+    display: grid;
+    gap: 0;
+}
+
+.pc-defense-favorites-header,
+.pc-defense-favorite-row {
+    display: grid;
+    grid-template-columns: minmax(104px, 0.72fr) minmax(160px, 0.96fr) minmax(0, 1.8fr);
+    gap: 10px;
+    align-items: start;
+}
+
+.pc-defense-favorites-header {
+    align-items: center;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: rgba(48, 39, 50, 0.95);
+    color: #f1dfcd;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.pc-defense-favorites-header > span:first-child {
+    padding-left: 0;
+}
+
+.pc-defense-favorite-row {
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    background: rgba(8, 8, 14, 0.12);
+}
+
+.pc-defense-favorite-targeting {
+    padding-top: 6px;
+    color: #efe6cf;
+    font-weight: 700;
+}
+
+.pc-defense-favorite-defense select,
+.pc-defense-favorite-use select {
+    width: 100%;
+    min-width: 0;
+}
+
+.pc-defense-favorite-use {
+    display: grid;
+    gap: 8px;
+}
+
+.pc-defense-favorite-threshold {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr) 30px;
+    gap: 8px;
+    align-items: end;
+}
+
+.pc-defense-favorite-threshold label,
+.pc-defense-favorite-extra-condition label {
+    display: grid;
+    gap: 3px;
+    margin: 0;
+    min-width: 0;
+    color: #bca99a;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.pc-defense-favorite-threshold input[type="number"] {
+    width: 100%;
+    text-align: center;
+}
+
+.pc-defense-favorite-extra-conditions {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 8px;
+}
+
+.pc-defense-favorite-extra-condition {
+    display: grid;
+    grid-template-columns: minmax(86px, 1fr) 68px minmax(0, 1fr) 30px;
+    gap: 8px;
+    align-items: end;
+}
+
+.pc-defense-favorite-extra-condition .pc-input,
+.pc-defense-favorite-threshold .pc-input {
+    min-width: 0;
+}
+
+.pc-defense-condition-action {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 4px !important;
+    line-height: 1 !important;
+}
+
+.pc-defense-condition-action:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -621,19 +884,20 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-settings-empty {
     margin: 0;
     padding: 10px 0;
-    color: #bca99a;
-    font-size: 13px;
+    color: var(--pc-settings-form-hint);
+    font-size: var(--font-size-14, 14px);
     line-height: 1.35;
 }
 
 .pc-setting-control-text {
     min-width: 82px;
     padding: 6px 10px;
-    border: 1px solid var(--input-border-color, rgba(203, 191, 154, 0.72));
+    border: 1px solid var(--input-border-color, #555);
     border-radius: 4px;
-    color: #bca99a;
+    color: var(--input-text-color, var(--color-light-3, #e7d1b1));
+    font-size: var(--font-size-14, 14px);
     text-align: center;
-    background: var(--input-background-color, rgba(49, 40, 49, 0.88));
+    background: var(--input-background-color, #2a2a2a);
 }
 
 .pc-settings-tag-list.current-tags-list {
@@ -777,15 +1041,21 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 @media (max-width: 860px) {
     .pc-setting-row {
-        grid-template-areas:
-            "copy"
-            "control";
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: stretch;
         gap: 6px;
+    }
+
+    .pc-setting-label,
+    .pc-setting-control,
+    .pc-setting-hint {
+        flex: 0 0 auto;
+        width: 100%;
     }
 
     .pc-setting-control {
         justify-content: flex-start;
+        min-width: 0;
     }
 }
 
@@ -822,6 +1092,10 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-effects-tab-panel,
 .pc-biography-tab-panel {
     padding: 16px;
+}
+
+.pc-inventory-tab-panel {
+    container-type: inline-size;
 }
 
 .pc-biography-tab-panel {
@@ -993,6 +1267,137 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-foundry-section .notable-combats-list-view,
 .pc-foundry-section .advantages-list-view {
     background: transparent !important;
+}
+
+.pc-effects-tab-panel {
+    display: grid;
+    gap: 14px;
+    container-type: inline-size;
+}
+
+.pc-passive-effects-browser {
+    min-height: 0;
+}
+
+.pc-inventory-search.pc-passive-effects-search {
+    width: 100%;
+    grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.pc-inventory-section-header.pc-passive-effects-section-header,
+.pc-inventory-item-row.pc-passive-effect-row {
+    grid-template-columns: minmax(150px, 1fr) minmax(96px, 0.34fr) 96px !important;
+}
+
+.pc-passive-effect-summary {
+    cursor: default;
+}
+
+.pc-passive-effect-summary:hover .pc-inventory-item-name,
+.pc-passive-effect-summary:focus .pc-inventory-item-name,
+.pc-passive-effect-summary:focus-visible .pc-inventory-item-name {
+    color: #f3e7d8;
+    text-shadow: none;
+}
+
+.pc-passive-effect-source {
+    display: block;
+    align-self: center;
+    overflow: hidden;
+    color: #d8cab8;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pc-passive-effects-column-source {
+    text-align: left;
+}
+
+.pc-passive-effects-column-controls,
+.pc-passive-effect-controls {
+    justify-content: flex-end !important;
+    text-align: right;
+}
+
+.pc-passive-effect-row > .pc-passive-effect-controls {
+    display: grid;
+    grid-template-columns: 24px 24px;
+    gap: 10px;
+    justify-self: stretch;
+    justify-content: end !important;
+    padding-right: 0;
+}
+
+@container (max-width: 480px) {
+    .pc-inventory-section-header.pc-passive-effects-section-header,
+    .pc-inventory-item-row.pc-passive-effect-row {
+        grid-template-columns: minmax(136px, 1fr) minmax(64px, 0.24fr) 66px !important;
+        gap: 6px;
+    }
+
+    .pc-passive-effect-row > .pc-passive-effect-controls {
+        grid-template-columns: 22px 22px;
+        gap: 5px;
+    }
+}
+
+.pc-passive-effect.pc-passive-effect-disabled .pc-passive-effect-name,
+.pc-passive-effect.pc-passive-effect-disabled .pc-passive-effect-icon {
+    opacity: 0.62;
+}
+
+.pc-passive-effect-toggle.header-control {
+    --button-size: 1.5rem;
+    --button-text-color: #c9b9a8;
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-hover-background-color: transparent;
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-light-2, #efe6d8);
+    --button-focus-outline-color: transparent;
+    display: flex;
+    flex: 0 0 var(--button-size);
+    align-items: center;
+    justify-content: center;
+    width: var(--button-size);
+    min-width: var(--button-size);
+    height: var(--button-size);
+    min-height: var(--button-size);
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: var(--button-background-color);
+    color: var(--button-text-color);
+    box-shadow: none;
+    font-size: var(--font-size-14, 14px);
+    line-height: normal;
+}
+
+.pc-passive-effect-menu-toggle.header-control {
+    --button-size: 1.5rem;
+}
+
+.pc-passive-effect-toggle.header-control:hover,
+.pc-passive-effect-toggle.header-control:focus,
+.pc-passive-effect-toggle.header-control:focus-visible,
+.pc-passive-effect-toggle.header-control.active {
+    background: transparent;
+    border-color: transparent;
+    color: var(--button-hover-text-color);
+    outline: none;
+    box-shadow: none;
+    text-shadow: 0 0 10px var(--color-shadow-primary, #ff0000);
+}
+
+.context-menu .pc-passive-effect-menu-separator,
+#context-menu .pc-passive-effect-menu-separator {
+    border-top: 1px solid rgba(159, 132, 117, 0.42);
+    margin-top: 4px;
+    padding-top: 4px;
 }
 
 .pc-effects-modifiers {
@@ -5460,7 +5865,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     min-width: 0;
     height: 34px;
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) 28px 30px 30px;
+    grid-template-columns: 28px minmax(0, 1fr) 30px 30px;
     align-items: center;
     border: 1px solid rgba(159, 132, 117, 0.34);
     border-radius: 4px;
@@ -5490,7 +5895,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     outline: none;
 }
 
-.pc-inventory-search-clear,
 .pc-inventory-stepper {
     display: inline-grid;
     place-items: center;
@@ -5499,11 +5903,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     color: #cdbbab;
     box-shadow: none;
     padding: 0;
-}
-
-.pc-inventory-search-clear {
-    width: 28px;
-    height: 28px;
 }
 
 .pc-inventory-toolbar-button {
@@ -5575,7 +5974,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .pc-inventory-section-header,
 .pc-inventory-item-row {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) 96px 118px 96px 78px;
+    grid-template-columns: minmax(140px, 1fr) minmax(64px, 0.28fr) minmax(108px, 0.4fr) minmax(64px, 0.28fr) 78px;
     align-items: center;
     gap: 8px;
 }
@@ -5594,6 +5993,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
     margin: 0;
     font-size: 12px;
     line-height: 1;
@@ -5603,6 +6003,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 
 .pc-inventory-column {
     justify-self: stretch;
+    min-width: 0;
     text-align: center;
     letter-spacing: 0;
 }
@@ -5750,6 +6151,13 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     cursor: default;
 }
 
+.pc-inventory-column-controls,
+.pc-inventory-row-controls {
+    justify-self: stretch;
+    justify-content: flex-end;
+    text-align: right;
+}
+
 .pc-inventory-number.pc-input {
     width: 42px;
     height: 26px;
@@ -5771,11 +6179,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     background: var(--button-background-color);
     border-color: var(--button-border-color);
     color: var(--button-text-color);
-}
-
-.pc-inventory-search-clear:hover {
-    background: rgba(238, 216, 185, 0.12);
-    color: #fff2df;
 }
 
 .pc-inventory-stepper:hover,
@@ -5871,6 +6274,39 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .pc-inventory-browser.drag-over {
     outline: 2px solid rgba(222, 123, 42, 0.72);
     outline-offset: 2px;
+}
+
+@container (max-width: 520px) {
+    .pc-inventory-section-header,
+    .pc-inventory-item-row {
+        grid-template-columns: minmax(0, 1fr) minmax(96px, 120px) 42px;
+        gap: 6px;
+    }
+
+    .pc-inventory-column-sunder,
+    .pc-inventory-column-charges,
+    .pc-inventory-sunder-control,
+    .pc-inventory-charges-control {
+        display: none;
+    }
+
+    .pc-inventory-section-title {
+        font-size: 11px;
+    }
+
+    .pc-inventory-column-quantity {
+        text-align: center;
+    }
+
+    .pc-inventory-row-controls {
+        gap: 2px;
+    }
+
+    .pc-inventory-equipped-marker.header-control,
+    .pc-inventory-menu-toggle.header-control {
+        --button-size: 1.25rem;
+        font-size: var(--font-size-12, 12px);
+    }
 }
 
 /* Scoped dropdown styling - peasant system UI only */
@@ -7398,7 +7834,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 
 /* Footer buttons: normalize to Foundry default style (match TAKE DMG / HEAL) */
 .peasant-tag-editor .peasant-tag-add,
-.peasant-tag-editor .peasant-tag-done,
 .peasant-tag-editor .peasant-tag-apply,
 .peasant-tag-editor .peasant-tag-clear,
 .peasant-tag-editor .peasant-tag-cancel {
@@ -7419,7 +7854,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 }
 
 .peasant-tag-editor .peasant-tag-add:hover,
-.peasant-tag-editor .peasant-tag-done:hover,
 .peasant-tag-editor .peasant-tag-apply:hover,
 .peasant-tag-editor .peasant-tag-clear:hover,
 .peasant-tag-editor .peasant-tag-cancel:hover {
@@ -7455,6 +7889,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .add-combat-btn,
 .add-skill-btn,
 .add-advantage-btn,
+.add-effect-btn,
 .add-item-btn {
   --button-size: 28px;
   min-width: max-content;
@@ -7476,6 +7911,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .add-combat-btn:hover,
 .add-skill-btn:hover,
 .add-advantage-btn:hover,
+.add-effect-btn:hover,
 .add-item-btn:hover {
   background: var(--button-hover-background-color) !important;
   color: var(--button-hover-text-color) !important;
@@ -7485,6 +7921,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .add-combat-btn:active,
 .add-skill-btn:active,
 .add-advantage-btn:active,
+.add-effect-btn:active,
 .add-item-btn:active {
   background: var(--button-hover-background-color) !important;
   color: var(--button-hover-text-color) !important;
@@ -7494,6 +7931,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .add-combat-btn,
 .add-skill-btn,
 .add-advantage-btn,
+.add-effect-btn,
 .add-item-btn {
   width: 100%;
   font-size: 13px;
@@ -9810,13 +10248,15 @@ nav.pc-item-tabs .pc-item-tab.active {
   grid-template-columns: repeat(2, minmax(0, 120px));
 }
 
-.pc-item-loot-details {
+.pc-item-loot-details,
+.pc-item-equipment-details {
   display: grid;
   gap: 8px;
   width: 100%;
 }
 
-.pc-item-loot-type-row {
+.pc-item-loot-type-row,
+.pc-item-equipment-type-row {
   display: grid;
   grid-template-columns: 120px minmax(180px, 1fr);
   gap: 12px;
@@ -9824,13 +10264,15 @@ nav.pc-item-tabs .pc-item-tab.active {
   min-width: 0;
 }
 
-.pc-item-loot-type-row > span {
+.pc-item-loot-type-row > span,
+.pc-item-equipment-type-row > span {
   color: #f0e5d0;
   font-size: 13px;
   font-weight: 700;
 }
 
-.pc-item-loot-type-select {
+.pc-item-loot-type-select,
+.pc-item-equipment-type-select {
   width: 100%;
   min-width: 0;
 }
@@ -9911,50 +10353,16 @@ nav.pc-item-tabs .pc-item-tab.active {
   text-align: center;
 }
 
-.pc-item-effects-list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.pc-item-effects-section-header,
+.pc-item-effect-row {
+  grid-template-columns: minmax(0, 1fr) 88px 34px;
 }
 
-.pc-item-effect {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  padding: 8px;
-  border: 1px solid rgba(159, 132, 117, 0.45);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.pc-item-effect-icon {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border: 1px solid rgba(159, 132, 117, 0.45);
-  border-radius: 4px;
-}
-
-.pc-item-effect-summary {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.pc-item-effect-summary strong,
-.pc-item-effect-summary span {
-  min-width: 0;
+.pc-item-effect-state {
   overflow: hidden;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.pc-item-effect-summary span {
-  color: #b9aa8f;
-  font-size: 12px;
 }
 
 @media (max-width: 560px) {

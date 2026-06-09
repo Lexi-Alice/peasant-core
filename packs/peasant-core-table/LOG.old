@@ -1,5 +1,7 @@
-2026/06/07-23:50:09.535 8c4 Log #1033: 0 ops saved to Table #1034 OK
-2026/06/07-23:50:09.537 8c4 Archiving C:\Users\smelo\AppData\Local\FoundryVTT\Data\systems\peasant-core\packs\peasant-core-table/001033.log: OK
-2026/06/07-23:50:09.537 8c4 Table #829: 13 entries OK
-2026/06/07-23:50:09.543 8c4 Archiving C:\Users\smelo\AppData\Local\FoundryVTT\Data\systems\peasant-core\packs\peasant-core-table/MANIFEST-001032: OK
-2026/06/07-23:50:09.550 8c4 **** Repaired leveldb C:\Users\smelo\AppData\Local\FoundryVTT\Data\systems\peasant-core\packs\peasant-core-table; recovered 1 files; 2161 bytes. Some data may have been lost. ****
+2026/06/09-03:26:41.182 7b78 Recovering log #1066
+2026/06/09-03:26:41.193 7b78 Delete type=0 #1066
+2026/06/09-03:26:41.194 7b78 Delete type=3 #1064
+2026/06/09-03:27:09.934 6114 Level-0 table #1071: started
+2026/06/09-03:27:09.934 6114 Level-0 table #1071: 0 bytes OK
+2026/06/09-03:27:09.938 6114 Delete type=0 #1069
+2026/06/09-03:27:09.939 6114 Manual compaction at level-0 from '!tables!q8XnBY5D3SK5ZJkA' @ 72057594037927935 : 1 .. '!tables.results!q8XnBY5D3SK5ZJkA.viaJOTd1tGeasXvW' @ 0 : 0; will stop at (end)

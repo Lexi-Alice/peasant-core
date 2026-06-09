@@ -1,5 +1,71 @@
 <hr class="section-divider pc-tab-detached-divider">
 <div class="pc-tab-panel pc-effects-tab-panel tab{{#if (eq activeSheetTab "effects")}} active{{/if}}" data-pc-tab-panel="effects" data-group="primary" data-tab="effects">
+  <fieldset class="pc-foundry-section pc-passive-effects-foundry-section">
+    <legend>Active Effects</legend>
+
+    <section class="pc-inventory-browser pc-passive-effects-browser" aria-label="Active Effects" data-pc-passive-effects-browser>
+      <div class="pc-inventory-toolbar pc-passive-effects-toolbar">
+        <div class="pc-inventory-search pc-passive-effects-search" role="search" aria-label="Search Active Effects">
+          <i class="fa-solid fa-search" aria-hidden="true"></i>
+          <input type="search" class="pc-inventory-search-input pc-passive-effects-search-input pc-input" placeholder="Search effects" autocomplete="off" aria-label="Search Active Effects" data-pc-passive-effects-search>
+        </div>
+      </div>
+
+      <section class="pc-inventory-list pc-passive-effects-list" data-pc-passive-effects-list>
+        {{#if hasPassiveEffects}}
+          <div class="pc-inventory-section pc-passive-effects-section" data-pc-passive-effects-section>
+            <header class="pc-inventory-section-header pc-passive-effects-section-header">
+              <h3 class="pc-inventory-section-title pc-passive-effects-section-title">
+                <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                <span>Active Effects</span>
+              </h3>
+              <div class="pc-inventory-column pc-passive-effects-column pc-passive-effects-column-source">Source</div>
+              <div class="pc-inventory-column pc-passive-effects-column pc-passive-effects-column-controls"></div>
+            </header>
+
+            <ol class="pc-inventory-items pc-passive-effects-items">
+              {{#each passiveEffects as |effect|}}
+                <li class="pc-inventory-item pc-passive-effect{{#if effect.disabled}} pc-passive-effect-disabled{{/if}}" data-pc-passive-effect data-effect-id="{{effect.id}}" data-effect-uuid="{{effect.uuid}}" data-search="{{effect.searchText}}" data-sort-manual="{{effect.sort}}" data-sort-alpha="{{effect.sortName}}">
+                  <div class="pc-inventory-item-row pc-passive-effect-row">
+                    <div class="pc-inventory-item-summary pc-passive-effect-summary" data-tooltip="{{effect.name}}">
+                      <img class="pc-inventory-item-image pc-passive-effect-icon" src="{{effect.icon}}" alt="">
+                      <span class="pc-inventory-item-name-stack pc-passive-effect-name-stack">
+                        <span class="pc-inventory-item-name pc-passive-effect-name">{{effect.name}}</span>
+                        <span class="pc-inventory-item-subtitle pc-passive-effect-subtitle">{{effect.subtitle}}</span>
+                      </span>
+                    </div>
+
+                    <div class="pc-inventory-row-field pc-passive-effect-source{{#unless effect.sourceName}} pc-inventory-muted{{/unless}}" data-tooltip="{{effect.sourceName}}">
+                      {{#if effect.sourceName}}{{effect.sourceName}}{{else}}-{{/if}}
+                    </div>
+
+                    <div class="pc-inventory-row-controls pc-passive-effect-controls">
+                      {{#if @root.owner}}
+                        {{#if effect.canToggle}}
+                          <button type="button" class="pc-passive-effect-toggle header-control icon fa-solid {{#if effect.disabled}}fa-toggle-off{{else}}fa-toggle-on active{{/if}}" data-tooltip="{{effect.toggleTooltip}}" aria-label="{{effect.toggleTooltip}}" aria-pressed="{{#if effect.disabled}}false{{else}}true{{/if}}" data-pc-passive-effect-toggle></button>
+                          <button type="button" class="pc-inventory-menu-toggle pc-passive-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-passive-effect-menu></button>
+                        {{/if}}
+                      {{/if}}
+                    </div>
+                  </div>
+                </li>
+              {{/each}}
+            </ol>
+          </div>
+        {{/if}}
+
+        {{#unless hasPassiveEffects}}
+          <div class="pc-inventory-empty-state">No active effects.</div>
+        {{/unless}}
+        <div class="pc-inventory-empty-state pc-passive-effects-search-empty" hidden>No matching effects.</div>
+      </section>
+
+      {{#if @root.editable}}
+        <button type="button" class="add-effect-btn" data-pc-passive-effect-add> + Add Effect </button>
+      {{/if}}
+    </section>
+  </fieldset>
+
   <fieldset class="pc-foundry-section pc-effects-foundry-section">
     <legend>Combat Adjustments</legend>
 

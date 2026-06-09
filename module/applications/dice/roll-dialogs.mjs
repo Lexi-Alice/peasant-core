@@ -95,11 +95,6 @@ async function promptToHitAccuracyRoll({
           await game.user.setFlag("peasant-core", accuracyFlag, accuracy);
           await rollFn({ toHit, accuracy, skillName, speaker: ChatMessage.getSpeaker() });
         }
-      },
-      cancel: {
-        icon: '<i class="fas fa-times"></i>',
-        label: "Cancel",
-        cssClass: "cancel-button-red"
       }
     },
     default: "roll",
@@ -151,11 +146,6 @@ export async function promptSavingRoll() {
           await game.user.setFlag("peasant-core", "lastSavingToHit", toHit);
           await performSavingRoll({ toHit, skillName: "Saving Roll", speaker: ChatMessage.getSpeaker() });
         }
-      },
-      cancel: {
-        icon: '<i class="fas fa-times"></i>',
-        label: "Cancel",
-        cssClass: "cancel-button-red"
       }
     },
     default: "roll",

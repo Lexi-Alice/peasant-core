@@ -66,6 +66,7 @@ export async function setPreferredDefenseMatch(actor, targetingType, defenseMatc
 
   const favorites = getDefenseFavorites(actor);
   favorites[favoriteKey] = {
+    ...((favorites[favoriteKey] && typeof favorites[favoriteKey] === "object") ? favorites[favoriteKey] : {}),
     index: favoriteIndex,
     name: String(defenseMatch?.combat?.name || "").trim()
   };

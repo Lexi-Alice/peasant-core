@@ -1,0 +1,123 @@
+<section class="pc-defense-favorites-window-body">
+  <div class="pc-defense-favorites-grid">
+    <div class="pc-defense-favorites-header" aria-hidden="true">
+      <span>Targeting Type</span>
+      <span>Defense</span>
+      <span>Use</span>
+    </div>
+
+    {{#each rows as |row|}}
+      <div class="pc-defense-favorite-row" data-pc-defense-favorite-row data-targeting-key="{{row.key}}">
+        <div class="pc-defense-favorite-targeting">{{row.label}}</div>
+
+        <div class="pc-defense-favorite-defense">
+          <select class="pc-input" data-pc-defense-select aria-label="{{row.label}} defense" {{#unless row.hasDefenseOptions}}disabled{{/unless}}>
+            <option value="">None</option>
+            {{#each row.defenseOptions as |option|}}
+              <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+            {{/each}}
+          </select>
+        </div>
+
+        <div class="pc-defense-favorite-use">
+          <select class="pc-input" data-pc-defense-mode aria-label="{{row.label}} use mode">
+            {{#each row.modeOptions as |option|}}
+              <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+            {{/each}}
+          </select>
+
+          <div class="pc-defense-favorite-threshold" {{#unless row.usesThreshold}}hidden{{/unless}}>
+            <label>
+              <span>Value</span>
+              <input
+                type="number"
+                class="pc-input"
+                value="{{row.thresholdValue}}"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                data-pc-defense-threshold-control
+                data-pc-defense-threshold-value
+                aria-label="{{row.label}} threshold value"
+                {{#unless row.usesThreshold}}disabled{{/unless}}>
+            </label>
+            <label>
+              <span>Resource</span>
+              <select
+                class="pc-input"
+                data-pc-defense-threshold-control
+                data-pc-defense-threshold-resource
+                aria-label="{{row.label}} threshold resource"
+                {{#unless row.usesThreshold}}disabled{{/unless}}
+                {{#unless row.hasResourceOptions}}disabled{{/unless}}>
+                {{#each row.resourceOptions as |option|}}
+                  <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+                {{/each}}
+              </select>
+            </label>
+            <button
+              type="button"
+              class="pc-defense-condition-action"
+              data-pc-defense-threshold-control
+              data-pc-defense-add-condition
+              data-tooltip="Add condition"
+              aria-label="Add condition"
+              {{#unless row.usesThreshold}}disabled{{/unless}}
+              {{#unless row.hasResourceOptions}}disabled{{/unless}}>
+              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            </button>
+            <div class="pc-defense-favorite-extra-conditions" data-pc-defense-extra-conditions>
+              {{#each row.extraConditions as |condition|}}
+                <div class="pc-defense-favorite-extra-condition" data-pc-defense-extra-condition>
+                  <label>
+                    <span>Condition</span>
+                    <select class="pc-input" data-pc-defense-threshold-control data-pc-defense-condition-mode aria-label="{{../label}} additional condition mode">
+                      {{#each condition.modeOptions as |option|}}
+                        <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+                      {{/each}}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Value</span>
+                    <input
+                      type="number"
+                      class="pc-input"
+                      value="{{condition.value}}"
+                      min="0"
+                      step="1"
+                      inputmode="numeric"
+                      data-pc-defense-threshold-control
+                      data-pc-defense-condition-value
+                      aria-label="{{../label}} additional condition value">
+                  </label>
+                  <label>
+                    <span>Resource</span>
+                    <select
+                      class="pc-input"
+                      data-pc-defense-threshold-control
+                      data-pc-defense-condition-resource
+                      aria-label="{{../label}} additional condition resource"
+                      {{#unless condition.hasResourceOptions}}disabled{{/unless}}>
+                      {{#each condition.resourceOptions as |option|}}
+                        <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+                      {{/each}}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    class="pc-defense-condition-action"
+                    data-pc-defense-threshold-control
+                    data-pc-defense-remove-condition
+                    data-tooltip="Remove condition"
+                    aria-label="Remove condition">
+                    <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                  </button>
+                </div>
+              {{/each}}
+            </div>
+          </div>
+        </div>
+      </div>
+    {{/each}}
+  </div>
+</section>

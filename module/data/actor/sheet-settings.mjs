@@ -74,6 +74,15 @@ export const PC_ACTOR_SETTING_DEFINITIONS = Object.freeze([
     min: 0
   },
   {
+    group: "Defenses",
+    label: "Favorited Defenses",
+    hint: "Configure favorited defenses to default selection, or automatic use.",
+    type: "action",
+    action: "defenseFavorites",
+    buttonLabel: "Configure",
+    buttonIcon: "fa-solid fa-gear"
+  },
+  {
     group: "Damage Resistances",
     label: "Blunt",
     hint: "Multiplies blunt damage taken before it is applied.",
@@ -216,6 +225,19 @@ export function getPeasantCoreSettingGroups(actor, editable = true) {
   for (const setting of PC_ACTOR_SETTING_DEFINITIONS) {
     const group = setting.group || "Settings";
     if (!groupMap.has(group)) groupMap.set(group, []);
+
+    if (setting.type === "action") {
+      groupMap.get(group).push({
+        ...setting,
+        id: `pc-setting-action-${setting.action || setting.label}`,
+        isAction: true,
+        buttonLabel: setting.buttonLabel || "Configure",
+        buttonIcon: setting.buttonIcon || "",
+        hasButtonIcon: !!setting.buttonIcon,
+        editable
+      });
+      continue;
+    }
 
     const value = getPeasantCoreSettingValue(actor, setting);
     const hasMin = Number.isFinite(Number(setting.min));
