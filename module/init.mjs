@@ -23,7 +23,8 @@ Hooks.once('init', () => {
   Object.assign(CONFIG.ActiveEffect.dataModels, PEASANT_ACTIVE_EFFECT_DATA_MODELS);
   CONFIG.ActiveEffect.typeLabels = {
     ...CONFIG.ActiveEffect.typeLabels,
-    enchantment: "TYPES.ActiveEffect.enchantment"
+    enchantment: "TYPES.ActiveEffect.enchantment",
+    skill: "TYPES.ActiveEffect.skill"
   };
   registerDebugLoggingSetting();
   registerPeasantCoreSettingsMenus();

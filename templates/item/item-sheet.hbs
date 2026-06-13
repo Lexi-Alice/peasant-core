@@ -83,10 +83,33 @@
               <span>Equipment Type</span>
               <select name="system.category" class="pc-input pc-item-equipment-type-select" aria-label="Equipment Type" {{#unless editable}}disabled{{/unless}}>
                 {{#each equipmentCategoryOptions}}
-                  <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                  {{#if options}}
+                    <optgroup label="{{label}}">
+                      {{#each options}}
+                        <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                      {{/each}}
+                    </optgroup>
+                  {{else}}
+                    <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                  {{/if}}
                 {{/each}}
               </select>
             </label>
+            {{#if isShieldEquipment}}
+              <div class="pc-item-equipment-shield-row">
+                <span>Shield</span>
+                <div class="pc-item-equipment-shield-fields">
+                  <label class="pc-item-equipment-shield-field">
+                    <span>HP</span>
+                    <input type="number" name="system.shield.hp" value="{{shieldHpInput}}" class="pc-input pc-item-equipment-shield-input" min="0" step="1" inputmode="numeric" aria-label="Shield HP" {{#unless editable}}disabled{{/unless}}>
+                  </label>
+                  <label class="pc-item-equipment-shield-field">
+                    <span>Hardness</span>
+                    <input type="number" name="system.shield.hardness" value="{{shieldHardnessInput}}" class="pc-input pc-item-equipment-shield-input" min="0" step="1" inputmode="numeric" aria-label="Shield Hardness" {{#unless editable}}disabled{{/unless}}>
+                  </label>
+                </div>
+              </div>
+            {{/if}}
           </div>
         </fieldset>
       {{/if}}

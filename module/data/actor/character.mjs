@@ -320,6 +320,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       
       // Notable Combats
       notableCombats: new fields.ArrayField(new fields.SchemaField({
+        id: new fields.StringField({ initial: "" }),
         type: new fields.StringField({ initial: "standard" }), // standard, Stance, Perk, Style, Cantrip, Historic, TM, Other
         specialGrade: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         class: new fields.NumberField({ integer: true, min: 1, max: 10, initial: 1 }),
@@ -328,6 +329,8 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         usesMax: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         usesCurrent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         name: new fields.StringField({ initial: "" }),
+        img: new fields.StringField({ initial: "" }),
+        effectIds: new fields.ArrayField(new fields.StringField({ initial: "" }), { initial: [] }),
         tohit: new fields.NumberField({ integer: true, min: 1, nullable: true, initial: null }),
         accuracy: new fields.NumberField({ integer: true, nullable: true, initial: null }),
         indent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),

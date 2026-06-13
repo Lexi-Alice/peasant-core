@@ -1,14 +1,17 @@
 import { delegate, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
-export function setupNotableCombatDragDropControls(sheet, html, { sheetDocument } = {}) {
+const COMBAT_ROW_DRAG_BLOCK_SELECTOR = "button, input, select, textarea, a, .combat-tag-draggable, .combat-roll-clickable, .combat-actions";
+const COMBAT_HOTBAR_DRAG_TYPE = "peasant-core.notableCombat";
+const COMBAT_ROW_DRAG_PREFIX = "peasant-core.notable-combat-sort";
+
+export function setupNotableCombatDragDropControls(sheet, html) {
   const root = toElement(html);
   if (!root) return;
 
-  const doc = sheetDocument ?? sheet?._getElementDocument?.(root) ?? root.ownerDocument ?? document;
-
   setupCombatTagDragDrop(sheet, root);
-  setupCombatRowDragDrop(sheet, root, doc);
+  setupCombatHotbarDrag(sheet, root);
+  setupCombatRowDragDrop(sheet, root);
 }
 
 export function setupNotableCombatTagEditorDrag(sheet, container, combatIndex, { onChanged } = {}) {
@@ -176,17 +179,30 @@ function setupCombatTagDragDrop(sheet, root) {
   });
 }
 
-function setupCombatRowDragDrop(sheet, root, sheetDocument) {
+function setupCombatRowDragDrop(sheet, root) {
   delegate(root, "dragstart", ".notable-combats-list .combat-item", (event, item) => {
     try {
+      if (event.target?.closest?.(COMBAT_ROW_DRAG_BLOCK_SELECTOR)) return;
+
       const index = resolveElementIndex(item, "data-combat-index");
       if (Number.isNaN(index)) return;
+      const list = item.closest(".notable-combats-list");
+      if (!list) return;
+
+      item.classList.add("dragging");
+      sheet._combatDragState = {
+        actorUuid: sheet.actor?.uuid,
+        fromIndex: index,
+        list
+      };
+
       if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", `combat:${index}`);
+        event.dataTransfer.setData("text/plain", `${COMBAT_ROW_DRAG_PREFIX}:${sheet.actor?.uuid ?? ""}:${index}`);
+        const dragImage = item.querySelector(".combat-view-line") ?? item;
+        const box = dragImage.getBoundingClientRect();
+        event.dataTransfer.setDragImage(dragImage, Math.min(box.width - 6, 48), box.height / 2);
       }
-      item.classList.add("dragging");
-      sheet._combatDragState = { fromIndex: index };
     } catch (e) {
       pcLog.debug("combat dragstart failed", e);
     }
@@ -196,69 +212,136 @@ function setupCombatRowDragDrop(sheet, root, sheetDocument) {
     try {
       item.classList.remove("dragging");
       sheet._combatDragState = null;
-      clearDragMarkers(root, ".notable-combats-list .combat-item", "drag-over-top", "drag-over-bottom");
+      clearCombatRowDragMarkers(root);
     } catch (e) {}
   });
 
-  delegate(root, "dragover", ".notable-combats-list, .notable-combats-list .combat-item", (event) => {
+  delegate(root, "dragover", ".notable-combats-list, .notable-combats-list .combat-item", (event, target) => {
     try {
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-
-      const el = sheetDocument.elementFromPoint(event.clientX, event.clientY);
-      if (!el) return;
-      const closest = el.closest?.(".notable-combats-list .combat-item");
-      const items = getCombatItems(root);
-      clearDragMarkers(root, ".notable-combats-list .combat-item", "drag-over-top", "drag-over-bottom");
-
       if (!sheet._combatDragState) return;
-      const toIndex = closest ? resolveElementIndex(closest, "data-combat-index") : items.length;
+
+      const list = target.closest?.(".notable-combats-list");
+      if (!list || list !== sheet._combatDragState.list) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      clearCombatRowDragMarkers(root);
+
+      const targetRow = getCombatDropTargetRow(event.target, list);
+      if (!targetRow) return;
+      const targetIndex = resolveElementIndex(targetRow, "data-combat-index");
+      if (Number.isNaN(targetIndex)) return;
+      const dropAfter = isCombatDropAfter(targetRow, event.clientY);
+      const toIndex = targetIndex + (dropAfter ? 1 : 0);
       if (Number.isNaN(toIndex)) return;
 
       const fromIndex = sheet._combatDragState.fromIndex;
       if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) return;
 
-      markVerticalDropTarget(items, toIndex);
+      targetRow.classList.toggle("drag-over-bottom", dropAfter);
+      targetRow.classList.toggle("drag-over-top", !dropAfter);
     } catch (e) {}
   });
 
   delegate(root, "dragleave", ".notable-combats-list", () => {
-    try { clearDragMarkers(root, ".notable-combats-list .combat-item", "drag-over-top", "drag-over-bottom"); } catch (e) {}
+    try { clearCombatRowDragMarkers(root); } catch (e) {}
   });
 
-  delegate(root, "drop", ".notable-combats-list, .notable-combats-list .combat-item", async (event) => {
+  delegate(root, "drop", ".notable-combats-list, .notable-combats-list .combat-item", async (event, target) => {
     try {
+      const dragData = getCombatSortDragData(event);
+      if (!sheet._combatDragState || dragData?.actorUuid !== sheet.actor?.uuid) return;
+
+      const list = target.closest?.(".notable-combats-list");
+      if (!list || list !== sheet._combatDragState.list) return;
+
       event.preventDefault();
-      event.stopPropagation();
-      const data = event.dataTransfer?.getData("text/plain") ?? "";
-      if (!data.startsWith("combat:")) return;
-      const fromIndex = Number.parseInt(data.replace("combat:", ""), 10);
-      if (Number.isNaN(fromIndex)) return;
+      event.stopImmediatePropagation();
+      clearCombatRowDragMarkers(root);
 
-      const dropTarget = event.target?.closest?.(".combat-item");
-      const toIndex = dropTarget ? resolveElementIndex(dropTarget, "data-combat-index") : getCombatItems(root).length;
-      if (Number.isNaN(toIndex)) return;
+      try {
+        const fromIndex = dragData.fromIndex;
+        if (Number.isNaN(fromIndex)) return;
 
-      sheet._combatDragState = null;
-      await sheet.actor.reorderPeasantNotableCombat?.(fromIndex, toIndex);
+        const dropTarget = getCombatDropTargetRow(event.target, list);
+        if (!dropTarget) return;
+
+        const targetIndex = resolveElementIndex(dropTarget, "data-combat-index");
+        const toIndex = targetIndex + (isCombatDropAfter(dropTarget, event.clientY) ? 1 : 0);
+        if (Number.isNaN(toIndex)) return;
+        if (toIndex === fromIndex || toIndex === fromIndex + 1) return;
+
+        await sheet.actor.reorderPeasantNotableCombat?.(fromIndex, toIndex);
+      } finally {
+        sheet._combatDragState = null;
+      }
     } catch (e) {
       console.warn("Failed to reorder combats via drag/drop:", e);
     }
   });
 }
 
-function getCombatItems(root) {
-  return qsa(root, ".notable-combats-list .combat-item");
+function setupCombatHotbarDrag(sheet, root) {
+  delegate(root, "dragstart", ".pc-notable-combat-hotbar-drag", (event, item) => {
+    try {
+      if (event.target?.closest?.(COMBAT_ROW_DRAG_BLOCK_SELECTOR)) return;
+
+      const combatIndex = resolveElementIndex(item, "data-combat-index");
+      if (Number.isNaN(combatIndex)) return;
+
+      const combat = sheet.actor?.system?.notableCombats?.[combatIndex] || null;
+      const combatId = String(item.dataset.combatId || combat?.id || "").trim();
+      const actorUuid = sheet.actor?.uuid || "";
+      if (!actorUuid) return;
+
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.setData("text/plain", JSON.stringify({
+          type: COMBAT_HOTBAR_DRAG_TYPE,
+          actorUuid,
+          combatId,
+          combatIndex
+        }));
+      }
+      item.classList.add("dragging");
+    } catch (e) {
+      pcLog.debug("combat hotbar dragstart failed", e);
+    }
+  });
+
+  delegate(root, "dragend", ".pc-notable-combat-hotbar-drag", (event, item) => {
+    try {
+      item.classList.remove("dragging");
+    } catch (e) {}
+  });
+}
+
+function clearCombatRowDragMarkers(root) {
+  clearDragMarkers(root, ".notable-combats-list .combat-item", "drag-over-top", "drag-over-bottom");
+}
+
+function getCombatRowsInList(list) {
+  return qsa(list, ".combat-item:not([hidden])");
+}
+
+function getCombatDropTargetRow(target, list) {
+  return target?.closest?.(".combat-item") ?? getCombatRowsInList(list).at(-1) ?? null;
+}
+
+function getCombatSortDragData(event) {
+  const raw = event?.dataTransfer?.getData?.("text/plain") ?? "";
+  const [, actorUuid, fromIndex] = raw.match(/^peasant-core\.notable-combat-sort:(.+):(\d+)$/) ?? [];
+  return actorUuid ? { actorUuid, fromIndex: Number.parseInt(fromIndex, 10) } : null;
+}
+
+function isCombatDropAfter(row, clientY) {
+  const rect = row.getBoundingClientRect();
+  return clientY >= rect.top + (rect.height / 2);
 }
 
 function clearDragMarkers(root, selector, ...classes) {
   for (const item of qsa(root, selector)) item.classList.remove(...classes);
-}
-
-function markVerticalDropTarget(items, toIndex) {
-  if (!items.length) return;
-  if (toIndex >= items.length) items[items.length - 1].classList.add("drag-over-bottom");
-  else items[toIndex]?.classList.add("drag-over-top");
 }
 
 function resolveElementIndex(element, attr) {

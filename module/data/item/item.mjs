@@ -61,7 +61,13 @@ export class PeasantWeaponModel extends foundry.abstract.TypeDataModel {
 
 export class PeasantEquipmentModel extends foundry.abstract.TypeDataModel {
   static defineSchema() {
-    return equipableItemSchema();
+    return {
+      ...equipableItemSchema(),
+      shield: new fields.SchemaField({
+        hp: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
+        hardness: new fields.NumberField({ integer: true, min: 0, initial: 0 })
+      })
+    };
   }
 }
 

@@ -62,8 +62,24 @@ const PC_ITEM_CURRENCY_OPTIONS = Object.freeze([
   { value: "pp", label: "pp" }
 ]);
 const PC_EQUIPMENT_CATEGORY_OPTIONS = Object.freeze([
-  { value: "", label: "" },
-  { value: "shield", label: "Shield" }
+  { value: "clothing", label: "Clothing" },
+  { value: "ring", label: "Ring" },
+  { value: "amulet", label: "Amulet" },
+  { value: "trinket", label: "Trinket" },
+  { value: "wand", label: "Wand" },
+  { value: "book", label: "Book" },
+  { value: "wondrous-item", label: "Wondrous Item" },
+  { value: "cape", label: "Cape" },
+  { value: "boots", label: "Boots" },
+  { value: "shield", label: "Shield" },
+  {
+    label: "Armor",
+    options: [
+      { value: "light-armor", label: "Light Armor" },
+      { value: "medium-armor", label: "Medium Armor" },
+      { value: "heavy-armor", label: "Heavy Armor" }
+    ]
+  }
 ]);
 const PC_LOOT_CATEGORY_OPTIONS = Object.freeze([
   { value: "art-object", label: "Art Object" },
@@ -122,10 +138,18 @@ function formatOptionalNumber(value) {
 
 function getSelectedOptions(options, value, fallback) {
   const activeValue = String(value || fallback);
-  return options.map(option => ({
-    ...option,
-    selected: option.value === activeValue
-  }));
+  return options.map(option => {
+    if (Array.isArray(option.options)) {
+      return {
+        ...option,
+        options: getSelectedOptions(option.options, activeValue, fallback)
+      };
+    }
+    return {
+      ...option,
+      selected: option.value === activeValue
+    };
+  });
 }
 
 function getItemQualityOptions(quality) {
@@ -371,6 +395,7 @@ export class PeasantItemSheet extends ItemSheetBase {
     const effectSortMode = this._getItemEffectSortMode();
     const effectSortConfig = PC_EFFECT_SORT_MODES[effectSortMode];
     const effectsGroupedByType = this._areItemEffectsGroupedByType();
+    const isShieldEquipment = type === "equipment" && system.category === "shield";
 
     return Object.assign(context, {
       item: this.item,
@@ -384,16 +409,19 @@ export class PeasantItemSheet extends ItemSheetBase {
       isTool: type === "tool",
       isConsumable: type === "consumable",
       isLoot: type === "loot",
+      isShieldEquipment,
       imageSrc: this.item?.img || getDefaultItemImage(),
       imageStyle: formatItemImageStyle(system),
       quantityInput: formatOptionalNumber(system.quantity ?? 1),
       valueInput: formatOptionalNumber(system.value ?? 0),
       sunderCurrentInput: formatOptionalNumber(system.sunder?.current ?? 0),
       sunderMaxInput: formatOptionalNumber(system.sunder?.max ?? 0),
+      shieldHpInput: formatOptionalNumber(system.shield?.hp ?? 0),
+      shieldHardnessInput: formatOptionalNumber(system.shield?.hardness ?? 0),
       qualityOptions: getItemQualityOptions(system.quality),
       magicTypeOptions: getSelectedOptions(PC_ITEM_MAGIC_TYPE_OPTIONS, system.magicType, "mundane"),
       currencyOptions: getSelectedOptions(PC_ITEM_CURRENCY_OPTIONS, system.currency, "gp"),
-      equipmentCategoryOptions: getSelectedOptions(PC_EQUIPMENT_CATEGORY_OPTIONS, system.category, ""),
+      equipmentCategoryOptions: getSelectedOptions(PC_EQUIPMENT_CATEGORY_OPTIONS, system.category, "clothing"),
       lootCategoryOptions: getSelectedOptions(PC_LOOT_CATEGORY_OPTIONS, system.category, "art-object"),
       itemTabs,
       activeItemTab,

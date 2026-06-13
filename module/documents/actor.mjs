@@ -32,6 +32,32 @@ export class PeasantActor extends Actor {
   static TO_HIT_PENALTY_TARGETS = Object.freeze(["Strength", "Dexterity", "Mental", "Social"]);
   static HARD_LOCATION_NAMES = Object.freeze(["Head", "Arms", "Legs", "Torso"]);
 
+  static createPeasantNotableCombatId() {
+    return foundry?.utils?.randomID?.(16) ?? `combat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  static ensurePeasantNotableCombatIds(combats) {
+    if (!Array.isArray(combats)) return combats;
+    const seen = new Set();
+    for (const combat of combats) {
+      if (!combat || typeof combat !== "object") continue;
+      const current = String(combat.id ?? "").trim();
+      if (current && !seen.has(current)) {
+        combat.id = current;
+        seen.add(current);
+        continue;
+      }
+
+      let nextId = "";
+      do {
+        nextId = PeasantActor.createPeasantNotableCombatId();
+      } while (seen.has(nextId));
+      combat.id = nextId;
+      seen.add(nextId);
+    }
+    return combats;
+  }
+
   prepareDerivedData() {
     super.prepareDerivedData();
 
@@ -818,12 +844,15 @@ export class PeasantActor extends Actor {
   static createDefaultPeasantCombatEntry(entry = {}) {
     const existing = (entry && typeof entry === "object") ? entry : {};
     const defaults = {
+      id: PeasantActor.createPeasantNotableCombatId(),
       type: "standard",
       specialGrade: 0,
       class: 1,
       rank: "0",
       sig: false,
       name: "",
+      img: "",
+      effectIds: [],
       tohit: null,
       accuracy: null,
       usesMax: 0,
@@ -857,7 +886,11 @@ export class PeasantActor extends Actor {
     };
 
     const merged = { ...defaults, ...existing };
+    merged.id = String(merged.id ?? "").trim() || PeasantActor.createPeasantNotableCombatId();
     merged.resourceCosts = Array.isArray(existing.resourceCosts) ? existing.resourceCosts : [];
+    merged.effectIds = Array.isArray(existing.effectIds)
+      ? existing.effectIds.map(id => String(id ?? "").trim()).filter(Boolean)
+      : [];
     merged.speed = { ...defaults.speed, ...(existing.speed || {}) };
     merged.damage = { ...defaults.damage, ...(existing.damage || {}) };
     merged.desperate = Number.parseInt(merged.desperate, 10) || 0;
@@ -890,6 +923,7 @@ export class PeasantActor extends Actor {
 
   async setPeasantNotableCombats(combats, options = {}) {
     const list = cloneActorList(combats);
+    PeasantActor.ensurePeasantNotableCombatIds(list);
     await this.update({ "system.notableCombats": list }, options);
     return { ok: true, changed: true, combats: list };
   }
@@ -1301,6 +1335,10 @@ export class PeasantActor extends Actor {
 
   async setPeasantNotableCombatDescription(index, description, options = {}) {
     return this.updatePeasantNotableCombat(index, { description: String(description ?? "") }, options);
+  }
+
+  async setPeasantNotableCombatImage(index, img, options = {}) {
+    return this.updatePeasantNotableCombat(index, { img: String(img ?? "") }, options);
   }
 
   getPeasantResourceName(rawName) {

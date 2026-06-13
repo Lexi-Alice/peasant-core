@@ -4,71 +4,85 @@
     <legend>Notable Combats</legend>
     <div class="notable-combats-container">
     {{#if @root.editable}}
-      <div class="notable-combats-header" style="display: flex; align-items: center; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #aaa;">
-        <div class="combat-header-drag" style="flex: 0 0 20px;"></div>
-        <div class="combat-header-sig" style="flex: 0 0 24px; text-align: center;">Sig?</div>
-        <div class="combat-header-class" style="flex: 0 0 48px; text-align: center;">Class</div>
-        <div class="combat-header-rank" style="flex: 0 0 48px; text-align: center;">Rank</div>
-        <div style="flex: 0 0 14px;"></div>
-        <div class="combat-header-name" style="flex: 1; padding-left: 2px;">Name</div>
-        <div style="flex: 0 0 26px;"></div>
-        <div class="combat-header-tohit" style="flex: 0 0 48px; text-align: center; font-size: 10px; margin-left: 2px;">TH</div>
-        <div class="combat-header-accuracy" style="flex: 0 0 48px; text-align: center; font-size: 10px; margin-left: 2px;">Acc</div>
-        <div class="combat-header-actions" style="flex: 0 0 68px;"></div>
-      </div>
-
-      <div class="notable-combats-list">
+      <div class="notable-combats-list notable-combats-list-view" style="padding: 10px; border-radius: 4px;">
+        <ul style="padding-left: 20px; margin: 0; list-style-type: disc;">
         {{#each notableCombats as |combat index|}}
-          <div class="combat-item" data-combat-index="{{index}}" data-indent="{{combat.indent}}" style="--indent-level: {{combat.indent}}; display: flex; align-items: center; flex-wrap: nowrap;" draggable="true">
-            <div class="combat-drag-handle" style="font-size: 18px; line-height: 1; flex: 0 0 20px; text-align: center;">&bull;</div>
+          <li class="combat-item combat-view-item" data-combat-index="{{index}}" data-indent="{{combat.indent}}" style="--indent-level: {{combat.indent}}; margin-left: {{multiply combat.indent 20}}px; margin-bottom: 4px; color: #e0e0e0;" draggable="true">
+            <div class="combat-view-line">
+              <span class="combat-edit-heading">
+                {{#if combat.isStandard}}
+                  <span class="combat-class-rank">{{combat.classRankDisplay}}:</span>{{#if combat.sig}}<span class="combat-sig-label">SIG</span>{{/if}}
+                {{else}}
+                  <span class="combat-class-rank">{{combat.specialTypeDisplay}}:</span>
+                {{/if}}
 
-            {{#if combat.isStandard}}
-              <div style="flex: 0 0 24px; text-align: center; display: flex; align-items: center; justify-content: center;">
-                <input type="checkbox" class="combat-sig-checkbox" {{#if combat.sig}}checked{{/if}} data-field="sig" data-tooltip="Sig?" aria-label="Sig?">
-              </div>
-              <input type="number" value="{{combat.class}}" class="combat-input combat-class pc-input" min="1" max="10" placeholder="C" data-field="class" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px;">
-              <input type="text" value="{{combat.rank}}" class="combat-input combat-rank pc-input" placeholder="R" data-field="rank" style="flex: 0 0 30px; text-align: center;" data-tooltip="Enter 0-4 or 'U' for untrained" aria-label="Combat rank">
-              <button type="button" class="combat-toggle-type" data-tooltip="Switch to Special Type" aria-label="Switch to Special Type" style="flex: 0 0 12px; width: 12px; height: 12px; padding: 0; font-size: 10px; border: none; background: transparent; color: #666; cursor: pointer; align-self: center; margin: 0 2px 0 0; line-height: 1;">&times;</button>
-            {{else}}
-              <select class="combat-select pc-select" data-field="type" style="flex: 0 0 75px; height: 24px; font-size: 11px;">
-                <option value="standard">Standard</option>
-                <option value="Stance" {{#if (eq combat.type "Stance")}}selected{{/if}}>Stance</option>
-                <option value="Perk" {{#if (eq combat.type "Perk")}}selected{{/if}}>Perk</option>
-                <option value="Style" {{#if (eq combat.type "Style")}}selected{{/if}}>Style</option>
-                <option value="Cantrip" {{#if (eq combat.type "Cantrip")}}selected{{/if}}>Cantrip</option>
-                <option value="Historic" {{#if (eq combat.type "Historic")}}selected{{/if}}>Historic</option>
-                <option value="TM" {{#if (eq combat.type "TM")}}selected{{/if}}>TM</option>
-                <option value="Spellcraft" {{#if (eq combat.type "Spellcraft")}}selected{{/if}}>Spellcraft</option>
-                <option value="Gate" {{#if (eq combat.type "Gate")}}selected{{/if}}>Gate</option>
-                <option value="Other" {{#if (eq combat.type "Other")}}selected{{/if}}>Other</option>
-              </select>
-              {{#if (eq combat.type "TM")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="Grade" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
-              {{else if (eq combat.type "Perk")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="Grade" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
-              {{else if (eq combat.type "Spellcraft")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="C#" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
-              {{else if (eq combat.type "Gate")}}
-                <input type="number" value="{{combat.specialGradeInput}}" class="combat-input combat-special-grade pc-input" min="0" placeholder="C#" data-field="specialGrade" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 52px; margin-left: 2px;">
+                {{#if combat.hasDescription}}
+                  <span class="combat-name-wrapper" data-index="{{index}}" tabindex="0" data-tooltip-html="{{combat.descriptionTooltipHtml}}">
+                    <span class="combat-name-view combat-has-desc" data-index="{{index}}">{{combat.name}}{{#if combat.hasToHit}}:{{else}}{{#if combat.hasAccuracy}}:{{/if}}{{/if}}</span>
+                  </span>
+                {{else}}
+                  <span class="combat-name-view">{{combat.name}}{{#if combat.hasToHit}}:{{else}}{{#if combat.hasAccuracy}}:{{/if}}{{/if}}</span>
+                {{/if}}
+
+                {{#if combat.allowToHitAcc}}
+                  <span class="combat-roll-clickable" data-action="rollCombat" data-index="{{index}}" role="button" tabindex="0" data-tooltip="Roll {{combat.name}}" aria-label="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
+                {{/if}}
+
+                <span class="combat-actions">
+                  <button type="button" class="combat-desc-btn" data-tooltip="Edit" aria-label="Edit"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>
+                  <button type="button" class="combat-indent" data-tooltip="Indent" aria-label="Indent">&rarr;</button>
+                  <button type="button" class="combat-outdent" data-tooltip="Outdent" aria-label="Outdent">&larr;</button>
+                  <button type="button" class="combat-delete" data-tooltip="Delete" aria-label="Delete">&times;</button>
+                </span>
+              </span>
+
+              {{#if combat.sig}}
+                <span class="combat-uses-display">
+                  <span class="uses-label">Uses</span>
+                  <div class="combat-uses-box">
+                    <input type="number" class="combat-uses-current pc-input-plain" data-index="{{index}}" value="{{combat.usesCurrent}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                    <span class="uses-separator">/ {{combat.usesMax}}</span>
+                  </div>
+                </span>
               {{/if}}
-            {{/if}}
 
-            <input type="text" value="{{combat.name}}" class="combat-input combat-name pc-input" placeholder="Combat name" data-field="name" style="flex: 1; margin-left: 2px;">
-            <button type="button" class="combat-desc-btn" data-tooltip="Edit Description" aria-label="Edit Description" style="margin-left:6px; background:#666; color:#fff; border:none; border-radius:3px; width:20px; height:20px; line-height:16px; padding:0; cursor:pointer;">+</button>
-            {{#if combat.allowToHitAcc}}
-              <input type="text" value="{{combat.tohit}}" class="combat-input combat-tohit pc-input" placeholder="TH" data-field="tohit" inputmode="numeric" pattern="\d*" style="flex: 0 0 30px; margin-left: 2px;">
-              <input type="text" value="{{combat.accuracy}}" class="combat-input combat-accuracy pc-input" placeholder="Acc" data-field="accuracy" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 30px; margin-left: 2px;">
-            {{/if}}
-            {{#if combat.sig}}
-              <input type="number" value="{{combat.usesMax}}" class="combat-input combat-uses-max pc-input" placeholder="Uses Max" data-field="usesMax" data-index="{{index}}" min="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" style="flex: 0 0 48px; margin-left: 2px; color: inherit; padding: 0;">
-            {{/if}}
-            <div class="combat-actions" style="display: flex; gap: 2px; flex: 0 0 auto;">
-              <button type="button" class="combat-indent" data-tooltip="Indent" aria-label="Indent" style="padding: 0 4px; font-size: 10px;">&rarr;</button>
-              <button type="button" class="combat-outdent" data-tooltip="Outdent" aria-label="Outdent" style="padding: 0 4px; font-size: 10px;">&larr;</button>
-              <button type="button" class="combat-delete" data-tooltip="Delete" aria-label="Delete" style="padding: 0 4px; font-size: 10px;">&times;</button>
+              {{#if combat.hasTags}}
+                <span class="combat-tags-inline" data-combat-index="{{index}}">
+                  {{#each combat.activeTags as |tag tagIdx|}}
+                    {{#if tag.isUses}}
+                      <span class="combat-uses-display combat-tag-uses-display combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">
+                        <span class="uses-label">{{tag.label}}</span>
+                        <span class="combat-uses-box">
+                          <input type="number" class="combat-uses-current combat-tag-uses-current pc-input-plain" data-index="{{../index}}" value="{{tag.current}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                          <span class="uses-separator">/ {{tag.max}}</span>
+                        </span>
+                      </span>
+                    {{else if tag.isSections}}
+                      <span class="combat-tag combat-tag-compact combat-tag-sections combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">
+                        {{tag.label}}:
+                        <input type="number" class="combat-tag-sections-current pc-input-plain" data-index="{{../index}}" value="{{tag.current}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                        <span>/{{tag.max}}</span>
+                      </span>
+                    {{else if tag.isSplitSecond}}
+                      <span class="combat-tag combat-tag-compact combat-tag-speed combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">
+                        {{tag.value}}:
+                        <input type="number" class="combat-tag-splitsecond-current pc-input-plain" data-index="{{../index}}" value="{{tag.splitSecondCurrent}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                        <span>/{{tag.splitSecondMax}}</span>
+                      </span>
+                    {{else if tag.rollable}}
+                      <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-rollable" data-action="rollCombatTag" data-combat-index="{{@../index}}" data-roll-type="{{tag.type}}" data-tag-type="{{tag.type}}" data-tag-index="{{@index}}" data-tooltip="Click to roll {{tag.label}}" aria-label="Click to roll {{tag.label}}">{{tag.label}}: {{tag.value}}</button>
+                    {{else if tag.value}}
+                      <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">{{#if tag.label}}{{tag.label}}: {{/if}}{{tag.value}}</button>
+                    {{else}}
+                      <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">{{tag.label}}</button>
+                    {{/if}}
+                  {{/each}}
+                </span>
+              {{/if}}
             </div>
-          </div>
+          </li>
         {{/each}}
+        </ul>
       </div>
       <button type="button" class="add-combat-btn"> + Add Combat </button>
     {{else}}
@@ -76,7 +90,7 @@
         <ul style="padding-left: 20px; margin: 0; list-style-type: disc;">
           {{#each notableCombats as |combat index|}}
             {{#if combat.isDisplayable}}
-              <li class="combat-view-item" style="margin-left: {{multiply combat.indent 20}}px; margin-bottom: 4px; color: #e0e0e0;">
+              <li class="combat-view-item pc-notable-combat-hotbar-drag" data-combat-index="{{index}}" data-combat-id="{{combat.id}}" draggable="true" data-tooltip="Drag to hotbar" style="margin-left: {{multiply combat.indent 20}}px; margin-bottom: 4px; color: #e0e0e0;">
                 <div class="combat-view-line">
                   {{#if combat.isStandard}}
                     <span class="combat-class-rank">{{combat.classRankDisplay}}:</span>{{#if combat.sig}}<span class="combat-sig-label">SIG</span>{{/if}}

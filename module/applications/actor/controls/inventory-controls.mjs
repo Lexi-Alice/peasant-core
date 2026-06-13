@@ -2,8 +2,10 @@ import { delegate, qs, qsa } from "../../dom.mjs";
 
 const PC_ITEM_TYPES = Object.freeze(["weapon", "equipment", "tool", "consumable", "loot"]);
 const PC_ITEM_TYPE_SET = new Set(PC_ITEM_TYPES);
+const EQUIPPABLE_ITEM_TYPES = new Set(["weapon", "equipment", "tool", "consumable"]);
 const INVENTORY_DRAG_PREFIX = "peasant-core.inventory-sort";
 const INVENTORY_DRAG_BLOCK_SELECTOR = "input, select, textarea, a, [data-pc-inventory-menu], [data-pc-inventory-equipped-marker], [data-pc-inventory-quantity-step]";
+const INVENTORY_CONTEXT_MENU_BLOCK_SELECTOR = "input, select, textarea, a, label, [data-pc-inventory-menu], [data-pc-inventory-equipped-marker], [data-pc-inventory-quantity-step], [contenteditable='true']";
 const INVENTORY_SORT_MODES = Object.freeze({
   manual: {
     next: "alpha",
@@ -206,6 +208,20 @@ async function updateItemField(sheet, input, item, field, value, { runQueuedInpu
   }
 }
 
+function isEquippableInventoryItem(item) {
+  return !!item && EQUIPPABLE_ITEM_TYPES.has(item.type);
+}
+
+async function setInventoryItemEquipped(sheet, item, equipped) {
+  if (!sheet?.canModifyActor || !isEquippableInventoryItem(item)) return;
+  try {
+    await item.update({ "system.equipped": !!equipped });
+  } catch (err) {
+    console.warn("Failed to update inventory equipped state:", err);
+    ui.notifications?.error?.("Failed to update equipped state. See console for details.");
+  }
+}
+
 function normalizeDropData(event) {
   const text = event?.dataTransfer?.getData?.("application/json") || event?.dataTransfer?.getData?.("text/plain");
   if (!text) return null;
@@ -334,9 +350,10 @@ function getContextMenuClass() {
     ?? null;
 }
 
-function getInventoryContextMenuEntries(sheet) {
-  return [
+function getInventoryContextMenuEntries(sheet, item = null) {
+  const entries = [
     {
+      group: "item",
       label: "View Item",
       icon: "fa-solid fa-eye",
       onClick: (_event, target) => {
@@ -345,6 +362,7 @@ function getInventoryContextMenuEntries(sheet) {
       }
     },
     {
+      group: "item",
       label: "Edit",
       icon: "fa-solid fa-pen-to-square",
       onClick: (_event, target) => {
@@ -353,6 +371,7 @@ function getInventoryContextMenuEntries(sheet) {
       }
     },
     {
+      group: "item",
       label: "Duplicate",
       icon: "fa-solid fa-copy",
       onClick: async (_event, target) => {
@@ -361,6 +380,7 @@ function getInventoryContextMenuEntries(sheet) {
       }
     },
     {
+      group: "item",
       label: "Delete",
       icon: "fa-solid fa-trash",
       onClick: async (_event, target) => {
@@ -370,6 +390,20 @@ function getInventoryContextMenuEntries(sheet) {
       }
     }
   ];
+
+  if (isEquippableInventoryItem(item)) {
+    entries.push({
+      group: "equipment",
+      label: item.system?.equipped ? "Unequip" : "Equip",
+      icon: "fa-solid fa-shield-halved",
+      onClick: async (_event, target) => {
+        const targetItem = getItemFromElement(sheet, target) ?? item;
+        await setInventoryItemEquipped(sheet, targetItem, !targetItem?.system?.equipped);
+      }
+    });
+  }
+
+  return entries;
 }
 
 function setupInventoryContextMenu(sheet, browser) {
@@ -381,8 +415,28 @@ function setupInventoryContextMenu(sheet, browser) {
     fixed: true,
     jQuery: false,
     relative: "target",
-    onOpen: () => {
-      ui.context.menuItems = getInventoryContextMenuEntries(sheet);
+    onOpen: element => {
+      const item = getItemFromElement(sheet, element);
+      ui.context.menuItems = getInventoryContextMenuEntries(sheet, item);
+    }
+  });
+
+  browser.addEventListener("contextmenu", (event) => {
+    const row = event.target?.closest?.("[data-pc-inventory-item]");
+    if (!row || !browser.contains(row)) return;
+
+    const blocked = event.target?.closest?.(INVENTORY_CONTEXT_MENU_BLOCK_SELECTOR);
+    const menuButton = qs(row, "[data-pc-inventory-menu]");
+    if ((blocked && row.contains(blocked)) || !menuButton || menuButton.disabled) event.stopPropagation();
+  }, true);
+
+  new ContextMenuClass(browser, "[data-pc-inventory-item]", [], {
+    fixed: true,
+    jQuery: false,
+    relative: "cursor",
+    onOpen: element => {
+      const item = getItemFromElement(sheet, element);
+      ui.context.menuItems = getInventoryContextMenuEntries(sheet, item);
     }
   });
 }
@@ -551,15 +605,8 @@ export function setupInventoryControls(sheet, html, { runQueuedInputUpdate = nul
   delegate(browser, "click", "[data-pc-inventory-equipped-marker]", async (event, button) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!sheet?.canModifyActor) return;
     const item = getItemFromElement(sheet, button);
-    if (!item) return;
-    try {
-      await item.update({ "system.equipped": !item.system?.equipped });
-    } catch (err) {
-      console.warn("Failed to update inventory equipped state:", err);
-      ui.notifications?.error?.("Failed to update equipped state. See console for details.");
-    }
+    await setInventoryItemEquipped(sheet, item, !item?.system?.equipped);
   });
 
   if (sheet.isEditMode) {

@@ -11,9 +11,14 @@ const PC_WORLD_MIGRATION_DEFENSE_BLOCK_CLEANUP = 4;
 const PC_WORLD_MIGRATION_CHARACTER_EXPERIMENTAL_REMOVAL = 5;
 const PC_WORLD_MIGRATION_OPTIONAL_NUMBERS = 6;
 const PC_WORLD_MIGRATION_STRUCTURED_NUMBERS = 7;
-const PC_WORLD_MIGRATION_LATEST = PC_WORLD_MIGRATION_STRUCTURED_NUMBERS;
+const PC_WORLD_MIGRATION_NOTABLE_COMBAT_IDS = 8;
+const PC_WORLD_MIGRATION_LATEST = PC_WORLD_MIGRATION_NOTABLE_COMBAT_IDS;
 const PC_CHARACTER_TYPES = new Set(["character"]);
 const PC_REMOVED_CHARACTER_EXPERIMENTAL_TYPE = "characterExperimental";
+
+function createNotableCombatId() {
+  return foundry?.utils?.randomID?.(16) ?? `combat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function normalizeNotableCombatCustomTagEntry(entry) {
   return {
@@ -103,6 +108,31 @@ function migrateNotableCombatStructuredNumbers(rawCombats) {
     const result = migrateCombatStructuredNumbers(combat);
     changed = changed || result.changed;
     return result.combat;
+  });
+  return { combats, changed };
+}
+
+function migrateNotableCombatIds(rawCombats) {
+  if (!Array.isArray(rawCombats)) return { combats: rawCombats, changed: false };
+  let changed = false;
+  const seen = new Set();
+  const combats = rawCombats.map((combat) => {
+    if (!combat || typeof combat !== "object") return combat;
+    const current = String(combat.id ?? "").trim();
+    if (current && !seen.has(current)) {
+      seen.add(current);
+      if (current === combat.id) return combat;
+      changed = true;
+      return { ...combat, id: current };
+    }
+
+    let id = "";
+    do {
+      id = createNotableCombatId();
+    } while (seen.has(id));
+    seen.add(id);
+    changed = true;
+    return { ...combat, id };
   });
   return { combats, changed };
 }
@@ -306,6 +336,14 @@ export async function migrateWorldNotableCombatData() {
       migrationState = {
         combats: combatStructuredMigration.combats,
         changed: migrationState.changed || combatStructuredMigration.changed
+      };
+    }
+
+    if (currentVersion < PC_WORLD_MIGRATION_NOTABLE_COMBAT_IDS) {
+      const combatIdMigration = migrateNotableCombatIds(migrationState.combats);
+      migrationState = {
+        combats: combatIdMigration.combats,
+        changed: migrationState.changed || combatIdMigration.changed
       };
     }
 

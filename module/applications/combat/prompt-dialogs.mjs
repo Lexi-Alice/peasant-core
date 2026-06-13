@@ -2,6 +2,19 @@ import { normalizeAppliedDamageType } from "../../data/actor/targeted-damage.mjs
 import { pcLog } from "../../utils/logging.mjs";
 import { renderDialogV2 } from "../dialogs.mjs";
 
+const FORCE_PASS_STRESS_TYPES = [
+  { key: "physical", label: "Physical Stress" },
+  { key: "mental", label: "Mental Stress" },
+  { key: "general", label: "General Stress" }
+];
+
+function getForcePassStressTypeOptions(actor) {
+  return FORCE_PASS_STRESS_TYPES.filter((type) => {
+    const count = Math.max(0, Number(actor?.system?.[`${type.key}StressCount`]) || 0);
+    return count > 0;
+  });
+}
+
 function showWaitingForDefenderResponseDialog() {
   let dialogApp = null;
   let dotInterval = null;
@@ -220,6 +233,12 @@ export async function showForcePassPromptDialog({
 } = {}) {
   if (!actor || stressCost <= 0) return { forced: false, selection: "no", spendType: "general" };
   const resolvedPromptText = String(promptText || `Spend ${stressCost} stress to force pass?`).trim();
+  const stressTypeOptions = getForcePassStressTypeOptions(actor);
+  if (!stressTypeOptions.length) return { forced: false, selection: "no-stress", spendType: null };
+  const defaultSpendType = stressTypeOptions[0].key;
+  const stressTypeOptionsHtml = stressTypeOptions
+    .map((type) => `<option value="${type.key}">${type.label}</option>`)
+    .join("");
 
   const content = `
     <form class="pc-force-pass-form">
@@ -227,9 +246,7 @@ export async function showForcePassPromptDialog({
         <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:#b0b0b0;">
           <span>${resolvedPromptText}</span>
           <select class="pc-defense-prompt-select pc-select pc-dialog-field-md" name="forcePassStressType">
-            <option value="physical">Physical Stress</option>
-            <option value="mental">Mental Stress</option>
-            <option value="general">General Stress</option>
+            ${stressTypeOptionsHtml}
           </select>
         </label>
       </div>
@@ -259,7 +276,7 @@ export async function showForcePassPromptDialog({
         yes: {
           label: "Yes",
           callback: async (html) => {
-            const spendType = String(html.find('[name="forcePassStressType"]').val() || "general").trim().toLowerCase();
+            const spendType = String(html.find('[name="forcePassStressType"]').val() || defaultSpendType).trim().toLowerCase();
             finalize({ forced: true, selection: "yes", spendType });
             return true;
           }

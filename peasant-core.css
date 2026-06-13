@@ -755,7 +755,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     min-height: 44px;
     padding: 8px 10px;
     border: 1px solid transparent;
-    background: rgba(8, 8, 14, 0.12);
+    background: transparent;
 }
 
 .pc-defense-favorite-targeting {
@@ -1076,6 +1076,10 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     box-shadow: none;
 }
 
+.actor-sheet .pc-foundry-section + .pc-foundry-section {
+    margin-top: 8px;
+}
+
 .pc-foundry-section legend {
     margin: 0;
     padding: 0 8px;
@@ -1113,6 +1117,10 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     padding: 0 2px;
 }
 
+.pc-biography-detail-strip + .pc-biography-details-section {
+    margin-top: 8px;
+}
+
 .pc-biography-details-section,
 .pc-sir-foundry-section {
     min-width: 0;
@@ -1132,6 +1140,12 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     gap: 5px;
     min-width: 0;
     margin: 0;
+}
+
+.pc-biography-tab-panel:not(.sir-section-edit) .pc-bio-field {
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: end;
+    column-gap: 8px;
 }
 
 .pc-bio-field > span,
@@ -1204,6 +1218,19 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .pc-bio-value:empty {
     min-height: 0;
     padding-top: 0;
+}
+
+.pc-biography-tab-panel:not(.sir-section-edit) .pc-bio-field .pc-bio-value {
+    min-height: 20px;
+    padding: 0 0 2px;
+    border-top: 0;
+    border-bottom: 1px solid rgba(203, 191, 154, 0.58);
+    line-height: 1.2;
+}
+
+.pc-biography-tab-panel:not(.sir-section-edit) .pc-bio-field .pc-bio-value:empty {
+    min-height: 20px;
+    padding: 0 0 2px;
 }
 
 .pc-biography-notes-grid {
@@ -5401,7 +5428,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     padding: 8px;
     border-radius: 4px;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
-    cursor: move;
+    cursor: grab;
     transition: all 0.2s;
     position: relative !important;
 }
@@ -5426,50 +5453,22 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 
 
 .skill-item.dragging {
-    opacity: 0.4;
+    cursor: grabbing;
+    opacity: 0.55;
     background: transparent;
 }
 
 .skill-item.drag-over-top {
-    border-top: 3px solid #4a9eff;
-    margin-top: -3px;
+    box-shadow: inset 0 2px 0 var(--color-shadow-primary, #ff0000);
 }
 
 .skill-item.drag-over-bottom {
-    border-bottom: 3px solid #4a9eff;
-    margin-bottom: -3px;
+    box-shadow: inset 0 -2px 0 var(--color-shadow-primary, #ff0000);
 }
 
-/* Stronger visible indicator for drag-over insertion positions */
-.skill-item.drag-over-top::before,
-.skill-item.drag-over-bottom::after {
-  content: '';
-  display: block;
-  height: 8px;
-  margin: -8px 0 8px 0;
-  background: linear-gradient(90deg, rgba(74,158,255,0.12), rgba(74,158,255,0.24));
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.skill-item.drag-over-top {
-  transform: translateY(-4px);
-}
-.skill-item.drag-over-bottom {
-  transform: translateY(4px);
-}
-
-/* Do not show insertion highlight on the element currently being dragged */
 .skill-item.dragging.drag-over-top,
 .skill-item.dragging.drag-over-bottom {
-  border-top: none !important;
-  border-bottom: none !important;
-  margin: 0 !important;
-  transform: none !important;
-}
-.skill-item.dragging.drag-over-top::before,
-.skill-item.dragging.drag-over-bottom::after {
-  display: none !important;
+  box-shadow: none;
 }
 
 .skill-input {
@@ -5588,66 +5587,28 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     background: transparent;
     border-radius: 4px;
     border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
+    cursor: grab;
     transition: all 0.15s ease;
     position: relative !important;
 }
 
 .advantage-item.dragging {
-    opacity: 0.4;
+    cursor: grabbing;
+    opacity: 0.55;
     background: transparent;
 }
 
 .advantage-item.drag-over-top {
-    border-top: 3px solid #4a9eff;
-    margin-top: -3px;
-    transform: translateY(-4px);
+    box-shadow: inset 0 2px 0 var(--color-shadow-primary, #ff0000);
 }
 
 .advantage-item.drag-over-bottom {
-    border-bottom: 3px solid #4a9eff;
-    margin-bottom: -3px;
-    transform: translateY(4px);
+    box-shadow: inset 0 -2px 0 var(--color-shadow-primary, #ff0000);
 }
 
-/* Subtle insertion indicator */
-.advantage-item.drag-over-top::before {
-    content: '';
-    display: block;
-    position: absolute;
-    top: -4px;
-    left: 0;
-    right: 0;
-    height: 8px;
-    background: linear-gradient(90deg, rgba(74,158,255,0.12), rgba(74,158,255,0.24));
-    border-radius: 4px;
-    pointer-events: none;
-}
-
-.advantage-item.drag-over-bottom::after {
-    content: '';
-    display: block;
-    position: absolute;
-    bottom: -4px;
-    left: 0;
-    right: 0;
-    height: 8px;
-    background: linear-gradient(90deg, rgba(74,158,255,0.12), rgba(74,158,255,0.24));
-    border-radius: 4px;
-    pointer-events: none;
-}
-
-/* Don't show indicators on the dragged element itself */
 .advantage-item.dragging.drag-over-top,
 .advantage-item.dragging.drag-over-bottom {
-    border-top: none !important;
-    border-bottom: none !important;
-    margin: 0 0 8px 0 !important;
-    transform: none !important;
-}
-
-.advantage-item.dragging.drag-over-top::before,
-.advantage-item.dragging.drag-over-bottom::after {
-    display: none !important;
+    box-shadow: none;
 }
 
 .advantage-drag-handle {
@@ -6421,6 +6382,165 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
   gap: 8px;
 }
 
+.pc-notable-combat-editor-header {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.pc-notable-combat-image-frame .pc-item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translate(-50%, -50%);
+}
+
+.pc-notable-combat-editor-summary {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pc-notable-combat-stat-grid {
+  display: grid;
+  grid-template-columns: minmax(64px, 80px) 22px minmax(64px, 80px) minmax(72px, 92px) minmax(76px, 96px);
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.pc-notable-combat-special-grid {
+  display: grid;
+  grid-template-columns: minmax(122px, 150px) repeat(3, minmax(72px, 96px));
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.pc-notable-combat-stat-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+
+.pc-notable-combat-stat-field > span {
+  overflow: hidden;
+  color: #b9aa8f;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pc-notable-combat-class-input,
+.pc-notable-combat-rank-input,
+.pc-notable-combat-tohit-input,
+.pc-notable-combat-accuracy-input,
+.pc-notable-combat-special-grade-input,
+.pc-notable-combat-type-select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+.pc-notable-combat-toggle-type.combat-toggle-type {
+  align-self: end !important;
+  margin: 0 2px 4px 0 !important;
+}
+
+.pc-notable-combat-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 26px;
+}
+
+.pc-notable-combat-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid rgba(159, 132, 117, 0.6);
+  border-radius: 4px;
+  background: rgba(48, 40, 49, 0.65);
+  color: var(--color-light-2, #d8d0c0);
+  font-size: 12px;
+}
+
+.pc-notable-combat-editor-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.pc-notable-combat-description-section,
+.pc-notable-combat-effects-section {
+  min-height: 0;
+}
+
+.pc-notable-combat-description-editor {
+  --min-height: 230px;
+  --menu-height: 34px;
+  min-height: var(--min-height);
+}
+
+.pc-notable-combat-tag-editor prose-mirror.pc-notable-combat-description-editor .menu-container {
+  flex: 0 0 auto;
+  min-height: var(--menu-height);
+  overflow: visible;
+}
+
+.pc-notable-combat-tag-editor prose-mirror.pc-notable-combat-description-editor menu.editor-menu {
+  position: relative;
+  inset: auto;
+  flex-wrap: wrap;
+  align-items: center;
+  height: auto;
+  min-height: var(--menu-height);
+  padding: 6px;
+}
+
+.pc-notable-combat-tag-editor prose-mirror.pc-notable-combat-description-editor .editor-container {
+  min-height: 170px;
+}
+
+.pc-notable-combat-empty-state {
+  min-height: 120px;
+  padding: 16px;
+  border: 1px dashed rgba(159, 132, 117, 0.5);
+  border-radius: 6px;
+  color: #b9aa8f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pc-notable-combat-tag-editor [hidden] {
+  display: none !important;
+}
+
+@media (max-width: 620px) {
+  .pc-notable-combat-tag-editor:not(.minimized, .minimizing, .maximizing) {
+    min-width: 0;
+  }
+
+  .pc-notable-combat-editor-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pc-notable-combat-image-frame {
+    width: 96px;
+    height: 96px;
+  }
+}
+
 /* Form group styling */
 .pc-description-editor .form-group {
   margin: 0 !important;
@@ -6833,30 +6953,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     .attributes-table { grid-template-columns: minmax(100px, 1.4fr) repeat(4, minmax(50px, 120px)); }
 }
 
-/* Skills list drag placeholder styling (subtle insertion indicator) */
-.skills-list .skill-placeholder {
-  display: block;
-  height: 8px;
-  background: rgba(33,150,243,0.6);
-  border-radius: 4px;
-  margin: 6px 6px;
-  width: calc(100% - 12px);
-  pointer-events: none;
-  z-index: 50;
-  transition: all 0.08s ease;
-}
-
-.skills-list .skill-item.dragging {
-  opacity: 0.5;
-}
-
-/* Hide the inserted placeholder bar so only the subtle top/bottom
-   insertion indicator is shown. The JS still maintains a placeholder
-   element for pointer positioning, but we hide its visual appearance. */
-.skills-list .skill-placeholder {
-  display: none !important;
-}
-
 /* Skill name wrapper for tooltip positioning */
 .skill-name-wrapper {
     position: relative !important;
@@ -7123,44 +7219,22 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 }
 
 .combat-item.dragging {
-  opacity: 0.4;
+  cursor: grabbing;
+  opacity: 0.55;
   background: transparent;
 }
 
 .combat-item.drag-over-top {
-  border-top: 3px solid #4a9eff;
-  margin-top: -3px;
-  transform: translateY(-4px);
+  box-shadow: inset 0 2px 0 var(--color-shadow-primary, #ff0000);
 }
 
 .combat-item.drag-over-bottom {
-  border-bottom: 3px solid #4a9eff;
-  margin-bottom: -3px;
-  transform: translateY(4px);
-}
-
-.combat-item.drag-over-top::before,
-.combat-item.drag-over-bottom::after {
-  content: '';
-  display: block;
-  height: 8px;
-  margin: -8px 0 8px 0;
-  background: linear-gradient(90deg, rgba(74,158,255,0.12), rgba(74,158,255,0.24));
-  border-radius: 4px;
-  pointer-events: none;
+  box-shadow: inset 0 -2px 0 var(--color-shadow-primary, #ff0000);
 }
 
 .combat-item.dragging.drag-over-top,
 .combat-item.dragging.drag-over-bottom {
-  border-top: none !important;
-  border-bottom: none !important;
-  margin: 0 !important;
-  transform: none !important;
-}
-
-.combat-item.dragging.drag-over-top::before,
-.combat-item.dragging.drag-over-bottom::after {
-  display: none !important;
+  box-shadow: none;
 }
 
 .combat-input {
@@ -7391,11 +7465,27 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
   display: list-item;
 }
 
+.notable-combats-list-view .combat-item.combat-view-item {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  transition: none;
+}
+
 .combat-view-line {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 4px; /* Reduced gap for compact look */
+}
+
+.notable-combats-list-view .combat-edit-heading {
+  flex: 1 1 100%;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
 }
 
 /* Combat class/rank display - compact */
@@ -9334,8 +9424,9 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 }
 
 .pc-notable-combat-tag-editor:not(.minimized, .minimizing, .maximizing) {
-  min-width: 420px;
-  min-height: 360px;
+  min-width: 520px;
+  min-height: 0;
+  max-height: calc(100vh - 80px);
 }
 
 .pc-readonly-description-dialog:not(.minimized, .minimizing, .maximizing) {
@@ -10265,7 +10356,8 @@ nav.pc-item-tabs .pc-item-tab.active {
 }
 
 .pc-item-loot-type-row > span,
-.pc-item-equipment-type-row > span {
+.pc-item-equipment-type-row > span,
+.pc-item-equipment-shield-row > span {
   color: #f0e5d0;
   font-size: 13px;
   font-weight: 700;
@@ -10275,6 +10367,48 @@ nav.pc-item-tabs .pc-item-tab.active {
 .pc-item-equipment-type-select {
   width: 100%;
   min-width: 0;
+}
+
+.pc-item-equipment-shield-row {
+  display: grid;
+  grid-template-columns: 120px minmax(180px, 1fr);
+  gap: 12px;
+  align-items: end;
+  min-width: 0;
+}
+
+.pc-item-equipment-shield-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(70px, 86px));
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.pc-item-equipment-shield-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+
+.pc-item-equipment-shield-field > span {
+  overflow: hidden;
+  color: #b9aa8f;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pc-item-equipment-shield-input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding-inline: 4px;
+  text-align: center;
 }
 
 .pc-item-checkbox-row {
@@ -10388,5 +10522,87 @@ nav.pc-item-tabs .pc-item-tab.active {
 .actor-sheet .pc-attributes-skills-section .tab:not(.active),
 .actor-sheet .pc-sheet-main-tab-stage .tab:not(.active) {
   display: none !important;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar {
+  overflow: hidden;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .slot-icon {
+  object-fit: cover;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .key {
+  z-index: 4;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-label,
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-tohit,
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-accuracy {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-tohit,
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-accuracy {
+  right: 4px;
+  overflow: hidden;
+  color: #d8f2ff;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-tohit {
+  top: 4px;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-accuracy {
+  top: 14px;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-label {
+  top: 24px;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff7dd;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar .pc-notable-hotbar-label-text {
+  display: -webkit-box;
+  width: 100%;
+  max-height: 100%;
+  line-height: 1;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--pc-notable-hotbar-label-lines, 2);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar.pc-notable-combat-hotbar-no-accuracy .pc-notable-hotbar-label {
+  top: 14px;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar.pc-notable-combat-hotbar-no-stats .pc-notable-hotbar-label {
+  top: 4px;
+}
+
+#hotbar #action-bar .slot.pc-notable-combat-hotbar-missing .slot-icon {
+  filter: grayscale(1) opacity(0.7);
 }
 

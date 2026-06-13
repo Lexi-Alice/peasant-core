@@ -46,11 +46,21 @@ export function applyDefensePenaltiesToRollResult(sourceRollResult, {
 
   rollResult.totalMoS = preDefenseTotalMoS - (totalDefensePenaltyValue * 0.25);
 
+  const sourceBaseMoS = Number(sourceRollResult.baseMoS);
+  const wasPreDefenseNarrowSuccess = String(sourceRollResult.resultText || "").trim() === "Narrow Success"
+    || (
+      !String(sourceRollResult.criticalType || "").trim()
+      && Number.isFinite(sourceBaseMoS)
+      && Number.isFinite(sourceTotalMoS)
+      && sourceBaseMoS >= 0
+      && sourceTotalMoS < 0
+    );
   const postDefenseBaseMoS = Number(rollResult.baseMoS);
   const postDefenseTotalMoS = Number(rollResult.totalMoS);
   const narrowSuccessIntoDefense = totalDefensePenaltyValue > 0
     && defenseFailureLabel !== "Failure due to Primal Evasion"
     && !String(rollResult.criticalType || "").trim()
+    && wasPreDefenseNarrowSuccess
     && Number.isFinite(postDefenseBaseMoS)
     && Number.isFinite(postDefenseTotalMoS)
     && postDefenseBaseMoS >= 0

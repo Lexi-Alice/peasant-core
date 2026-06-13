@@ -7,7 +7,14 @@ function getDefaultEffectIcon() {
 function getActiveEffectTypeLabel(type) {
   const key = CONFIG?.ActiveEffect?.typeLabels?.[type];
   if (key && game?.i18n?.has?.(key)) return game.i18n.localize(key);
-  return type === "base" ? "Base" : type === "enchantment" ? "Enchantment" : "";
+  if (type === "base") return "Base";
+  if (type === "enchantment") return "Enchantment";
+  if (type === "skill") return "Skill";
+  return "";
+}
+
+function getPeasantEffectCategory(effect) {
+  return String(effect?.getFlag?.("peasant-core", "effectCategory") ?? "").trim();
 }
 
 function formatSearchText(...parts) {
@@ -68,7 +75,8 @@ async function prepareActorPassiveEffect(effect, actor, index) {
   const source = await resolveEffectSource(effect, actor);
   const sourceName = getEffectSourceName(effect, actor, source);
   const type = effect?.type || "base";
-  const typeLabel = getActiveEffectTypeLabel(type);
+  const category = getPeasantEffectCategory(effect);
+  const typeLabel = category === "skill" ? "Skill" : getActiveEffectTypeLabel(type);
   const status = getEffectStatusLabel(effect);
   const name = effect?.name ?? effect?.label ?? "Effect";
   const subtitle = typeLabel ? `${typeLabel} - ${status}` : status;
