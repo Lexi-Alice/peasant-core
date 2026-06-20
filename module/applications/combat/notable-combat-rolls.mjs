@@ -30,7 +30,9 @@ export async function executeResolvedNotableCombatRoll({
   defenseToHitPenalty = 0,
   defenseFailureLabel = "Failure due to Defense",
   targetLabel = "",
-  cardClass = ""
+  cardClass = "",
+  edgeChainContext = null,
+  edgeExplodeReroll = null
 } = {}) {
   const combatMods = actor.system?.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0, costMod: 0 };
   const toHitMod = Number.parseInt(combatMods.toHit, 10) || 0;
@@ -90,10 +92,12 @@ export async function executeResolvedNotableCombatRoll({
       accuracy: untrainedAccuracyValue,
       skillName: untrainedName,
       speaker,
-      cardClass
+      cardClass,
+      edgeChainContext,
+      edgeExplodeReroll
     });
   } else {
-    rollResult = await performSkillRoll({ toHit: finalToHit, accuracy: accuracyValue, skillName: combatName, speaker, cardClass });
+    rollResult = await performSkillRoll({ toHit: finalToHit, accuracy: accuracyValue, skillName: combatName, speaker, cardClass, edgeChainContext, edgeExplodeReroll });
   }
 
   const forcePassResult = await maybeForcePassFailedNotableRoll({

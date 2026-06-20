@@ -4,7 +4,7 @@ import { pcLog } from "../../utils/logging.mjs";
 import { getActiveNotableCombatTargets, getPreferredActorToken, getPreferredDefensePromptRecipientUser } from "./actor-targets.mjs";
 import { isChainCancelledResult, withWaitingForDefenderResponse } from "./prompt-dialogs.mjs";
 
-export async function emitDefensePromptRequestsForAttack({ actor, combat, combatIndex, attackerToken = null } = {}) {
+export async function emitDefensePromptRequestsForAttack({ actor, combat, combatIndex, attackerToken = null, edgeChainContext = null, edgeExplodeReroll = null } = {}) {
   const targetingType = getCombatTargetingType(combat);
   if (!targetingType) {
     pcLog.debug("Peasant Core | Defense prompt skipped: no targeting type", {
@@ -78,7 +78,9 @@ export async function emitDefensePromptRequestsForAttack({ actor, combat, combat
       targetTokenUuid: targetTokenDocument?.uuid || null,
       targetTokenName: String(target.targetName || targetToken?.name || targetTokenDocument?.name || targetActor?.name || "").trim(),
       targetActorId: targetActor?.id || null,
-      targetActorUuid: targetActor?.uuid || null
+      targetActorUuid: targetActor?.uuid || null,
+      edgeChainContext,
+      edgeExplodeReroll
     };
     pcLog.debug("Peasant Core | Requesting defense prompt", {
       attack: payload.attackCombatName,

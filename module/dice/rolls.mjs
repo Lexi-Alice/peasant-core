@@ -5,6 +5,13 @@ import { registerPeasantCoreApi } from "../utils/api.mjs";
 import { rollPeasantCriticalExplosion } from "./exploding.mjs";
 import { applyMessageMode, escapeHtml } from "../utils/chat.mjs";
 import { pcLog } from "../utils/logging.mjs";
+import {
+  attachEdgeExplodeToChatMessage,
+  attachEdgeChainToChatMessage,
+  createSkillEdgeChainContext,
+  getCriticalEdgeBlockFromRollResult,
+  getMatchingEdgeExplodeReroll
+} from "../applications/combat/edge-chain-rolls.mjs";
 
 function getRollCardClassAttribute(...extraClasses) {
   const safeClass = extraClasses
@@ -74,10 +81,12 @@ export async function performConsciousnessCheck({
   await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content, style }));
 }
 
-export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "" } = {}) {
+export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "", edgeChainContext = null, edgeExplodeReroll = null } = {}) {
   pcLog.debug('Peasant Core: performSkillRoll called', { toHit, accuracy, skillName });
-  const roll = await new Roll('2d6').evaluate();
-  const initialDice = roll.dice[0].results.map(r => r.result);
+  const edgeExplodeRoll = getMatchingEdgeExplodeReroll(edgeExplodeReroll, { trained: true, skillName, cardClass, speaker });
+  const initialDice = edgeExplodeRoll?.initialDice?.length >= 2
+    ? edgeExplodeRoll.initialDice.slice(0, 2)
+    : (await new Roll('2d6').evaluate()).dice[0].results.map(r => r.result);
   const diceValues = initialDice.join(', ');
 
   const critical = await rollPeasantCriticalExplosion(initialDice);
@@ -146,7 +155,7 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
   </fieldset>`;
 
   const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
-  return {
+  const rollResult = {
     chatMessage,
     toHit,
     accuracy: accuracyNum,
@@ -162,12 +171,30 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
     resultText,
     criticalType
   };
+  await attachEdgeChainToChatMessage(
+    chatMessage,
+    edgeChainContext || createSkillEdgeChainContext({
+      trained: true,
+      toHit,
+      accuracy,
+      skillName,
+      speaker,
+      style,
+      cardClass
+    }),
+    [],
+    getCriticalEdgeBlockFromRollResult(rollResult)
+  );
+  await attachEdgeExplodeToChatMessage(chatMessage, rollResult, { trained: true, skillName, cardClass, speaker });
+  return rollResult;
 }
 
-export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Untrained Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "" } = {}) {
+export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Untrained Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "", edgeChainContext = null, edgeExplodeReroll = null } = {}) {
   pcLog.debug('Peasant Core: performUntrainedSkillRoll called', { toHit, accuracy, skillName });
-  const roll = await new Roll('3d6').evaluate();
-  const allDice = roll.dice[0].results.map(r => r.result);
+  const edgeExplodeRoll = getMatchingEdgeExplodeReroll(edgeExplodeReroll, { trained: false, skillName, cardClass, speaker });
+  const allDice = edgeExplodeRoll?.allDice?.length >= 3
+    ? edgeExplodeRoll.allDice.slice(0, 3)
+    : (await new Roll('3d6').evaluate()).dice[0].results.map(r => r.result);
   const maxValue = Math.max(...allDice);
   const maxIndex = allDice.indexOf(maxValue);
   const keptDice = allDice.filter((_, index) => index !== maxIndex);
@@ -233,7 +260,7 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
   </fieldset>`;
 
   const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
-  return {
+  const rollResult = {
     chatMessage,
     toHit,
     accuracy: accuracyNum,
@@ -250,6 +277,22 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
     resultText,
     criticalType
   };
+  await attachEdgeChainToChatMessage(
+    chatMessage,
+    edgeChainContext || createSkillEdgeChainContext({
+      trained: false,
+      toHit,
+      accuracy,
+      skillName,
+      speaker,
+      style,
+      cardClass
+    }),
+    [],
+    getCriticalEdgeBlockFromRollResult(rollResult)
+  );
+  await attachEdgeExplodeToChatMessage(chatMessage, rollResult, { trained: false, skillName, cardClass, speaker });
+  return rollResult;
 }
 
 export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER } = {}) {

@@ -47,13 +47,18 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
-export function prepareActorSheetBaseContext(data, actor, { isEditable = true, isEditMode = false } = {}) {
+export function prepareActorSheetBaseContext(data, actor, { isEditable = true, isEditMode = false, sourceSystem = null } = {}) {
+  const system = actor?.system ?? {};
+  const editSystem = sourceSystem ?? system;
   data.artPanelCollapsed = !!actor?.getFlag?.("peasant-core", PC_ART_PANEL_COLLAPSED_FLAG);
   data.editable = isEditable && isEditMode;
   data.peasantCoreSettingGroups = getPeasantCoreSettingGroups(actor, data.editable !== false);
-  data.sirLocations = getSirLocationRows(actor);
+  data.sirLocations = getSirLocationRows(actor).map((row) => {
+    if (row.isCustom || !row.field) return row;
+    return { ...row, value: editSystem?.[row.field] ?? "" };
+  });
 
-  const bolsteredHpSafe = Math.max(0, Number(data?.actor?.system?.bolsteredHp) || 0);
+  data.bolsteredHpValue = Math.max(0, Number(system?.bolsteredHp) || 0);
   const runMultiplierRaw = Number(actor?.getFlag?.("peasant-core", PC_RUN_MULTIPLIER_FLAG));
   const runMultiplier = Number.isFinite(runMultiplierRaw) && runMultiplierRaw >= 1
     ? Math.floor(runMultiplierRaw)
@@ -63,32 +68,21 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
     ? Math.floor(sprintMultiplierRaw)
     : PC_DEFAULT_SPRINT_MULTIPLIER;
 
-  if (data?.actor?.system) {
-    data.actor.system.bolsteredHp = bolsteredHpSafe;
-    data.haltValuesInput = normalizeHaltSlashValue(data.actor.system.haltValues || [0, 0, 0, 0]);
-    data.naturalHaltValuesInput = normalizeHaltSlashValue(data.actor.system.naturalHaltValues || [0, 0, 0, 0]);
-    const rawCombatMods = data.actor.system.combatMods || {};
-    const haltBuffs = sanitizeCombatHaltBuffs(rawCombatMods.haltBuffs);
-    data.actor.system.combatMods = {
-      ...rawCombatMods,
-      toHit: Number(rawCombatMods.toHit) || 0,
-      accuracy: Number(rawCombatMods.accuracy) || 0,
-      diceRate: Number(rawCombatMods.diceRate) || 0,
-      flatDamage: Number(rawCombatMods.flatDamage) || 0,
-      costMod: Number(rawCombatMods.costMod) || 0,
-      haltBuffs
-    };
-  }
+  data.haltValuesInput = normalizeHaltSlashValue(editSystem?.haltValues || [0, 0, 0, 0]);
+  data.naturalHaltValuesInput = normalizeHaltSlashValue(editSystem?.naturalHaltValues || [0, 0, 0, 0]);
+  data.combatModsInput = normalizeCombatModsForSheet(editSystem?.combatMods);
 
   data.runMultiplier = runMultiplier;
   data.sprintMultiplier = sprintMultiplier;
 
-  const portraitMovement = Math.max(0, Number(data?.actor?.system?.movement) || 0);
-  const initiative = data?.actor?.system?.initiative;
+  const portraitMovement = Math.max(0, Number(system?.movement) || 0);
+  const initiative = system?.initiative;
+  const initiativeInput = editSystem?.initiative;
   const initiativeDisplay = hasOptionalInteger(initiative)
     ? formatOptionalIntegerInput(initiative, { showPlus: true })
     : "+0";
-  data.initiativeInput = formatOptionalIntegerInput(initiative, { showPlus: true });
+  data.initiativeInput = formatOptionalIntegerInput(initiativeInput, { showPlus: true });
+  data.movementInput = Math.max(0, Number(editSystem?.movement) || 0);
   data.portraitStats = {
     movement: portraitMovement,
     run: portraitMovement * runMultiplier,
@@ -96,42 +90,56 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
     initiative: initiativeDisplay
   };
 
-  data.combatHaltBuffRows = buildCombatHaltBuffRows(data?.actor?.system?.combatMods?.haltBuffs);
+  data.combatHaltBuffRows = buildCombatHaltBuffRows(editSystem?.combatMods?.haltBuffs);
 }
 
-export function prepareActorIdentityContext(data, actor, { isEditMode = false } = {}) {
-  const raceSelection = resolveCustomSelect(actor?.system?.race, actor?.system?.customRace);
-  const originSelection = resolveCustomSelect(actor?.system?.origin, actor?.system?.customOrigin);
-  const specificOriginSelection = resolveCustomSelect(actor?.system?.specificOrigin, actor?.system?.customSpecificOrigin);
-  data.customRaceSelected = raceSelection.isCustom;
-  data.customOriginSelected = originSelection.isCustom;
-  data.customSpecificOriginSelected = specificOriginSelection.isCustom;
-  data.hasCustomIdentitySelection = !!isEditMode && (raceSelection.isCustom || originSelection.isCustom || specificOriginSelection.isCustom);
-  data.originOptions = getNationalOriginOptions(actor?.system?.origin);
-  data.displayRace = raceSelection.display || "Human";
-  data.displayOrigin = originSelection.isCustom
-    ? originSelection.display
-    : resolveNationalOriginLabel(originSelection.display);
+export function prepareActorIdentityContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
+  const system = actor?.system ?? {};
+  const editSystem = sourceSystem ?? system;
+  const editRaceSelection = resolveCustomSelect(editSystem?.race, editSystem?.customRace);
+  const editOriginSelection = resolveCustomSelect(editSystem?.origin, editSystem?.customOrigin);
+  const editSpecificOriginSelection = resolveCustomSelect(editSystem?.specificOrigin, editSystem?.customSpecificOrigin);
+  const displayRaceSelection = resolveCustomSelect(system?.race, system?.customRace);
+  const displayOriginSelection = resolveCustomSelect(system?.origin, system?.customOrigin);
+  const displaySpecificOriginSelection = resolveCustomSelect(system?.specificOrigin, system?.customSpecificOrigin);
+  data.customRaceSelected = editRaceSelection.isCustom;
+  data.customOriginSelected = editOriginSelection.isCustom;
+  data.customSpecificOriginSelected = editSpecificOriginSelection.isCustom;
+  data.hasCustomIdentitySelection = !!isEditMode && (editRaceSelection.isCustom || editOriginSelection.isCustom || editSpecificOriginSelection.isCustom);
+  data.originOptions = getNationalOriginOptions(editSystem?.origin);
+  data.displayRace = displayRaceSelection.display || "Human";
+  data.displayOrigin = displayOriginSelection.isCustom
+    ? displayOriginSelection.display
+    : resolveNationalOriginLabel(displayOriginSelection.display);
   if (!data.displayOrigin) data.displayOrigin = getDefaultNationalOriginLabel();
-  data.displaySpecificOrigin = specificOriginSelection.display || "Soldier";
+  data.displaySpecificOrigin = displaySpecificOriginSelection.display || "Soldier";
 }
 
-export function prepareActorEdgeContext(data, actor) {
+export function prepareActorEdgeContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
+  const system = actor?.system ?? {};
+  const editSystem = sourceSystem ?? system;
   const defaultEdgeLabelMode = getDefaultEdgeLabelMode(actor);
-  const edgeLabelMode = sanitizeEdgeLabelMode(actor?.system?.edgeLabelMode, defaultEdgeLabelMode);
-  const edgeCustomLabel = String(actor?.system?.edgeCustomLabel ?? "");
+  const edgeLabelMode = sanitizeEdgeLabelMode(system?.edgeLabelMode, defaultEdgeLabelMode);
+  const edgeCustomLabel = String(system?.edgeCustomLabel ?? "");
+  const editEdgeLabelMode = sanitizeEdgeLabelMode(editSystem?.edgeLabelMode, defaultEdgeLabelMode);
+  const editEdgeCustomLabel = String(editSystem?.edgeCustomLabel ?? "");
   data.edgeLabelMode = edgeLabelMode;
+  data.edgeLabelModeInput = editEdgeLabelMode;
   data.edgeLabelIsCustom = edgeLabelMode === EDGE_LABEL_MODE_CUSTOM;
+  data.edgeLabelInputIsCustom = editEdgeLabelMode === EDGE_LABEL_MODE_CUSTOM;
   data.edgeCustomLabel = edgeCustomLabel;
+  data.edgeCustomLabelInput = editEdgeCustomLabel;
   data.edgeDisplayLabel = resolveEdgeLabel(edgeLabelMode, edgeCustomLabel, defaultEdgeLabelMode);
-  const edgeResourcesRaw = Array.isArray(actor?.system?.edgeResources) ? actor.system.edgeResources : [];
+  const edgeResourcesRaw = Array.isArray((isEditMode ? editSystem : system)?.edgeResources)
+    ? (isEditMode ? editSystem : system).edgeResources
+    : [];
   data.edgeResources = edgeResourcesRaw.map((entry, index) => {
-    const normalized = normalizeEdgeResourceEntry(entry, edgeLabelMode);
+    const normalized = normalizeEdgeResourceEntry(entry, editEdgeLabelMode);
     return {
       ...normalized,
       index,
       isCustom: normalized.labelMode === EDGE_LABEL_MODE_CUSTOM,
-      displayLabel: resolveEdgeLabel(normalized.labelMode, normalized.customLabel, edgeLabelMode)
+      displayLabel: resolveEdgeLabel(normalized.labelMode, normalized.customLabel, editEdgeLabelMode)
     };
   });
 }
@@ -172,6 +180,19 @@ function buildCombatHaltBuffRows(haltBuffs) {
 
     return row;
   });
+}
+
+function normalizeCombatModsForSheet(combatMods) {
+  const raw = combatMods || {};
+  return {
+    ...raw,
+    toHit: Number(raw.toHit) || 0,
+    accuracy: Number(raw.accuracy) || 0,
+    diceRate: Number(raw.diceRate) || 0,
+    flatDamage: Number(raw.flatDamage) || 0,
+    costMod: Number(raw.costMod) || 0,
+    haltBuffs: sanitizeCombatHaltBuffs(raw.haltBuffs)
+  };
 }
 
 function resolveCustomSelect(baseValue, customValue) {

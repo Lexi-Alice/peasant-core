@@ -1,5 +1,6 @@
 import { applyToHitAccuracy } from "../dice/roll-targets.mjs";
 import { formatOptionalIntegerInput, parseOptionalInteger } from "../data/actor/helpers.mjs";
+import { withPeasantActorSourceWriteContext } from "../data/actor/source-system.mjs";
 import { registerPeasantCoreApi } from "../utils/api.mjs";
 import { pcLog } from "../utils/logging.mjs";
 import { toElement } from "./dom.mjs";
@@ -53,7 +54,7 @@ async function ensureNotableCombatId(actor, combatIndex) {
   if (typeof actor.setPeasantNotableCombats === "function") {
     await actor.setPeasantNotableCombats(nextCombats, { render: false });
   } else {
-    await actor.update({ "system.notableCombats": nextCombats }, { render: false });
+    await actor.update({ "system.notableCombats": nextCombats }, withPeasantActorSourceWriteContext({ render: false }));
   }
   return id;
 }

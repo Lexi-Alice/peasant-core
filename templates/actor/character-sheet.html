@@ -11,19 +11,19 @@
     {{#if @root.editable}}
       <div class="character-field-popover">
         <select name="system.race" class="character-field pc-select">
-          <option value="Human" {{#if (eq actor.system.race "Human")}} selected{{/if}}>Human</option>
-          <option value="Eve" {{#if (eq actor.system.race "Eve")}} selected{{/if}}>Eve</option>
-          <option value="Taru" {{#if (eq actor.system.race "Taru")}} selected{{/if}}>Taru</option>
-          <option value="Tarfel" {{#if (eq actor.system.race "Tarfel")}} selected{{/if}}>Tarfel</option>
-          <option value="Lupine" {{#if (eq actor.system.race "Lupine")}} selected{{/if}}>Lupine</option>
-          <option value="Ursa" {{#if (eq actor.system.race "Ursa")}} selected{{/if}}>Ursa</option>
-          <option value="Leon" {{#if (eq actor.system.race "Leon")}} selected{{/if}}>Leon</option>
-          <option value="Doomi" {{#if (eq actor.system.race "Doomi")}} selected{{/if}}>Doomi</option>
-          <option value="Skeever" {{#if (eq actor.system.race "Skeever")}} selected{{/if}}>Skeever</option>
+          <option value="Human" {{#if (eq source.system.race "Human")}} selected{{/if}}>Human</option>
+          <option value="Eve" {{#if (eq source.system.race "Eve")}} selected{{/if}}>Eve</option>
+          <option value="Taru" {{#if (eq source.system.race "Taru")}} selected{{/if}}>Taru</option>
+          <option value="Tarfel" {{#if (eq source.system.race "Tarfel")}} selected{{/if}}>Tarfel</option>
+          <option value="Lupine" {{#if (eq source.system.race "Lupine")}} selected{{/if}}>Lupine</option>
+          <option value="Ursa" {{#if (eq source.system.race "Ursa")}} selected{{/if}}>Ursa</option>
+          <option value="Leon" {{#if (eq source.system.race "Leon")}} selected{{/if}}>Leon</option>
+          <option value="Doomi" {{#if (eq source.system.race "Doomi")}} selected{{/if}}>Doomi</option>
+          <option value="Skeever" {{#if (eq source.system.race "Skeever")}} selected{{/if}}>Skeever</option>
           <option value="Custom" {{#if customRaceSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customRaceSelected}}
-          <input type="text" name="system.customRace" class="character-field-popover-input pc-input" value="{{actor.system.customRace}}" placeholder="Custom race" />
+          <input type="text" name="system.customRace" class="character-field-popover-input pc-input" value="{{source.system.customRace}}" placeholder="Custom race" />
         {{/if}}
       </div>
     {{else}}
@@ -39,7 +39,7 @@
           <option value="Custom" {{#if customOriginSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customOriginSelected}}
-          <input type="text" name="system.customOrigin" class="character-field-popover-input pc-input" value="{{actor.system.customOrigin}}" placeholder="Custom origin" />
+          <input type="text" name="system.customOrigin" class="character-field-popover-input pc-input" value="{{source.system.customOrigin}}" placeholder="Custom origin" />
         {{/if}}
       </div>
     {{else}}
@@ -49,27 +49,27 @@
     {{#if @root.editable}}
       <div class="character-field-popover">
         <select name="system.specificOrigin" class="character-field pc-select">
-          <option value="Soldier" {{#if (eq actor.system.specificOrigin "Soldier")}} selected{{/if}}>Soldier</option>
-          <option value="Merchant" {{#if (eq actor.system.specificOrigin "Merchant")}} selected{{/if}}>Merchant</option>
-          <option value="Noble" {{#if (eq actor.system.specificOrigin "Noble")}} selected{{/if}}>Noble</option>
-          <option value="Fate-Bound" {{#if (eq actor.system.specificOrigin "Fate-Bound")}} selected{{/if}}>Fate-Bound</option>
-          <option value="Adventurer" {{#if (eq actor.system.specificOrigin "Adventurer")}} selected{{/if}}>Adventurer</option>
-          <option value="Wanderer" {{#if (eq actor.system.specificOrigin "Wanderer")}} selected{{/if}}>Wanderer</option>
-          <option value="Scoundrel" {{#if (eq actor.system.specificOrigin "Scoundrel")}} selected{{/if}}>Scoundrel</option>
-          <option value="Pirate" {{#if (eq actor.system.specificOrigin "Pirate")}} selected{{/if}}>Pirate</option>
-          <option value="Commoner" {{#if (eq actor.system.specificOrigin "Commoner")}} selected{{/if}}>Commoner</option>
-          <option value="Tradesman" {{#if (eq actor.system.specificOrigin "Tradesman")}} selected{{/if}}>Tradesman</option>
-          <option value="Innkeep" {{#if (eq actor.system.specificOrigin "Innkeep")}} selected{{/if}}>Inkeep</option>
-          <option value="Apprentice" {{#if (eq actor.system.specificOrigin "Apprentice")}} selected{{/if}}>Apprentice</option>
-          <option value="Exile" {{#if (eq actor.system.specificOrigin "Exile")}} selected{{/if}}>Exile</option>
-          <option value="Covenant" {{#if (eq actor.system.specificOrigin "Covenant")}} selected{{/if}}>Covenant</option>
-          <option value="Umbral Explorer" {{#if (eq actor.system.specificOrigin "Umbral Explorer")}} selected{{/if}}>Umbral Explorer</option>
-          <option value="Bandit" {{#if (eq actor.system.specificOrigin "Bandit")}} selected{{/if}}>Bandit</option>
-          <option value="Deprived" {{#if (eq actor.system.specificOrigin "Deprived")}} selected{{/if}}>Deprived</option>
+          <option value="Soldier" {{#if (eq source.system.specificOrigin "Soldier")}} selected{{/if}}>Soldier</option>
+          <option value="Merchant" {{#if (eq source.system.specificOrigin "Merchant")}} selected{{/if}}>Merchant</option>
+          <option value="Noble" {{#if (eq source.system.specificOrigin "Noble")}} selected{{/if}}>Noble</option>
+          <option value="Fate-Bound" {{#if (eq source.system.specificOrigin "Fate-Bound")}} selected{{/if}}>Fate-Bound</option>
+          <option value="Adventurer" {{#if (eq source.system.specificOrigin "Adventurer")}} selected{{/if}}>Adventurer</option>
+          <option value="Wanderer" {{#if (eq source.system.specificOrigin "Wanderer")}} selected{{/if}}>Wanderer</option>
+          <option value="Scoundrel" {{#if (eq source.system.specificOrigin "Scoundrel")}} selected{{/if}}>Scoundrel</option>
+          <option value="Pirate" {{#if (eq source.system.specificOrigin "Pirate")}} selected{{/if}}>Pirate</option>
+          <option value="Commoner" {{#if (eq source.system.specificOrigin "Commoner")}} selected{{/if}}>Commoner</option>
+          <option value="Tradesman" {{#if (eq source.system.specificOrigin "Tradesman")}} selected{{/if}}>Tradesman</option>
+          <option value="Innkeep" {{#if (eq source.system.specificOrigin "Innkeep")}} selected{{/if}}>Inkeep</option>
+          <option value="Apprentice" {{#if (eq source.system.specificOrigin "Apprentice")}} selected{{/if}}>Apprentice</option>
+          <option value="Exile" {{#if (eq source.system.specificOrigin "Exile")}} selected{{/if}}>Exile</option>
+          <option value="Covenant" {{#if (eq source.system.specificOrigin "Covenant")}} selected{{/if}}>Covenant</option>
+          <option value="Umbral Explorer" {{#if (eq source.system.specificOrigin "Umbral Explorer")}} selected{{/if}}>Umbral Explorer</option>
+          <option value="Bandit" {{#if (eq source.system.specificOrigin "Bandit")}} selected{{/if}}>Bandit</option>
+          <option value="Deprived" {{#if (eq source.system.specificOrigin "Deprived")}} selected{{/if}}>Deprived</option>
           <option value="Custom" {{#if customSpecificOriginSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customSpecificOriginSelected}}
-          <input type="text" name="system.customSpecificOrigin" class="character-field-popover-input pc-input" value="{{actor.system.customSpecificOrigin}}" placeholder="Custom specific origin" />
+          <input type="text" name="system.customSpecificOrigin" class="character-field-popover-input pc-input" value="{{source.system.customSpecificOrigin}}" placeholder="Custom specific origin" />
         {{/if}}
       </div>
     {{else}}
@@ -93,9 +93,9 @@
         <div class="pc-banner-ap-meter" role="meter" aria-label="Action points" aria-valuemin="0" aria-valuenow="{{apBar.value}}" aria-valuemax="{{apBar.max}}">
           <div class="pc-banner-ap-label{{#if @root.editable}} is-editing{{/if}}">
             {{#if @root.editable}}
-              <input type="number" name="system.ap.value" value="{{actor.system.ap.value}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" class="pc-banner-ap-input pc-input" aria-label="Current AP">
+              <input type="number" name="system.ap.value" value="{{apBar.valueInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" class="pc-banner-ap-input pc-input" aria-label="Current AP">
               <span>/</span>
-              <input type="number" name="system.ap.max" value="{{actor.system.ap.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" class="pc-banner-ap-input pc-input" aria-label="Maximum AP">
+              <input type="number" name="system.ap.max" value="{{apBar.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" class="pc-banner-ap-input pc-input" aria-label="Maximum AP">
               <span>AP</span>
             {{else}}
               {{apBar.value}} / {{apBar.max}} AP
@@ -118,7 +118,7 @@
       <div class="pc-art-panel-frame">
         <div class="portrait-container">
           <div class="character-portrait {{#if @root.editable}}editing{{/if}}">
-            <img src="{{actor.img}}" alt="{{actor.name}}" style="transform: translate(-50%, -50%) translate({{actor.system.portraitOffsetX}}px, {{actor.system.portraitOffsetY}}px) scale({{actor.system.portraitScale}});" />
+            <img src="{{actor.img}}" alt="{{actor.name}}" style="transform: translate(-50%, -50%) translate({{portraitOffsetX}}px, {{portraitOffsetY}}px) scale({{actor.system.portraitScale}});" />
             {{#if @root.editable}}
               <div class="portrait-controls">
                 <button type="button" class="portrait-control-btn select-portrait-btn" data-tooltip="Change Portrait" aria-label="Change Portrait">
@@ -154,9 +154,9 @@
                   <span class="pc-portrait-resource-max">{{armorCharge.max}}</span>
                 </span>
                 {{#if @root.editable}}
-                  <input type="number" class="pc-portrait-resource-max-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge maximum" hidden>
+                  <input type="number" class="pc-portrait-resource-max-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge maximum" hidden>
                 {{else}}
-                  <input type="number" class="pc-portrait-resource-value-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.value}}" min="0" max="{{armorCharge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge current" hidden>
+                  <input type="number" class="pc-portrait-resource-value-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.valueInput}}" min="0" max="{{armorCharge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge current" hidden>
                 {{/if}}
               </div>
               <span class="pc-portrait-lozenge-label">Armor Charge</span>
@@ -164,7 +164,7 @@
             {{#if @root.editable}}
               <label class="pc-portrait-lozenge pc-portrait-lozenge-edit" data-tooltip="Movement / Run / Sprint: {{portraitStats.movement}} / {{portraitStats.run}} / {{portraitStats.sprint}}" aria-label="Movement">
                 <span class="pc-portrait-lozenge-frame">
-                  <input type="number" data-field="system.movement" class="pc-portrait-lozenge-input pc-input" value="{{actor.system.movement}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Movement">
+                  <input type="number" data-field="system.movement" class="pc-portrait-lozenge-input pc-input" value="{{movementInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Movement">
                 </span>
                 <span class="pc-portrait-lozenge-label">Movement</span>
               </label>
@@ -212,7 +212,7 @@
                 </span>
                 {{#if @root.editable}}
                   {{#if simplifiedHp}}
-                    <input type="number" class="pc-portrait-hp-input pc-portrait-hp-max-input pc-input" value="{{hpBar.healthMax}}" min="1" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Maximum HP" hidden>
+                    <input type="number" class="pc-portrait-hp-input pc-portrait-hp-max-input pc-input" value="{{hpBar.healthMaxInput}}" min="1" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Maximum HP" hidden>
                   {{/if}}
                 {{else}}
                   {{#if owner}}
@@ -222,10 +222,10 @@
               </div>
               {{#if owner}}
                 <label class="pc-portrait-hp-side pc-portrait-hp-temp" data-tooltip="Temporary HP" aria-label="Temporary HP">
-                  <input type="number" class="pc-portrait-hp-input pc-portrait-thp-input pc-input" value="{{#if hpBar.tempValue}}{{hpBar.tempValue}}{{/if}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Temporary HP">
+                  <input type="number" class="pc-portrait-hp-input pc-portrait-thp-input pc-input" value="{{#if hpBar.tempValueInput}}{{hpBar.tempValueInput}}{{/if}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Temporary HP">
                 </label>
                 <label class="pc-portrait-hp-side pc-portrait-hp-bolstered" data-tooltip="Bolstered HP max {{hpBar.bolsteredMax}}" aria-label="Bolstered HP">
-                  <input type="number" class="pc-portrait-hp-input pc-portrait-bhp-input pc-input" value="{{#if hpBar.bolsteredValue}}{{hpBar.bolsteredValue}}{{/if}}" min="0" max="{{hpBar.bolsteredMax}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Bolstered HP">
+                  <input type="number" class="pc-portrait-hp-input pc-portrait-bhp-input pc-input" value="{{#if hpBar.bolsteredValueInput}}{{hpBar.bolsteredValueInput}}{{/if}}" min="0" max="{{hpBar.bolsteredMax}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" placeholder="0" aria-label="Bolstered HP">
                 </label>
               {{else}}
                 <div class="pc-portrait-hp-side pc-portrait-hp-temp" data-tooltip="Temporary HP" aria-label="Temporary HP">
@@ -264,7 +264,7 @@
                   </span>
                   {{#if @root.editable}}
                     <span class="pc-portrait-stress-max-edit">
-                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="physical" value="{{stressBars.physical.count}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Physical stress columns">
+                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="physical" value="{{stressBars.physical.countInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Physical stress columns">
                     </span>
                   {{else}}
                     <span>{{stressBars.physical.totalSeverity}} / {{stressBars.physical.maxSeverity}}</span>
@@ -302,7 +302,7 @@
                   </span>
                   {{#if @root.editable}}
                     <span class="pc-portrait-stress-max-edit">
-                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="mental" value="{{stressBars.mental.count}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Mental stress columns">
+                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="mental" value="{{stressBars.mental.countInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Mental stress columns">
                     </span>
                   {{else}}
                     <span>{{stressBars.mental.totalSeverity}} / {{stressBars.mental.maxSeverity}}</span>
@@ -342,7 +342,7 @@
                   </span>
                   {{#if @root.editable}}
                     <span class="pc-portrait-stress-max-edit">
-                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="general" value="{{stressBars.general.count}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="General stress columns">
+                      <input type="number" class="pc-portrait-stress-count-input pc-input" data-stress-type="general" value="{{stressBars.general.countInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="General stress columns">
                     </span>
                   {{else}}
                     <span>{{stressBars.general.totalSeverity}} / {{stressBars.general.maxSeverity}}</span>
@@ -376,9 +376,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.stamina.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="stamina" value="{{resourceBars.stamina.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Stamina maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="stamina" value="{{resourceBars.stamina.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Stamina maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="stamina" value="{{resourceBars.stamina.value}}" min="0" max="{{resourceBars.stamina.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Stamina current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="stamina" value="{{resourceBars.stamina.valueInput}}" min="0" max="{{resourceBars.stamina.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Stamina current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -396,9 +396,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.attunement.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="attunement" value="{{resourceBars.attunement.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Attunement maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="attunement" value="{{resourceBars.attunement.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Attunement maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="attunement" value="{{resourceBars.attunement.value}}" min="0" max="{{resourceBars.attunement.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Attunement current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="attunement" value="{{resourceBars.attunement.valueInput}}" min="0" max="{{resourceBars.attunement.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Attunement current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -420,9 +420,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.capacity.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="capacity" value="{{resourceBars.capacity.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Capacity maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="capacity" value="{{resourceBars.capacity.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Capacity maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="capacity" value="{{resourceBars.capacity.value}}" min="0" max="{{resourceBars.capacity.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Capacity current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="capacity" value="{{resourceBars.capacity.valueInput}}" min="0" max="{{resourceBars.capacity.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Capacity current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -440,9 +440,9 @@
                           <span class="pc-portrait-resource-max">{{resourceBars.edge.max}}</span>
                         </span>
                           {{#if @root.editable}}
-                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="edge" value="{{resourceBars.edge.max}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="{{resourceBars.edge.label}} maximum" hidden>
+                            <input type="number" class="pc-portrait-resource-max-input pc-input" data-resource="edge" value="{{resourceBars.edge.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="{{resourceBars.edge.label}} maximum" hidden>
                           {{else}}
-                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="edge" value="{{resourceBars.edge.value}}" min="0" max="{{resourceBars.edge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="{{resourceBars.edge.label}} current" hidden>
+                            <input type="number" class="pc-portrait-resource-value-input pc-input" data-resource="edge" value="{{resourceBars.edge.valueInput}}" min="0" max="{{resourceBars.edge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="{{resourceBars.edge.label}} current" hidden>
                           {{/if}}
                       </div>
                     </div>
@@ -454,10 +454,10 @@
           <div class="halt-section pc-portrait-halt-list {{#if simplifiedHp}}simplified-halt-section{{/if}}">
             <div class="halt-row">
               <div class="halt-label-group">
-                <span class="halt-letter {{#if actor.system.hardHead}}hard{{/if}}" data-loc="Head" data-type="halt" data-tooltip="Head" aria-label="Head">H</span>
-                <span class="halt-letter {{#if actor.system.hardArms}}hard{{/if}}" data-loc="Arms" data-type="halt" data-tooltip="Arms" aria-label="Arms">A</span>
-                <span class="halt-letter {{#if actor.system.hardLegs}}hard{{/if}}" data-loc="Legs" data-type="halt" data-tooltip="Legs" aria-label="Legs">L</span>
-                <span class="halt-letter {{#if actor.system.hardTorso}}hard{{/if}}" data-loc="Torso" data-type="halt" data-tooltip="Torso" aria-label="Torso">T</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardHead}}hard{{/if}}{{else}}{{#if actor.system.hardHead}}hard{{/if}}{{/if}}" data-loc="Head" data-type="halt" data-tooltip="Head" aria-label="Head">H</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardArms}}hard{{/if}}{{else}}{{#if actor.system.hardArms}}hard{{/if}}{{/if}}" data-loc="Arms" data-type="halt" data-tooltip="Arms" aria-label="Arms">A</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardLegs}}hard{{/if}}{{else}}{{#if actor.system.hardLegs}}hard{{/if}}{{/if}}" data-loc="Legs" data-type="halt" data-tooltip="Legs" aria-label="Legs">L</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardTorso}}hard{{/if}}{{else}}{{#if actor.system.hardTorso}}hard{{/if}}{{/if}}" data-loc="Torso" data-type="halt" data-tooltip="Torso" aria-label="Torso">T</span>
                 :
               </div>
               {{#if @root.editable}}
@@ -472,10 +472,10 @@
               {{#if @root.editable}}
                 <div class="halt-label-group">
                   <span class="halt-title" style="margin-right: 4px;">Natural</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardHead}}hard{{/if}}" data-loc="Head" data-type="natural">H</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardArms}}hard{{/if}}" data-loc="Arms" data-type="natural">A</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardLegs}}hard{{/if}}" data-loc="Legs" data-type="natural">L</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardTorso}}hard{{/if}}" data-loc="Torso" data-type="natural">T</span>
+                  <span class="halt-letter {{#if source.system.naturalHardHead}}hard{{/if}}" data-loc="Head" data-type="natural">H</span>
+                  <span class="halt-letter {{#if source.system.naturalHardArms}}hard{{/if}}" data-loc="Arms" data-type="natural">A</span>
+                  <span class="halt-letter {{#if source.system.naturalHardLegs}}hard{{/if}}" data-loc="Legs" data-type="natural">L</span>
+                  <span class="halt-letter {{#if source.system.naturalHardTorso}}hard{{/if}}" data-loc="Torso" data-type="natural">T</span>
                   <span style="margin-left: 2px;">:</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
@@ -516,7 +516,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" data-tooltip="Click to open Blessing menu" aria-label="Open Build Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.build" value="{{actor.system.build}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Build score">
+                <input type="number" name="system.build" value="{{source.system.build}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Build score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.build}}</div>
               {{/if}}
@@ -529,7 +529,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" data-tooltip="Click to open Blessing menu" aria-label="Open Reflex Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.reflex" value="{{actor.system.reflex}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Reflex score">
+                <input type="number" name="system.reflex" value="{{source.system.reflex}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Reflex score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.reflex}}</div>
               {{/if}}
@@ -558,7 +558,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" data-tooltip="Click to open Blessing menu" aria-label="Open Intuition Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.intuition" value="{{actor.system.intuition}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Intuition score">
+                <input type="number" name="system.intuition" value="{{source.system.intuition}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Intuition score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.intuition}}</div>
               {{/if}}
@@ -571,7 +571,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" data-tooltip="Click to open Blessing menu" aria-label="Open Learn Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.learn" value="{{actor.system.learn}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Learn score">
+                <input type="number" name="system.learn" value="{{source.system.learn}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Learn score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.learn}}</div>
               {{/if}}
@@ -584,7 +584,7 @@
             <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" data-tooltip="Click to open Blessing menu" aria-label="Open Charisma Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
-                <input type="number" name="system.charisma" value="{{actor.system.charisma}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Charisma score">
+                <input type="number" name="system.charisma" value="{{source.system.charisma}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Charisma score">
               {{else}}
                 <div class="pc-attr-hex-score">{{actor.system.charisma}}</div>
               {{/if}}
@@ -630,4 +630,3 @@
   {{> "systems/peasant-core/templates/actor/parts/character-inventory.html" }}
   {{> "systems/peasant-core/templates/actor/parts/character-settings.html" }}
 </div>
-

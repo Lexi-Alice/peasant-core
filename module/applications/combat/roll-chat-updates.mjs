@@ -46,6 +46,24 @@ export async function updateSkillRollChatCardFromResult(rollResult, { label = nu
       baseMosLine.textContent = `Base MoS: ${baseMoS >= 0 ? "+" : ""}${baseMoS.toFixed(2)}`;
     }
 
+    let criticalDiceLine = detailLines.find((child) => child.textContent?.trim().startsWith("Critical Dice:"));
+    const criticalDice = Array.isArray(rollResult?.additionalDice)
+      ? rollResult.additionalDice.map((die) => Number.parseInt(die, 10)).filter((die) => Number.isFinite(die))
+      : [];
+    if (criticalDice.length > 0) {
+      if (!(criticalDiceLine instanceof HTMLElement)) {
+        criticalDiceLine = document.createElement("div");
+        if (baseMosLine instanceof HTMLElement) {
+          rollDetails.insertBefore(criticalDiceLine, baseMosLine);
+        } else {
+          rollDetails.appendChild(criticalDiceLine);
+        }
+      }
+      criticalDiceLine.textContent = `Critical Dice: [${criticalDice.join(", ")}] = ${criticalDice.reduce((sum, value) => sum + value, 0)}`;
+    } else if (criticalDiceLine instanceof HTMLElement) {
+      criticalDiceLine.remove();
+    }
+
     let accuracyLine = detailLines.find((child) => child.textContent?.trim().startsWith("Accuracy:"));
     const accuracyValue = rollResult?.accuracy;
     const hasAccuracyValue = !(accuracyValue === undefined || accuracyValue === null || accuracyValue === "");

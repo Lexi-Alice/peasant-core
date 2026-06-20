@@ -3,6 +3,10 @@ import {
   getPeasantCoreApiFunction as _getPeasantCoreApiFunction,
   registerPeasantCoreApi as _registerPeasantCoreApi
 } from "../utils/api.mjs";
+import {
+  getCombatPhase,
+  getSeizeEligibility
+} from "../data/combat-turn-order.mjs";
 import { pcLog } from "../utils/logging.mjs";
 
 export const PC_SOCKET_NAMESPACE = "system.peasant-core";
@@ -10,6 +14,8 @@ const PC_SOCKET_REQUEST_SEIZE_TURN = "requestSeizeTurn";
 const PC_SOCKET_RESPONSE_SEIZE_TURN = "responseSeizeTurn";
 const PC_SOCKET_REQUEST_END_TURN = "requestEndTurn";
 const PC_SOCKET_RESPONSE_END_TURN = "responseEndTurn";
+const PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL = "requestEdgeLocationRoll";
+const PC_SOCKET_RESPONSE_EDGE_LOCATION_ROLL = "responseEdgeLocationRoll";
 export const PC_SOCKET_PROMPT_DEFENSE = "promptDefense";
 export const PC_SOCKET_PROMPT_INCOMING_HIT = "promptIncomingHit";
 const PC_SOCKET_APPLY_INCOMING_HIT = "applyIncomingHit";
@@ -22,8 +28,10 @@ const PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HEAL = "applyIncomingHeal";
 const PC_SOCKETLIB_HANDLER_CANCEL_REMOTE_PROMPT = "cancelRemotePrompt";
 const PC_SOCKETLIB_HANDLER_REQUEST_SEIZE_TURN = "requestSeizeTurn";
 const PC_SOCKETLIB_HANDLER_REQUEST_END_TURN = "requestEndTurn";
+const PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL = "requestEdgeLocationRoll";
 const _pcPendingSeizeRequests = new Map();
 const _pcPendingEndTurnRequests = new Map();
+const _pcPendingEdgeLocationRollRequests = new Map();
 let _pcSocketlib = null;
 let _pcSocketlibInitializationQueued = false;
 
@@ -121,6 +129,14 @@ function _initializePeasantSocketlib() {
           combatId: payload.combatId
         });
         return _handleEndTurnRequest(payload);
+      });
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, async (payload = {}) => {
+        pcLog.debug("Peasant Core | socketlib Edge Location Roll request received", {
+          gm: game.user?.name,
+          requester: payload.userId,
+          messageId: payload.messageId
+        });
+        return _handleEdgeLocationRollRequest(payload);
       });
       pcLog.debug("Peasant Core | socketlib defense prompt handler registered.");
     } catch (err) {
@@ -340,6 +356,7 @@ export function initializePeasantSockets() {
     applyIncomingHitForUser: _applyIncomingHitForUser,
     applyIncomingHealForUser: _applyIncomingHealForUser,
     requestEndTurnFromGM,
+    requestEdgeLocationRollFromGM,
     cancelPromptForUser: _cancelRemotePromptForUser
   });
 
@@ -516,37 +533,18 @@ function _canUseSeizeButton(combat, combatantId, phase) {
   const targetCombatant = combat.combatants.get(combatantId);
   if (!targetCombatant) return { ok: false, reason: "Combatant not found." };
 
-  const currentIdx = Number(combat.turn);
-  const targetIdx = combat.turns.findIndex(c => c.id === combatantId);
-  if (!Number.isFinite(currentIdx) || targetIdx === -1) {
-    return { ok: false, reason: "Combat turn order is unavailable." };
-  }
-
-  if (targetIdx <= currentIdx) {
-    return { ok: false, reason: "Only higher initiative combatants can seize." };
-  }
-
-  const currentPhase = Number(combat.getFlag("peasant-core", "combatPhase") || 0);
-  let movePassed = false;
-  let stdPassed = false;
-
-  if (currentPhase === 0) {
-    if (targetIdx < currentIdx) movePassed = true;
-  } else {
-    movePassed = true;
-    stdPassed = true;
-  }
-
-  const seizedMove = (combat.getFlag("peasant-core", "seizedMovement") || []).includes(combatantId);
-  const seizedStd = (combat.getFlag("peasant-core", "seizedStandard") || []).includes(combatantId);
-
-  if (normalizedPhase === 0) {
-    if (seizedMove) return { ok: false, reason: "Movement has already been seized for that combatant." };
-    if (movePassed) return { ok: false, reason: "Movement can no longer be seized." };
-  } else {
-    if (seizedStd) return { ok: false, reason: "Standard has already been seized for that combatant." };
-    if (stdPassed) return { ok: false, reason: "Standard can no longer be seized." };
-  }
+  const seizeEligibility = getSeizeEligibility({
+    turns: combat.turns,
+    round: combat.round,
+    history: combat.getFlag("peasant-core", "turnHistory"),
+    currentTurn: combat.turn,
+    currentPhase: getCombatPhase(combat),
+    targetId: combatantId,
+    targetPhase: normalizedPhase,
+    seizedMovementIds: combat.getFlag("peasant-core", "seizedMovement") || [],
+    seizedStandardIds: combat.getFlag("peasant-core", "seizedStandard") || []
+  });
+  if (!seizeEligibility.ok) return seizeEligibility;
 
   return { ok: true, targetCombatant };
 }
@@ -615,6 +613,27 @@ async function _handleEndTurnRequest(payload = {}) {
     combatantName: combat.combatant?.name || null,
     phase: Number(combat.getFlag("peasant-core", "combatPhase") || 0)
   };
+}
+
+async function _handleEdgeLocationRollRequest(payload = {}) {
+  if (!game.user?.isGM) {
+    return { ok: false, error: "Only an active GM can process Edge Location Roll requests." };
+  }
+
+  const requester = game.users?.get(payload.requesterUserId || payload.userId);
+  if (!requester) {
+    return { ok: false, error: "Requesting user was not found." };
+  }
+
+  const handler = _getPeasantCoreApiFunction("applyEdgeLocationRoll");
+  if (typeof handler !== "function") {
+    return { ok: false, error: "Edge Location Roll workflow is unavailable." };
+  }
+
+  return await handler({
+    ...payload,
+    requesterUserId: requester.id
+  });
 }
 
 export async function requestSeizeTurnFromGM(combat, combatantId, phase) {
@@ -748,6 +767,49 @@ export async function requestEndTurnFromGM(combat) {
     console.warn("Peasant Core | End-turn request failed", err);
     ui.notifications?.error?.(err?.message || "Failed to advance turn.");
     return false;
+  });
+}
+
+export async function requestEdgeLocationRollFromGM(payload = {}) {
+  const gm = _getPreferredActiveGM();
+  if (!gm) {
+    return { ok: false, error: "A GM must be online to process Edge Location Roll." };
+  }
+
+  const requestId = payload.requestId || foundry.utils.randomID();
+  const requestPayload = {
+    ...payload,
+    type: PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL,
+    requestId,
+    userId: game.user.id,
+    requesterUserId: game.user.id
+  };
+
+  if (_pcSocketlib?.executeAsGM || _pcSocketlib?.executeAsUser) {
+    try {
+      const result = _pcSocketlib.executeAsGM
+        ? await _pcSocketlib.executeAsGM(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, requestPayload)
+        : await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, gm.id, requestPayload);
+      if (result && typeof result === "object" && "ok" in result) return result;
+      if (result !== false && result != null) return { ok: true, result };
+      console.warn("Peasant Core | socketlib Edge Location Roll request was not handled, falling back to raw socket");
+    } catch (err) {
+      console.warn("Peasant Core | socketlib Edge Location Roll request failed, falling back to raw socket", err);
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      _pcPendingEdgeLocationRollRequests.delete(requestId);
+      reject(new Error("Timed out waiting for GM Edge Location Roll response."));
+    }, 10000);
+
+    _pcPendingEdgeLocationRollRequests.set(requestId, { resolve, reject, timeout });
+    pcLog.debug(`Peasant Core | Sending Edge Location Roll request ${requestId} for message ${requestPayload.messageId || ""}`);
+    game.socket.emit(PC_SOCKET_NAMESPACE, requestPayload);
+  }).catch(err => {
+    console.warn("Peasant Core | Edge Location Roll request failed", err);
+    return { ok: false, error: err?.message || "Failed to process Edge Location Roll." };
   });
 }
 
@@ -953,35 +1015,73 @@ export function registerPeasantSocketHandler() {
         return;
       }
 
-      if (payload.type !== PC_SOCKET_REQUEST_SEIZE_TURN && payload.type !== PC_SOCKET_REQUEST_END_TURN) return;
+      if (payload.type === PC_SOCKET_RESPONSE_EDGE_LOCATION_ROLL) {
+        if (payload.userId !== game.user?.id) return;
+
+        const pending = _pcPendingEdgeLocationRollRequests.get(payload.requestId);
+        if (!pending) return;
+
+        clearTimeout(pending.timeout);
+        _pcPendingEdgeLocationRollRequests.delete(payload.requestId);
+        pending.resolve({
+          ok: !!payload.ok,
+          error: payload.error || null,
+          messageId: payload.messageId || null,
+          replacementMessageId: payload.replacementMessageId || null
+        });
+        return;
+      }
+
+      if (
+        payload.type !== PC_SOCKET_REQUEST_SEIZE_TURN
+        && payload.type !== PC_SOCKET_REQUEST_END_TURN
+        && payload.type !== PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL
+      ) return;
       if (!game.user?.isGM) return;
 
       const preferredGM = _getPreferredActiveGM();
       if (!preferredGM || preferredGM.id !== game.user.id) return;
 
       const respond = response => {
+        let responseType = PC_SOCKET_RESPONSE_SEIZE_TURN;
+        if (payload.type === PC_SOCKET_REQUEST_END_TURN) responseType = PC_SOCKET_RESPONSE_END_TURN;
+        else if (payload.type === PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL) responseType = PC_SOCKET_RESPONSE_EDGE_LOCATION_ROLL;
+
         game.socket.emit(PC_SOCKET_NAMESPACE, {
-          type: payload.type === PC_SOCKET_REQUEST_END_TURN ? PC_SOCKET_RESPONSE_END_TURN : PC_SOCKET_RESPONSE_SEIZE_TURN,
+          type: responseType,
           requestId: payload.requestId,
           userId: payload.userId,
           ...response
         });
       };
 
-      respond(await (payload.type === PC_SOCKET_REQUEST_END_TURN
-        ? _handleEndTurnRequest(payload)
-        : _handleSeizeTurnRequest(payload)));
+      if (payload.type === PC_SOCKET_REQUEST_END_TURN) {
+        respond(await _handleEndTurnRequest(payload));
+      } else if (payload.type === PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL) {
+        respond(await _handleEdgeLocationRollRequest(payload));
+      } else {
+        respond(await _handleSeizeTurnRequest(payload));
+      }
     } catch (err) {
       console.error("Peasant Core | Socket handler error", err);
-      if ((payload.type === PC_SOCKET_REQUEST_SEIZE_TURN || payload.type === PC_SOCKET_REQUEST_END_TURN) && game.user?.isGM) {
+      if ((
+        payload.type === PC_SOCKET_REQUEST_SEIZE_TURN
+        || payload.type === PC_SOCKET_REQUEST_END_TURN
+        || payload.type === PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL
+      ) && game.user?.isGM) {
+        let responseType = PC_SOCKET_RESPONSE_SEIZE_TURN;
+        if (payload.type === PC_SOCKET_REQUEST_END_TURN) responseType = PC_SOCKET_RESPONSE_END_TURN;
+        else if (payload.type === PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL) responseType = PC_SOCKET_RESPONSE_EDGE_LOCATION_ROLL;
         game.socket.emit(PC_SOCKET_NAMESPACE, {
-          type: payload.type === PC_SOCKET_REQUEST_END_TURN ? PC_SOCKET_RESPONSE_END_TURN : PC_SOCKET_RESPONSE_SEIZE_TURN,
+          type: responseType,
           requestId: payload.requestId,
           userId: payload.userId,
           ok: false,
           error: err?.message || (payload.type === PC_SOCKET_REQUEST_END_TURN
             ? "GM failed to process end-turn request."
-            : "GM failed to process seize request.")
+            : (payload.type === PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL
+              ? "GM failed to process Edge Location Roll request."
+              : "GM failed to process seize request."))
         });
       }
     }

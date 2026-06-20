@@ -23,7 +23,11 @@
           </button>
 
           <div class="pc-inventory-row-field pc-inventory-sunder-control" aria-label="{{item.sunder.label}}">
-            {{#if item.sunder.hasValue}}
+            {{#if item.sunder.unavailable}}
+              <span class="pc-inventory-static-value pc-inventory-resource-max">{{item.sunder.current}}</span>
+              <span class="pc-inventory-resource-separator">/</span>
+              <span class="pc-inventory-static-value pc-inventory-resource-max">{{item.sunder.max}}</span>
+            {{else if item.sunder.hasValue}}
               {{#if ../owner}}
                 <input type="number" class="pc-inventory-number pc-input" value="{{item.sunder.currentInput}}" min="0" step="1" inputmode="numeric" data-pc-inventory-resource-current data-resource-kind="{{item.sunder.kind}}" aria-label="{{item.sunder.label}} Current">
                 <span class="pc-inventory-resource-separator">/</span>

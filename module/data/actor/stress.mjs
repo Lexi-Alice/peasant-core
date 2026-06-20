@@ -1,3 +1,5 @@
+import { withPeasantActorStateWriteContext } from "./source-system.mjs";
+
 export async function applyCombatStressDamageForActor(actor, stressType, amount) {
   const countField = `${stressType}StressCount`;
   const maxBoxes = actor?.system?.[countField] || 0;
@@ -21,7 +23,8 @@ export async function applyCombatStressDamageForActor(actor, stressType, amount)
   }
 
   if (Object.keys(updates).length > 0) {
-    await actor.update(updates);
+    if (typeof actor.updatePeasantStateData === "function") await actor.updatePeasantStateData(updates);
+    else await actor.update(updates, withPeasantActorStateWriteContext());
   }
 
   return remaining;

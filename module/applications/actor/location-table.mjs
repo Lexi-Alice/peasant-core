@@ -8,6 +8,12 @@ import {
   isArmorPenLocationLike,
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
+import {
+  LOCATION_ROLL_SOURCE_STANDALONE,
+  LOCATION_ROLL_SOURCE_WORKFLOW,
+  PC_LOCATION_ROLL_FLAG,
+  createLocationRollFlag
+} from "../../data/location-rolls.mjs";
 
 export {
   getTargetedDamageConditionKey,
@@ -284,7 +290,20 @@ export function highlightArmorPenLocationResultInChatMessage(message) {
   return true;
 }
 
-export async function drawLocationTableLikeMacro({ messageMode = null, rollMode = null } = {}) {
+function getCreatedMessage(messageResult) {
+  if (Array.isArray(messageResult)) return messageResult.find(Boolean) || null;
+  return messageResult || null;
+}
+
+export async function drawLocationTableLikeMacro({
+  messageMode = null,
+  rollMode = null,
+  source = LOCATION_ROLL_SOURCE_STANDALONE,
+  workflowId = "",
+  revision = 0,
+  replacementOfMessageId = null,
+  workflow = null
+} = {}) {
   const table = getLocationRollTable();
   if (!table) {
     ui.notifications?.warn?.("Location table not found. Expected a rollable table named 'Location' or 'Location Table'.");
@@ -301,16 +320,41 @@ export async function drawLocationTableLikeMacro({ messageMode = null, rollMode 
       ui.notifications?.warn?.("Could not resolve a hit location from the location table.");
       return null;
     }
-    await table.toMessage(draw.results, {
+    const locationResult = normalizeLocationResultText(rawText);
+    const locationRollFlag = createLocationRollFlag({
+      source,
+      result: locationResult,
+      workflowId,
+      revision,
+      replacementOfMessageId,
+      workflow,
+      createdBy: game.user?.id || null
+    });
+    const messageResult = await table.toMessage(draw.results, {
       roll: draw.roll,
+      messageData: {
+        flags: {
+          "peasant-core": {
+            [PC_LOCATION_ROLL_FLAG]: locationRollFlag
+          }
+        }
+      },
       messageOptions: {
         messageMode: messageMode || rollMode || getCurrentMessageMode()
       }
     });
+    const chatMessage = getCreatedMessage(messageResult);
+    if (chatMessage?.setFlag) {
+      await chatMessage.setFlag("peasant-core", PC_LOCATION_ROLL_FLAG, locationRollFlag);
+    }
     return {
-      ...normalizeLocationResultText(rawText),
+      ...locationResult,
       roll: draw?.roll || null,
-      draw
+      draw,
+      chatMessage,
+      locationMessageId: chatMessage?.id || null,
+      locationRollFlag,
+      workflowId: locationRollFlag.workflowId
     };
   } catch (e) {
     if (hookId !== null) {
@@ -323,5 +367,12 @@ export async function drawLocationTableLikeMacro({ messageMode = null, rollMode 
 }
 
 export async function rollAutomatedAttackLocation({ actor, attackerToken = null, combatName = "", targetLabel = "" } = {}) {
-  return await drawLocationTableLikeMacro({ messageMode: getCurrentMessageMode() });
+  return await drawLocationTableLikeMacro({
+    messageMode: getCurrentMessageMode(),
+    source: LOCATION_ROLL_SOURCE_WORKFLOW,
+    workflow: {
+      attackCombatName: String(combatName || "Combat").trim() || "Combat",
+      targetLabel: String(targetLabel || "").trim()
+    }
+  });
 }

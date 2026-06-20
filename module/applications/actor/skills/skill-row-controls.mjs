@@ -1,6 +1,6 @@
 import { showReadonlyDescriptionDialog } from "../controls/description-dialogs.mjs";
 import { formatOptionalIntegerInput, parseOptionalInteger } from "../../../data/actor/helpers.mjs";
-import { resolveItemIndex, resolveRowIndex, sanitizeOptionalIntegerInputElement } from "../controls/sheet-listener-helpers.mjs";
+import { getActorSourceSystem, resolveItemIndex, resolveRowIndex, sanitizeOptionalIntegerInputElement } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, qs, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
@@ -169,7 +169,7 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
       await runQueued(input, "_skillsSaveQueue", "Skill to-hit/accuracy change", async () => {
         const tohitEl = qs(row, ".skill-tohit");
         const accEl = qs(row, ".skill-accuracy");
-        const currentSkill = sheet.actor.system.skills?.[index] || {};
+        const currentSkill = getActorSourceSystem(sheet.actor).skills?.[index] || {};
         const tohitVal = tohitEl ? (tohitEl.value || "") : (currentSkill.tohit || "");
         const accValRaw = accEl ? accEl.value : (currentSkill.accuracy || "");
         const accVal = (accValRaw === "" || accValRaw === null) ? "" : String(accValRaw);
@@ -324,7 +324,7 @@ function normalizeRankValue(raw) {
 function collectSkillsFromDOMForSig(sheet) {
   const skillEls = qsa(toElement(sheet.element), ".skills-list .skill-item");
   const skills = [];
-  const existing = JSON.parse(JSON.stringify(sheet.actor.system.skills || []));
+  const existing = JSON.parse(JSON.stringify(getActorSourceSystem(sheet.actor).skills || []));
   for (let i = 0; i < skillEls.length; i++) {
     const el = skillEls[i];
     const hasSelect = !!qs(el, ".skill-select");

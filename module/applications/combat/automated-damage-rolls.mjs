@@ -83,7 +83,7 @@ export async function rollAutomatedCombatDamage(actor, combat, {
     </div>
   </fieldset>`;
 
-  await ChatMessage.create(applyMessageMode({
+  const chatMessage = await ChatMessage.create(applyMessageMode({
     user: game.user.id,
     speaker,
     content: chatHtml,
@@ -98,6 +98,7 @@ export async function rollAutomatedCombatDamage(actor, combat, {
     typeLabel,
     normalizedType,
     roll,
+    chatMessage,
     allDice,
     adjustedDiceTotal,
     displayTotal

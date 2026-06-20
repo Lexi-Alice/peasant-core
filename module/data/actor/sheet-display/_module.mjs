@@ -7,3 +7,4 @@ export * from "./inventory.mjs";
 export * from "./effects.mjs";
 export * from "./notable-combat.mjs";
 export * from "./health-resources.mjs";
+export * from "./source-edit.mjs";

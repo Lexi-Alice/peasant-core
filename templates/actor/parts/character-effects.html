@@ -72,17 +72,17 @@
     <div class="combat-modifiers pc-effects-modifiers">
       <div class="combat-modifier-box">
         <label>To-Hit</label>
-        <input type="number" name="system.combatMods.toHit" value="{{#if actor.system.combatMods.toHit}}{{actor.system.combatMods.toHit}}{{else}}0{{/if}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+        <input type="number" name="system.combatMods.toHit" value="{{combatModsInput.toHit}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
         <p class="pc-effect-hint">Adjusts attack and save target numbers.</p>
       </div>
       <div class="combat-modifier-box">
         <label>Accuracy</label>
-        <input type="number" name="system.combatMods.accuracy" value="{{#if actor.system.combatMods.accuracy}}{{actor.system.combatMods.accuracy}}{{else}}0{{/if}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+        <input type="number" name="system.combatMods.accuracy" value="{{combatModsInput.accuracy}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
         <p class="pc-effect-hint">Adds accuracy to notable combat and skill rolls.</p>
       </div>
       <div class="combat-modifier-box">
         <label>Die-Rate</label>
-        <input type="number" name="system.combatMods.diceRate" value="{{#if actor.system.combatMods.diceRate}}{{actor.system.combatMods.diceRate}}{{else}}0{{/if}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+        <input type="number" name="system.combatMods.diceRate" value="{{combatModsInput.diceRate}}" class="combat-mod-input pc-input" tabindex="0" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
         <p class="pc-effect-hint">Adjusts die-rate progression for damage, healing, and similar effects.</p>
       </div>
 

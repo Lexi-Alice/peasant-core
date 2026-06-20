@@ -1,4 +1,16 @@
 ﻿import { rollPeasantCriticalExplosion } from "../dice/exploding.mjs";
+import {
+  PC_PHASE_MOVEMENT,
+  PC_PHASE_STANDARD,
+  PC_SKIP_INITIATIVE_REANCHOR_OPTION,
+  getCombatPhase,
+  getCombatTurns,
+  getFirstPendingTurnIndex,
+  getReanchoredTurnForCombat,
+  getSeizedIdsForPhase,
+  normalizeCombatPhase
+} from "../data/combat-turn-order.mjs";
+import { PeasantCombatant } from "./combatant.mjs";
 import { pcLog } from "../utils/logging.mjs";
 
 const sortCombatantsAscending = function(a, b) {
@@ -46,10 +58,11 @@ export const PC_INITIATIVE_LOCKED_FLAG = "initiativeLocked";
 const getCombatState = function(combat) {
   if (!combat) return null;
   if (combat.turn === null || combat.turn === undefined) return null;
+  const round = Number(combat.round ?? 0);
   return {
-    round: Number(combat.round ?? 0),
+    round,
     turn: Number(combat.turn ?? 0),
-    phase: Number(combat.getFlag("peasant-core", "combatPhase") || 0),
+    phase: getCombatPhase(combat),
     combatantId: combat.combatant?.id ?? null,
     combatantName: combat.combatant?.name ?? null
   };
@@ -79,15 +92,19 @@ const statesEqual = function(a, b) {
 // Combatant id is checked only when both sides provide one.
 const statesMatchForUndo = function(recordedTo, currentState) {
   if (!recordedTo || !currentState) return false;
-  const samePosition = Number(recordedTo.round) === Number(currentState.round)
-    && Number(recordedTo.turn) === Number(currentState.turn)
+  const sameRoundPhase = Number(recordedTo.round) === Number(currentState.round)
     && Number(recordedTo.phase ?? 0) === Number(currentState.phase ?? 0);
-  if (!samePosition) return false;
+  if (!sameRoundPhase) return false;
 
+  const samePosition = Number(recordedTo.turn) === Number(currentState.turn);
   const recordedId = recordedTo.combatantId ?? null;
   const currentId = currentState.combatantId ?? null;
-  if (recordedId && currentId && recordedId !== currentId) return false;
-  return true;
+  if (samePosition) {
+    if (recordedId && currentId && recordedId !== currentId) return false;
+    return true;
+  }
+
+  return !!recordedId && !!currentId && recordedId === currentId;
 };
 
 const getUndoStateFromHistoryEntry = function(entry, currentState = null) {
@@ -162,6 +179,26 @@ const resolveTurnIndex = function(combat, state) {
 export class PeasantCombat extends Combat {
   _sortCombatants(a, b) {
     return sortCombatantsAscending(a, b);
+  }
+
+  async reanchorCurrentPhaseTurn() {
+    if (!this.round) return this;
+    this.setupTurns();
+
+    const next = getReanchoredTurnForCombat(this);
+    if (next.turn < 0) {
+      ui.combat?.render?.(true);
+      return this;
+    }
+
+    if (normalizeCombatPhase(next.phase) !== getCombatPhase(this)) {
+      await this.setFlag("peasant-core", "combatPhase", next.phase);
+    }
+    if (Number(this.turn) !== Number(next.turn)) {
+      await this.update({ turn: next.turn });
+    }
+    ui.combat?.render?.(true);
+    return this;
   }
 
   async rollInitiative(ids, options = {}) {
@@ -383,10 +420,11 @@ export class PeasantCombat extends Combat {
     
     // Update combatants
     if (updates.length > 0) {
-      await this.updateEmbeddedDocuments("Combatant", updates);
+      const shouldResetTurnOrder = updates.length > 1 || (this.round === 0 && this.turn === null);
+      await this.updateEmbeddedDocuments("Combatant", updates, shouldResetTurnOrder ? { [PC_SKIP_INITIATIVE_REANCHOR_OPTION]: true } : {});
       
       // If we rolled for multiple combatants (likely start of round), ensure we start at the bottom
-      if (updates.length > 1 || (this.round === 0 && this.turn === null)) {
+      if (shouldResetTurnOrder) {
           // Reset to Movement phase (0)
           await this.setFlag("peasant-core", "combatPhase", 0);
           
@@ -425,8 +463,6 @@ export class PeasantCombat extends Combat {
 
   // Override nextTurn for two-phase system with Seizure support
   async nextTurn(options = {}) {
-    // Prevent infinite recursion
-    const depth = options._recursionDepth || 0;
     if (!game.user?.isGM && !options._pcRemoteTurnAdvance) {
       const requestEndTurnFromGM = game.peasantCore?.requestEndTurnFromGM;
       if (typeof requestEndTurnFromGM === "function") {
@@ -436,6 +472,7 @@ export class PeasantCombat extends Combat {
       }
       return this;
     }
+    const depth = options._recursionDepth || 0;
     const historyStartState = options._historyStartState || (depth === 0 ? getCombatState(this) : null);
     const finalize = async (result = this) => {
       if (depth === 0) {
@@ -459,69 +496,66 @@ export class PeasantCombat extends Combat {
         await this.setFlag("peasant-core", "seizureStack", seizureStack);
         
         await this.setFlag("peasant-core", "combatPhase", returnState.phase);
-        await this.update({ round: returnState.round, turn: returnState.turn });
+        const returnTurn = resolveTurnIndex(this, returnState);
+        await this.update({ round: returnState.round, turn: returnTurn });
         
         ui.notifications.info(`Returning from Seizure -> ${this.combatant?.name || "Combatant"}`);
         return finalize(this);
     }
 
-    // 2. Normal Flow with Skip Logic
-    const currentPhase = this.getFlag("peasant-core", "combatPhase") || 0; // 0=Movement, 1=Standard
-    const combatants = this.turns;
-    const currentIdx = this.turn ?? -1;
-    
-    // Helper to check if next candidate is seized
-    const isSeized = (id, phase) => {
-        const flag = phase === 0 ? "seizedMovement" : "seizedStandard";
-        const seized = this.getFlag("peasant-core", flag) || [];
-        return seized.includes(id);
-    };
+    // 2. Normal flow: completed phases are derived from turn history by combatant id.
+    const currentPhase = getCombatPhase(this);
+    const currentCombatantId = this.combatant?.id;
+    const justCompletedIds = currentCombatantId ? [currentCombatantId] : [];
+    const turns = getCombatTurns(this);
+    const history = this.getFlag("peasant-core", "turnHistory");
 
-    if (currentPhase === 0) {
-      // Movement phase - going up (ascending)
-      if (currentIdx >= combatants.length - 1) {
-        // Reached top, switch to Standard phase
-        await this.setFlag("peasant-core", "combatPhase", 1);
-        
-        // IMMEDIATE CHECK: Did this combatant seize Standard?
-        // If so, we must skip them immediately by calling nextTurn again (which will now process as Standard phase)
-        if (this.combatant && isSeized(this.combatant.id, 1)) {
-             pcLog.debug(`Peasant Core | Skipping ${this.combatant.name} (Seized Standard at Transition)`);
-             const result = await this.nextTurn({ _recursionDepth: depth + 1, _historyStartState: historyStartState });
-             return finalize(result);
-        }
-        
+    if (currentPhase === PC_PHASE_MOVEMENT) {
+      const movementTurn = getFirstPendingTurnIndex({
+        turns,
+        history,
+        round: this.round,
+        phase: PC_PHASE_MOVEMENT,
+        seizedIds: getSeizedIdsForPhase(this, PC_PHASE_MOVEMENT),
+        additionalCompletedIds: justCompletedIds
+      });
+
+      if (movementTurn >= 0) {
+        await this.update({ turn: movementTurn });
+        ui.notifications.info(`${this.combatant?.name || "Combatant"} - Movement Phase`);
+        return finalize(this);
+      }
+
+      await this.setFlag("peasant-core", "combatPhase", PC_PHASE_STANDARD);
+      const standardTurn = getFirstPendingTurnIndex({
+        turns,
+        history,
+        round: this.round,
+        phase: PC_PHASE_STANDARD,
+        seizedIds: getSeizedIdsForPhase(this, PC_PHASE_STANDARD)
+      });
+
+      if (standardTurn >= 0) {
+        await this.update({ turn: standardTurn });
         ui.notifications.info(`${this.combatant?.name || "Combatant"} - Standard Phase`);
       } else {
-        // Move to next
-        await Combat.prototype.nextTurn.call(this);
-        
-        // Check if this new combatant has seized this Movement phase
-        if (this.combatant && isSeized(this.combatant.id, 0)) {
-            pcLog.debug(`Peasant Core | Skipping ${this.combatant.name} (Seized Movement)`);
-            const result = await this.nextTurn({ _recursionDepth: depth + 1, _historyStartState: historyStartState });
-            return finalize(result);
-        }
-        
-        ui.notifications.info(`${this.combatant?.name || "Combatant"} - Movement Phase`);
+        ui.notifications.warn("End of round. Use 'New Round' button to start next round.");
       }
     } else {
-      // Standard phase - going down (descending)
-      if (currentIdx <= 0) {
-        // Reached bottom, round complete
-        ui.notifications.warn("End of round. Use 'New Round' button to start next round.");
-      } else {
-        // Move to previous combatant's standard (going backwards through list)
-        await this.update({ turn: currentIdx - 1 });
-        
-        // Check if this new combatant has seized this Standard phase
-        if (this.combatant && isSeized(this.combatant.id, 1)) {
-            pcLog.debug(`Peasant Core | Skipping ${this.combatant.name} (Seized Standard)`);
-            const result = await this.nextTurn({ _recursionDepth: depth + 1, _historyStartState: historyStartState });
-            return finalize(result);
-        }
-        
+      const standardTurn = getFirstPendingTurnIndex({
+        turns,
+        history,
+        round: this.round,
+        phase: PC_PHASE_STANDARD,
+        seizedIds: getSeizedIdsForPhase(this, PC_PHASE_STANDARD),
+        additionalCompletedIds: justCompletedIds
+      });
+
+      if (standardTurn >= 0) {
+        await this.update({ turn: standardTurn });
         ui.notifications.info(`${this.combatant?.name || "Combatant"} - Standard Phase`);
+      } else {
+        ui.notifications.warn("End of round. Use 'New Round' button to start next round.");
       }
     }
     
@@ -633,7 +667,7 @@ export class PeasantCombat extends Combat {
             }
         }
         
-        await this.updateEmbeddedDocuments("Combatant", updates);
+        await this.updateEmbeddedDocuments("Combatant", updates, { [PC_SKIP_INITIATIVE_REANCHOR_OPTION]: true });
         
         // Force a resort of turns now that flags and values are restored
         this.setupTurns();
@@ -642,7 +676,7 @@ export class PeasantCombat extends Combat {
     } else {
         // Brand new round - Reset initiatives
         const updates = this.combatants.map(c => ({ _id: c.id, initiative: null }));
-        await this.updateEmbeddedDocuments("Combatant", updates);
+        await this.updateEmbeddedDocuments("Combatant", updates, { [PC_SKIP_INITIATIVE_REANCHOR_OPTION]: true });
         
         // Clear seized flags for the new round so nobody is skipped
         await this.setFlag("peasant-core", "seizedMovement", []);
@@ -717,7 +751,7 @@ export class PeasantCombat extends Combat {
       }
       
       if (updates.length > 0) {
-        await this.updateEmbeddedDocuments("Combatant", updates);
+        await this.updateEmbeddedDocuments("Combatant", updates, { [PC_SKIP_INITIATIVE_REANCHOR_OPTION]: true });
         
         // Force a resort of turns
         this.setupTurns();
@@ -896,11 +930,11 @@ export class PeasantCombat extends Combat {
                     const c = this.combatants.get(id);
                     if (c) await c.setFlag("peasant-core", "initiativeTiebreaker", val);
                  }
-             }
-             if (updates.length > 0) {
-                await this.updateEmbeddedDocuments("Combatant", updates);
+              }
+              if (updates.length > 0) {
+                await this.updateEmbeddedDocuments("Combatant", updates, { [PC_SKIP_INITIATIVE_REANCHOR_OPTION]: true });
                 this.setupTurns(); // Force resort
-             }
+              }
         }
     }
     
@@ -922,6 +956,7 @@ export class PeasantCombat extends Combat {
 
 export function configurePeasantCombat() {
   CONFIG.Combat.documentClass = PeasantCombat;
+  CONFIG.Combatant.documentClass = PeasantCombatant;
   CONFIG.Combat.initiativeIcon = {
     icon: "../systems/peasant-core/ui/initiative-2d6.svg",
     hover: "../systems/peasant-core/ui/initiative-2d6-highlight.svg"

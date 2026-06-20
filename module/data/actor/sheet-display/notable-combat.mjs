@@ -43,8 +43,8 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
-export function prepareActorNotableCombatContext(data, actor) {
-  const sourceNotableCombats = (actor.system.notableCombats || []);
+export function prepareActorNotableCombatContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
+  const sourceNotableCombats = ((isEditMode ? sourceSystem : actor.system)?.notableCombats || []);
   const combatMods = actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0, costMod: 0 };
   const toHitMod = parseInt(combatMods.toHit) || 0;
   const accuracyMod = parseInt(combatMods.accuracy) || 0;

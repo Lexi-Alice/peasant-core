@@ -1,6 +1,8 @@
 ﻿// Peasant Core System Initialization
 import { configurePeasantCombat } from "./documents/_module.mjs";
 import { PEASANT_ACTIVE_EFFECT_DATA_MODELS } from "./data/active-effect/_module.mjs";
+import { configurePeasantActiveEffectStateOperations } from "./data/active-effect/state-operations.mjs";
+import { configurePeasantActiveEffectSheetEnhancements } from "./applications/active-effect/active-effect-config.mjs";
 import { configureChatListeners } from "./applications/chat-listeners.mjs";
 import { configureCombatTracker } from "./applications/combat-tracker.mjs";
 import { drawLocationTableLikeMacro } from "./applications/actor/location-table.mjs";
@@ -18,6 +20,7 @@ initializePeasantSockets();
 Hooks.once('init', () => {
   console.log('Peasant Core | System initialized');
   configurePeasantCombat();
+  configurePeasantActiveEffectStateOperations();
   configureChatListeners();
   configureCombatTracker();
   Object.assign(CONFIG.ActiveEffect.dataModels, PEASANT_ACTIVE_EFFECT_DATA_MODELS);
@@ -26,6 +29,7 @@ Hooks.once('init', () => {
     enchantment: "TYPES.ActiveEffect.enchantment",
     skill: "TYPES.ActiveEffect.skill"
   };
+  configurePeasantActiveEffectSheetEnhancements();
   registerDebugLoggingSetting();
   registerPeasantCoreSettingsMenus();
 

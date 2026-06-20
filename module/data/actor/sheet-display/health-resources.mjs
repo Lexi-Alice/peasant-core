@@ -40,17 +40,23 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
-export function prepareActorHealthResourceContext(data, actor, { isEditMode = false } = {}) {
+export function prepareActorHealthResourceContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
+  const system = actor.system ?? {};
+  const editSystem = sourceSystem ?? system;
+  const numberInput = (value, fallback = 0) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, number) : fallback;
+  };
   data.simplifiedHp = isSimplifiedHpActor(actor);
   data.bolsteredHpMax = getActorBolsteredMax(actor);
 
   if (data.simplifiedHp) {
     const maxHealth = getActorHealthMax(actor);
-    const currentHealthRaw = Number(actor.system?.health?.value);
+    const currentHealthRaw = Number(system?.health?.value);
     const currentHealth = Number.isFinite(currentHealthRaw)
       ? Math.max(0, Math.min(currentHealthRaw, maxHealth))
       : maxHealth;
-    data.actor.system.health = { ...(data.actor.system.health || {}), value: currentHealth, max: maxHealth };
+    data.simplifiedHealth = { value: currentHealth, max: maxHealth };
     data.hpWithLabels = [];
     data.woundThresholds = "";
     data.woundThresholdsReduced = false;
@@ -65,8 +71,8 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
       { value: 10, text: "Terrible" },
       { value: 11, text: "Critical" }
     ];
-    const hpGrid = actor.system?.hp?.grid || [];
-    const hpCols = Number(actor.system?.hp?.cols) || 0;
+    const hpGrid = system?.hp?.grid || [];
+    const hpCols = Number(system?.hp?.cols) || 0;
     data.hpWithLabels = hpGrid.map((row, index) => {
       return {
         cells: row,
@@ -74,7 +80,7 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
       };
     });
 
-    const isWounded = actor.system.conditions?.wounded || false;
+    const isWounded = system.conditions?.wounded || false;
     const woundMult = getWoundThresholdMultipliers(actor);
     const headThreshold = hpCols * woundMult.head;
     const armsThreshold = hpCols * woundMult.arms;
@@ -104,11 +110,15 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
     data.isWounded = isWounded;
   }
 
-  const healthMaxForBar = Math.max(0, Number(data.actor.system?.health?.max) || getActorHealthMax(actor));
-  const healthValueForBar = Math.max(0, Math.min(Number(data.actor.system?.health?.value) || 0, healthMaxForBar));
-  const tempHpValueForBar = Math.max(0, Number(data.actor.system?.temporaryHp?.value) || 0);
-  const tempHpMaxForBar = Math.max(0, Number(data.actor.system?.temporaryHp?.max) || 0, tempHpValueForBar);
-  const bolsteredHpValueForBar = Math.max(0, Number(data.actor.system?.bolsteredHp) || 0);
+  const healthMaxForBar = data.simplifiedHp
+    ? data.simplifiedHealth.max
+    : Math.max(0, Number(system?.health?.max) || getActorHealthMax(actor));
+  const healthValueForBar = data.simplifiedHp
+    ? data.simplifiedHealth.value
+    : Math.max(0, Math.min(Number(system?.health?.value) || 0, healthMaxForBar));
+  const tempHpValueForBar = Math.max(0, Number(system?.temporaryHp?.value) || 0);
+  const tempHpMaxForBar = Math.max(0, Number(system?.temporaryHp?.max) || 0, tempHpValueForBar);
+  const bolsteredHpValueForBar = Math.max(0, Number(system?.bolsteredHp) || 0);
   const bolsteredHpMaxForBar = Math.max(0, Number(data.bolsteredHpMax) || getActorBolsteredMax(actor));
   const pct = (value, max) => {
     if (!Number.isFinite(max) || max <= 0) return 0;
@@ -117,28 +127,37 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
   data.hpBar = {
     healthValue: healthValueForBar,
     healthMax: healthMaxForBar,
+    healthValueInput: numberInput(editSystem?.health?.value, healthValueForBar),
+    healthMaxInput: numberInput(editSystem?.health?.max, healthMaxForBar),
     healthPct: pct(healthValueForBar, healthMaxForBar),
     tempValue: tempHpValueForBar,
     tempMax: tempHpMaxForBar,
+    tempValueInput: numberInput(editSystem?.temporaryHp?.value, tempHpValueForBar),
+    tempMaxInput: numberInput(editSystem?.temporaryHp?.max, tempHpMaxForBar),
     tempPct: pct(tempHpValueForBar, tempHpMaxForBar),
     bolsteredValue: bolsteredHpValueForBar,
     bolsteredMax: bolsteredHpMaxForBar,
+    bolsteredValueInput: numberInput(editSystem?.bolsteredHp, bolsteredHpValueForBar),
     bolsteredPct: pct(bolsteredHpValueForBar, bolsteredHpMaxForBar)
   };
 
-  const apMaxForBar = Math.max(0, Number(data.actor.system?.ap?.max) || 0);
-  const apValueForBar = Math.max(0, Math.min(Number(data.actor.system?.ap?.value) || 0, apMaxForBar));
+  const apMaxForBar = Math.max(0, Number(system?.ap?.max) || 0);
+  const apValueForBar = Math.max(0, Math.min(Number(system?.ap?.value) || 0, apMaxForBar));
   data.apBar = {
     value: apValueForBar,
     max: apMaxForBar,
+    valueInput: numberInput(editSystem?.ap?.value, apValueForBar),
+    maxInput: numberInput(editSystem?.ap?.max, apMaxForBar),
     pct: pct(apValueForBar, apMaxForBar)
   };
 
   const showZeroResourceBars = !!isEditMode;
   const buildResourceBar = (key, label) => {
-    const max = Math.max(0, Number(data.actor.system?.[key]?.max) || 0);
-    const value = Math.max(0, Math.min(Number(data.actor.system?.[key]?.value) || 0, max));
-    return { key, label, value, max, pct: pct(value, max), show: showZeroResourceBars || max > 0 };
+    const max = Math.max(0, Number(system?.[key]?.max) || 0);
+    const value = Math.max(0, Math.min(Number(system?.[key]?.value) || 0, max));
+    const maxInput = numberInput(editSystem?.[key]?.max, max);
+    const valueInput = Math.max(0, Math.min(numberInput(editSystem?.[key]?.value, value), maxInput));
+    return { key, label, value, max, valueInput, maxInput, pct: pct(value, max), show: showZeroResourceBars || max > 0 };
   };
   const staminaBar = buildResourceBar("stamina", "Stamina");
   const attunementBar = buildResourceBar("attunement", "Attunement");
@@ -157,14 +176,14 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
     anyVisible: staminaBar.show || attunementBar.show || capacityBar.show || edgeBar.show
   };
 
-  const haltParts = parseHaltSlashValues(actor.system.haltValues || "0/0/0/0");
+  const haltParts = parseHaltSlashValues(system.haltValues || "0/0/0/0");
   const hardLocations = [
-    actor.system.hardHead,
-    actor.system.hardArms,
-    actor.system.hardLegs,
-    actor.system.hardTorso
+    system.hardHead,
+    system.hardArms,
+    system.hardLegs,
+    system.hardTorso
   ];
-  const combatHaltTotals = getCombatHaltBuffTotals(actor.system?.combatMods?.haltBuffs);
+  const combatHaltTotals = getCombatHaltBuffTotals(system?.combatMods?.haltBuffs);
   const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];
 
   data.haltDisplay = haltParts.map((val, index) => {
@@ -174,13 +193,13 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
     };
   });
 
-  const naturalHaltParts = parseHaltSlashValues(actor.system.naturalHaltValues || "0/0/0/0");
+  const naturalHaltParts = parseHaltSlashValues(system.naturalHaltValues || "0/0/0/0");
 
   const naturalHardLocations = [
-    actor.system.naturalHardHead,
-    actor.system.naturalHardArms,
-    actor.system.naturalHardLegs,
-    actor.system.naturalHardTorso
+    system.naturalHardHead,
+    system.naturalHardArms,
+    system.naturalHardLegs,
+    system.naturalHardTorso
   ];
   const naturalHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_NATURAL] || [0, 0, 0, 0];
 
@@ -192,7 +211,7 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
   });
 
   if (!data.simplifiedHp) {
-    const conditions = actor.system.conditions || {};
+    const conditions = system.conditions || {};
     data.activeConditions = [];
     data.hasConditions = false;
 

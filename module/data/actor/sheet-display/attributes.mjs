@@ -41,7 +41,8 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
-export function prepareActorAttributeContext(data, actor) {
+export function prepareActorAttributeContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
+  const editSystem = sourceSystem ?? actor.system;
   const build = actor.system.build || 0;
   const reflex = actor.system.reflex || 0;
   const intuition = actor.system.intuition || 0;
@@ -79,6 +80,8 @@ export function prepareActorAttributeContext(data, actor) {
 
   const reflexAoeSaveEnabled = !!actor.system.reflexAoeSaveEnabled;
   const reflexAoeValue = parseOptionalInteger(actor.system.reflexAoeSaveTarget, { min: 1 });
+  const reflexAoeInputEnabled = !!editSystem.reflexAoeSaveEnabled;
+  const reflexAoeInputValue = parseOptionalInteger(editSystem.reflexAoeSaveTarget, { min: 1 });
   const reflexAoeSaveTn = reflexAoeValue !== null ? Math.max(2, reflexAoeValue) : null;
 
   const isSummer = blessing.type === "summer" && blessing.target;
@@ -110,8 +113,8 @@ export function prepareActorAttributeContext(data, actor) {
     mntToHit: `${mntToHitNum}+`,
     socToHit: `${socToHitNum}+`
   };
-  data.reflexAoeSaveEnabled = reflexAoeSaveEnabled;
-  data.reflexAoeSaveTarget = formatOptionalIntegerInput(reflexAoeValue);
+  data.reflexAoeSaveEnabled = isEditMode ? reflexAoeInputEnabled : reflexAoeSaveEnabled;
+  data.reflexAoeSaveTarget = formatOptionalIntegerInput(isEditMode ? reflexAoeInputValue : reflexAoeValue);
   data.reflexAoeSaveTn = reflexAoeSaveEnabled && Number.isFinite(reflexAoeSaveTn) ? reflexAoeSaveTn : null;
   data.reflexAoeSaveDisplay = reflexAoeSaveEnabled && Number.isFinite(reflexAoeSaveTn) ? `${reflexAoeSaveTn}+` : "";
   data.blessing = blessing;

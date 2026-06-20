@@ -6679,6 +6679,31 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     background: transparent !important;
 }
 
+#chat-log .message #context-menu,
+.chat-message #context-menu,
+body:has(#chat-log .message.context) > #context-menu[popover],
+body:has(.chat-message.context) > #context-menu[popover] {
+    --background-color: var(--color-cool-5, #0b0a13);
+    --border-color: var(--color-cool-3, #584a75);
+    --text-color: var(--color-light-3, #e7d1b1);
+    --hover-text-color: var(--color-light-1, #f5f1e8);
+    --group-separator: var(--color-cool-4, #302831);
+    --hover-entry-border: var(--color-cool-4, #302831);
+    --hover-entry-background: var(--color-dark-1, #000000);
+    background: var(--background-color) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-color) !important;
+}
+
+#chat-log .message #context-menu li.context-item:hover,
+.chat-message #context-menu li.context-item:hover,
+body:has(#chat-log .message.context) > #context-menu[popover] li.context-item:hover,
+body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
+    background: var(--hover-entry-background) !important;
+    border-color: var(--hover-entry-border) !important;
+    color: var(--hover-text-color) !important;
+}
+
 /* Roll cards are rendered with inline dark backgrounds; override to match sheet/chat surface */
 #chat-log .message .skill-roll-card,
 .chat-message .skill-roll-card {
@@ -10173,6 +10198,13 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
   font-size: 14px;
 }
 
+.pc-item-sunder-box.skill-uses-box .pc-item-sunder-unavailable:disabled {
+  color: var(--input-text-color, #e0e0e0);
+  -webkit-text-fill-color: var(--input-text-color, #e0e0e0);
+  font-weight: 400;
+  opacity: 1;
+}
+
 .pc-item-sunder-box .uses-separator {
   color: #888;
   font-size: 14px;
@@ -10604,5 +10636,53 @@ nav.pc-item-tabs .pc-item-tab.active {
 
 #hotbar #action-bar .slot.pc-notable-combat-hotbar-missing .slot-icon {
   filter: grayscale(1) opacity(0.7);
+}
+
+.pc-ae-key-browser {
+  position: absolute;
+  z-index: 1000;
+  padding: 6px;
+  border: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
+  background: var(--pc-sheet-surface, rgba(11, 10, 19, 0.95));
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  color: var(--color-text-light-highlight, #f0f0e0);
+}
+
+.pc-ae-key-browser[hidden] {
+  display: none !important;
+}
+
+.pc-ae-key-browser .pc-ae-key-browser-content {
+  overflow-y: auto;
+  border: 1px solid rgba(159, 132, 117, 0.3);
+  scrollbar-width: thin;
+}
+
+.pc-ae-key-browser .pc-ae-key-option {
+  overflow: hidden;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(159, 132, 117, 0.3);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-ae-key-browser .pc-ae-key-option:last-child {
+  border-bottom: 0;
+}
+
+.pc-ae-key-browser .pc-ae-key-option:hover,
+.pc-ae-key-browser .pc-ae-key-option.selected {
+  background: var(--color-text-selection-bg, rgba(88, 74, 117, 0.85));
+  color: var(--color-text-light-highlight, #ffffff);
+}
+
+.pc-ae-key-browser .pc-ae-key-option-empty,
+.pc-ae-key-browser .pc-ae-key-option-empty:hover {
+  cursor: default;
+  background: transparent;
+  color: var(--color-text-light-6, #a79d94);
 }
 

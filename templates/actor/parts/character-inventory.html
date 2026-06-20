@@ -11,7 +11,7 @@
               <img class="pc-inventory-currency-icon" src="{{currency.icon}}" alt="">
             </span>
             {{#if @root.owner}}
-              <input type="number" name="system.currency.{{currency.key}}" value="{{currency.value}}" class="pc-inventory-currency-input pc-input" min="0" step="1" inputmode="numeric" data-dtype="Number" aria-label="{{currency.tooltip}}">
+              <input type="number" name="system.currency.{{currency.key}}" value="{{currency.inputValue}}" class="pc-inventory-currency-input pc-input" min="0" step="1" inputmode="numeric" data-dtype="Number" aria-label="{{currency.tooltip}}">
             {{else}}
               <span class="pc-inventory-currency-value">{{currency.value}}</span>
             {{/if}}
@@ -20,7 +20,7 @@
         <label class="pc-inventory-useless-collection-box" data-tooltip="Useless Collection" aria-label="Useless Collection">
           <i class="fa-solid fa-box-open" aria-hidden="true"></i>
           {{#if @root.owner}}
-            <input type="number" name="system.uselessCollection" value="{{inventoryUselessCollection}}" class="pc-inventory-useless-collection-input pc-input" min="0" step="1" inputmode="numeric" data-dtype="Number" aria-label="Useless Collection">
+            <input type="number" name="system.uselessCollection" value="{{inventoryUselessCollectionInput}}" class="pc-inventory-useless-collection-input pc-input" min="0" step="1" inputmode="numeric" data-dtype="Number" aria-label="Useless Collection">
           {{else}}
             <span class="pc-inventory-useless-collection-value">{{inventoryUselessCollection}}</span>
           {{/if}}

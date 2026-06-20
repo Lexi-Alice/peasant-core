@@ -21,7 +21,7 @@ import { rollAttributeSaveFromElement, rollAttributeToHitFromElement, rollCombat
 import { blurActiveEditableInSheet as blurActiveEditableInSheetHelper, collectAdvantagesFromSheet, createSheetUpdateQueue, initializeSheetSaveQueues, runQueuedInputUpdate as runQueuedInputUpdateHelper, sanitizeOptionalIntegerInputElement } from "./controls/sheet-listener-helpers.mjs";
 import { setupWoundsControls } from "./controls/wounds-controls.mjs";
 import { openDefenseFavoritesWindow } from "./defense-favorites-window.mjs";
-import { prepareActorAdvantageContext, prepareActorAttributeContext, prepareActorEdgeContext, prepareActorEffectContext, prepareActorHealthResourceContext, prepareActorIdentityContext, prepareActorInventoryContext, prepareActorNotableCombatContext, prepareActorSheetBaseContext, prepareActorSkillContext, prepareActorStressContext } from "./context/sheet-context.mjs";
+import { buildPeasantActorSourceContext, prepareActorAdvantageContext, prepareActorAttributeContext, prepareActorEdgeContext, prepareActorEffectContext, prepareActorHealthResourceContext, prepareActorIdentityContext, prepareActorInventoryContext, prepareActorNotableCombatContext, prepareActorSheetBaseContext, prepareActorSkillContext, prepareActorStressContext } from "./context/sheet-context.mjs";
 import { setupActorEffectControls } from "./controls/effects-controls.mjs";
 import { setupNotableCombatControls } from "./notable-combat/notable-combat-controls.mjs";
 import { setupNotableCombatDragDropControls } from "./notable-combat/notable-combat-drag-drop.mjs";
@@ -894,24 +894,28 @@ export class PeasantActorSheet extends ActorSheetBase {
       }
       data.owner = this.canModifyActor;
       data.canObserve = this.canObserveActor;
-      prepareActorSheetBaseContext(data, this.actor, { isEditable: this.isEditable, isEditMode: this.isEditMode });
-      if (this.isReadOnlyObserver) data.artPanelCollapsed = false;
+      data.source = buildPeasantActorSourceContext(this.actor);
+      prepareActorSheetBaseContext(data, this.actor, { isEditable: this.isEditable, isEditMode: this.isEditMode, sourceSystem: data.source.system });
       if (this.isEditMode && this._initiativeInputDraft !== undefined) {
         data.initiativeInput = this._initiativeInputDraft;
       }
-      prepareActorIdentityContext(data, this.actor, { isEditMode: this.isEditMode });
-      prepareActorEdgeContext(data, this.actor);
-      prepareActorAttributeContext(data, this.actor);
-      prepareActorStressContext(data, this.actor, { isEditMode: this.isEditMode });
+      if (this.isReadOnlyObserver) data.artPanelCollapsed = false;
+      prepareActorIdentityContext(data, this.actor, { isEditMode: this.isEditMode, sourceSystem: data.source.system });
+      prepareActorEdgeContext(data, this.actor, { isEditMode: this.isEditMode, sourceSystem: data.source.system });
+      prepareActorAttributeContext(data, this.actor, { isEditMode: this.isEditMode, sourceSystem: data.source.system });
+      prepareActorStressContext(data, this.actor, { isEditMode: this.isEditMode, sourceSystem: data.source.system });
 
     // Ensure portrait offsets are valid for current scale
     const scale = Math.max(1.0, this.actor.system.portraitScale || 1);
     if (scale <= 1.0) {
-      data.actor.system.portraitOffsetX = 0;
-      data.actor.system.portraitOffsetY = 0;
+      data.portraitOffsetX = 0;
+      data.portraitOffsetY = 0;
+    } else {
+      data.portraitOffsetX = this.actor.system.portraitOffsetX || 0;
+      data.portraitOffsetY = this.actor.system.portraitOffsetY || 0;
     }
 
-    prepareActorSkillContext(data, this.actor, { logger: pcLog });
+    prepareActorSkillContext(data, this.actor, { logger: pcLog, isEditMode: this.isEditMode, sourceSystem: data.source.system });
 
     const TextEditorImpl = TextEditorImplementation;
     const escapeHtml = foundry.utils.escapeHTML ?? ((value) => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])));
@@ -931,18 +935,18 @@ export class PeasantActorSheet extends ActorSheetBase {
       ? await TextEditorImpl.enrichHTML(this.actor.system.biography, { async: true })
       : "";
 
-    prepareActorAdvantageContext(data, this.actor);
+    prepareActorAdvantageContext(data, this.actor, { isEditMode: this.isEditMode, sourceSystem: data.source.system });
     for (const advantage of data.flexibleAdvantages ?? []) {
       advantage.descriptionTooltipHtml = await buildDescriptionTooltipHtml(advantage, "Advantage");
     }
 
-    prepareActorNotableCombatContext(data, this.actor);
+    prepareActorNotableCombatContext(data, this.actor, { isEditMode: this.isEditMode, sourceSystem: data.source.system });
     for (const combat of data.notableCombats ?? []) {
       combat.descriptionTooltipHtml = await buildDescriptionTooltipHtml(combat, "Combat");
     }
 
     data.biography = this.actor.system.biography || "";
-    await prepareActorInventoryContext(data, this.actor);
+    await prepareActorInventoryContext(data, this.actor, { sourceSystem: data.source.system });
     await prepareActorEffectContext(data, this.actor);
     const inventorySortMode = this._pcInventorySortMode === "alpha" ? "alpha" : "manual";
     data.inventorySortToggle = {
@@ -957,7 +961,7 @@ export class PeasantActorSheet extends ActorSheetBase {
       label: "Group by Category"
     };
 
-    prepareActorHealthResourceContext(data, this.actor, { isEditMode: this.isEditMode });
+    prepareActorHealthResourceContext(data, this.actor, { isEditMode: this.isEditMode, sourceSystem: data.source.system });
 
       return data;
     } catch (err) {

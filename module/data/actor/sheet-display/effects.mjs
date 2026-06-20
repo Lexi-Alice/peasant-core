@@ -103,12 +103,16 @@ async function prepareActorPassiveEffect(effect, actor, index) {
 }
 
 function getEffectCollectionKeys(effect) {
-  const parentUuid = effect?.parent?.uuid ?? "";
-  return [
-    effect?.uuid,
-    String(effect?.origin ?? "").trim(),
-    [parentUuid, effect?.id ?? effect?._id ?? ""].filter(Boolean).join(".")
-  ].filter(Boolean);
+  const keys = [];
+  const uuid = String(effect?.uuid ?? "").trim();
+  const parentUuid = String(effect?.parent?.uuid ?? "").trim();
+  const id = String(effect?.id ?? effect?._id ?? "").trim();
+  if (uuid) keys.push(`uuid:${uuid}`);
+  if (parentUuid && id) keys.push(`parent:${parentUuid}.${id}`);
+  if (keys.length) return keys;
+
+  const origin = String(effect?.origin ?? "").trim();
+  return origin ? [`origin:${origin}`] : [];
 }
 
 function addEffectToCollection(effects, seen, effect) {

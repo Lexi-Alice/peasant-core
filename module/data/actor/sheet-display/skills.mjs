@@ -41,8 +41,8 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
-export function prepareActorSkillContext(data, actor, { logger = null } = {}) {
-  const sourceSkills = (actor.system.skills || []);
+export function prepareActorSkillContext(data, actor, { logger = null, isEditMode = false, sourceSystem = null } = {}) {
+  const sourceSkills = ((isEditMode ? sourceSystem : actor.system)?.skills || []);
   const skillCombatMods = actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
   const skillToHitMod = parseInt(skillCombatMods.toHit) || 0;
   const skillAccuracyMod = parseInt(skillCombatMods.accuracy) || 0;

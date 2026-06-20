@@ -1,13 +1,13 @@
 import { computeBaseAttrToHits, computeBaseSaves } from "../../../data/actor/attributes.mjs";
-import { getCombatDesperateDieRateModifier } from "../../../data/actor/combat-damage.mjs";
-import { getCombatFlatDamageModifier } from "../../../data/actor/combat-modifiers.mjs";
 import { hasOptionalInteger, parseOptionalInteger } from "../../../data/actor/helpers.mjs";
 import { PC_CONSCIOUSNESS_SAVE_FLAG, PC_SAVE_MODIFIER_FLAG } from "../../../data/actor/sheet-settings.mjs";
-import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
+import { hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 import { performConsciousnessCheck, performSavingRoll, performSkillRoll, performUntrainedSkillRoll } from "../../../dice/rolls.mjs";
-import { applyMessageMode, escapeHtml } from "../../../utils/chat.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
+import { attachRollUndoToChatMessage, captureActorRollUndo } from "../../chat-undo.mjs";
+import { attachEdgeChainToChatMessage, createActorSkillEdgeChainContext } from "../../combat/edge-chain-rolls.mjs";
+import { rollManualCombatTag } from "../../combat/manual-combat-tag-rolls.mjs";
 import { startNotableCombatRoll } from "../../combat/notable-combat-workflow.mjs";
 
 function getActionElement(sheet, event, target) {
@@ -151,7 +151,6 @@ export async function rollCombatTagFromElement(sheet, event, target) {
 
     const combats = sheet.actor.system.notableCombats || [];
     const combat = combats[idx] || {};
-    const combatName = combat.name || "Combat";
 
     if (rollType === "heal" && hasCombatDice(combat.heal)) {
       await startNotableCombatRoll({
@@ -164,120 +163,11 @@ export async function rollCombatTagFromElement(sheet, event, target) {
       return;
     }
 
-    const combatMods = sheet.actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
-    const diceRateMod = parseInt(combatMods.diceRate) || 0;
-    const flatDamageMod = getCombatFlatDamageModifier(combatMods);
-    const desperateDieRateMod = getCombatDesperateDieRateModifier(sheet.actor, combat).modifier;
-
-    let diceCount = 0;
-    let diceValue = 0;
-    let flat = 0;
-    let rollLabel = "";
-    let typeLabel = "";
-
-    if (rollType === "damage" && combat.damage) {
-      const result = applyDieRate(
-        combat.damage.diceCount || 0,
-        combat.damage.diceValue || 0,
-        combat.damage.flat || 0,
-        diceRateMod + desperateDieRateMod,
-        combat.damage.diceBonus || 0
-      );
-      diceCount = result.diceCount;
-      diceValue = result.diceValue;
-      flat = result.flat + flatDamageMod;
-      rollLabel = "Damage";
-      typeLabel = combat.damage.type || "";
-    } else if (rollType === "heal" && combat.heal) {
-      const result = applyDieRate(
-        combat.heal.diceCount || 0,
-        combat.heal.diceValue || 0,
-        combat.heal.flat || 0,
-        diceRateMod,
-        combat.heal.diceBonus || 0
-      );
-      diceCount = result.diceCount;
-      diceValue = result.diceValue;
-      flat = result.flat + flatDamageMod;
-      rollLabel = "Heal";
-      typeLabel = combat.heal.type || "";
-    } else if (rollType === "manifest" && combat.manifest) {
-      const result = applyDieRate(
-        combat.manifest.diceCount || 0,
-        combat.manifest.diceValue || 0,
-        combat.manifest.flat || 0,
-        diceRateMod,
-        combat.manifest.diceBonus || 0
-      );
-      diceCount = result.diceCount;
-      diceValue = result.diceValue;
-      flat = result.flat + flatDamageMod;
-      rollLabel = "Manifest";
-    }
-
-    const canRollDice = diceCount > 0 && diceValue > 0;
-    const naturalDiceCount = canRollDice ? diceCount : 0;
-    const useStability = canRollDice && !!combat.stability && (rollType === "damage" || rollType === "heal" || rollType === "manifest");
-    const useStrengthen = useStability && !!combat.strengthen;
-    const rolledDiceCount = useStability ? (naturalDiceCount * 2) : naturalDiceCount;
-    const roll = await new Roll(canRollDice ? `${rolledDiceCount}d${diceValue}` : "0").evaluate();
-
-    const diceResults = canRollDice ? roll.dice.map(d => d.results.map(r => r.result)) : [];
-    const allDice = diceResults.flat();
-    const diceBreakdown = allDice.join(", ");
-    const diceSum = allDice.reduce((a, b) => a + b, 0);
-    let adjustedDiceTotal = diceSum;
-    let diceDetailLine = `<div>Dice: [${diceBreakdown}] = ${diceSum}</div>`;
-
-    if (useStrengthen) {
-      const indexed = allDice.map((value, index) => ({ value, index }));
-      indexed.sort((a, b) => (b.value - a.value) || (a.index - b.index));
-      const keepCount = Math.min(naturalDiceCount, allDice.length);
-      const keepIndexSet = new Set(indexed.slice(0, keepCount).map((d) => d.index));
-      adjustedDiceTotal = allDice.reduce((sum, value, index) => sum + (keepIndexSet.has(index) ? value : 0), 0);
-      const droppedDisplay = allDice
-        .map((die, index) => keepIndexSet.has(index) ? `${die}` : `<span style="color: #888;">${die}</span>`)
-        .join(", ");
-      diceDetailLine = `<div>Strengthened Dice: [${droppedDisplay}] = ${adjustedDiceTotal}</div>`;
-    } else if (useStability) {
-      adjustedDiceTotal = Math.floor(diceSum / 2);
-      diceDetailLine = `<div>Stabilized Dice: [${diceBreakdown}] / 2 = ${adjustedDiceTotal}</div>`;
-    }
-
-    const total = adjustedDiceTotal + flat;
-    const speaker = ChatMessage.getSpeaker({ actor: sheet.actor });
-    const typeDisplay = typeLabel ? `<span style="color: #aaa; font-size: 11px; margin-left: 6px;">${typeLabel}</span>` : "";
-    const rollId = `dice-roll-${Date.now()}`;
-    const rollCardClass = rollType === "damage" ? " pc-damage-roll-card" : (rollType === "heal" ? " pc-heal-roll-card" : (rollType === "manifest" ? " pc-manifest-roll-card" : ""));
-    const chatHtml = `<fieldset class="skill-roll-card${rollCardClass}" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-  <legend>
-    ${escapeHtml(combatName)}
-  </legend>
-  <div style="display: flex; flex-direction: column; gap: 6px;">
-    <div style="display: flex; gap: 6px;">
-      <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
-        <span style="color: #ffffff; font-weight: bold; font-size: 11px;">${rollLabel}:</span>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #4ade80; border: 2px solid #22c55e;">
-            ${total}
-          </button>${typeDisplay}
-        </div>
-      </div>
-    </div>
-    <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
-      <div style="color: #4a9eff; font-weight: bold; margin-bottom: 2px;">Roll Details:</div>
-      ${diceDetailLine}${flat !== 0 ? `
-      <div>Flat Modifier: ${flat > 0 ? "+" : ""}${flat}</div>` : ""}
-    </div>
-  </div>
-</fieldset>`;
-
-    await ChatMessage.create(applyMessageMode({
-      user: game.user.id,
-      speaker,
-      content: chatHtml,
-      rolls: [roll]
-    }));
+    await rollManualCombatTag({
+      actor: sheet.actor,
+      combatIndex: idx,
+      rollType
+    });
   } catch (e) {
     console.error("combat-tag-rollable handler failed", e);
   }
@@ -314,13 +204,48 @@ export async function rollSkillFromElement(sheet, event, target) {
     };
 
     const accVal = accuracy !== 0 ? accuracy : undefined;
+    let rollResult = null;
+    let edgeChainContext = null;
     if (isUntrained) {
       const untrainedSkillName = `${skill.name || "Skill"} Untrained Skill Roll`;
-      await performUntrainedSkillRoll({ toHit: tohit, accuracy: 0, skillName: untrainedSkillName, speaker: ChatMessage.getSpeaker({ actor: sheet.actor }) });
+      edgeChainContext = createActorSkillEdgeChainContext({
+        actor: sheet.actor,
+        skillIndex: idx,
+        skillName: skill.name || "Skill"
+      });
+      rollResult = await performUntrainedSkillRoll({
+        toHit: tohit,
+        accuracy: 0,
+        skillName: untrainedSkillName,
+        speaker: ChatMessage.getSpeaker({ actor: sheet.actor }),
+        edgeChainContext
+      });
     } else {
-      await performSkillRoll({ toHit: tohit, accuracy: accVal, skillName, speaker: ChatMessage.getSpeaker({ actor: sheet.actor }) });
+      edgeChainContext = createActorSkillEdgeChainContext({
+        actor: sheet.actor,
+        skillIndex: idx,
+        skillName: skill.name || "Skill"
+      });
+      rollResult = await performSkillRoll({
+        toHit: tohit,
+        accuracy: accVal,
+        skillName,
+        speaker: ChatMessage.getSpeaker({ actor: sheet.actor }),
+        edgeChainContext
+      });
     }
-    await consumeSigUse();
+    const useResult = await captureActorRollUndo(
+      sheet.actor,
+      `${skill.name || "Skill"} Skill Use`,
+      consumeSigUse
+    );
+    await attachRollUndoToChatMessage(rollResult?.chatMessage, useResult.undoRecords, {
+      label: `Undo ${skill.name || "Skill"} Roll Effects`
+    });
+    await attachEdgeChainToChatMessage(rollResult?.chatMessage, edgeChainContext, useResult.undoRecords, {
+      preRollRecords: useResult.undoRecords,
+      postRollRecords: []
+    });
   } catch (err) {
     console.warn("Skill roll click failed:", err);
   }

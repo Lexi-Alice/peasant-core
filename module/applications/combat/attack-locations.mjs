@@ -1,5 +1,10 @@
 import { doesPromptResultCountAsActiveDefense } from "../../data/actor/defense-results.mjs";
 import {
+  PC_LOCATION_ROLL_FLAG,
+  buildSupersededLocationRollFlag,
+  normalizeLocationRollFlag
+} from "../../data/location-rolls.mjs";
+import {
   createChosenLocationTableMessage,
   createLocationRollFromSkillOption,
   getTargetedDamageLocationDisplay,
@@ -22,6 +27,14 @@ function createMagnetismTorsoLocationRoll(magnetismGrade) {
     byMagnetism: true,
     magnetismGrade
   };
+}
+
+async function markLocationRollSuperseded(message, reason) {
+  const flag = normalizeLocationRollFlag(message?.getFlag?.("peasant-core", PC_LOCATION_ROLL_FLAG));
+  if (!flag || !message?.setFlag) return;
+  await message.setFlag("peasant-core", PC_LOCATION_ROLL_FLAG, buildSupersededLocationRollFlag(flag, {
+    supersededReason: reason
+  }));
 }
 
 export async function resolveAttackLocationForTarget({
@@ -72,6 +85,7 @@ export async function resolveAttackLocationForTarget({
 
   if (defendedByReflex && locationRoll?.location === "Head") {
     ui.notifications?.info?.("Head deflected by the defensive reflex. Rerolling location.");
+    await markLocationRollSuperseded(locationRoll.chatMessage, "reflex-deflection");
     const rerolledLocation = await rollAutomatedAttackLocation({
       actor,
       attackerToken,

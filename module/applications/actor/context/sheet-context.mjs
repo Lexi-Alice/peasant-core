@@ -1,4 +1,5 @@
 export {
+  buildPeasantActorSourceContext,
   prepareActorAdvantageContext,
   prepareActorAttributeContext,
   prepareActorEdgeContext,

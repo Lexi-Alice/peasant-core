@@ -47,6 +47,7 @@ export async function applyTargetedDamageWorkflow(actor, {
     ? await actor.applyPeasantTargetedDamage({ amount, type, location, isAP, useArmorCharge, ignoreHaltReduction, woundLocation, suppressLocationBreaks })
     : { ok: false, message: "Peasant Core targeted damage workflow is not available for this actor." };
 
+  let chatMessage = null;
   if (result?.damageToGrid > 0 && result?.events?.length > 0) {
     const speaker = chatSpeaker || ChatMessage.getSpeaker({ actor });
     const chatContent = buildDamageTakenChatCard({
@@ -60,8 +61,8 @@ export async function applyTargetedDamageWorkflow(actor, {
       isHybrid: result.isHybrid,
       events: result.events
     });
-    await ChatMessage.create({ user: game.user.id, speaker, content: chatContent });
+    chatMessage = await ChatMessage.create({ user: game.user.id, speaker, content: chatContent });
   }
 
-  return result;
+  return chatMessage ? { ...result, chatMessage } : result;
 }

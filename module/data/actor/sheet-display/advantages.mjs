@@ -40,9 +40,10 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
-export function prepareActorAdvantageContext(data, actor) {
-  const advantageNamesRaw = Array.isArray(actor.system.flexibleAdvantages) ? actor.system.flexibleAdvantages : [];
-  const advantageDescriptionsRaw = Array.isArray(actor.system.flexibleAdvantageDescriptions) ? actor.system.flexibleAdvantageDescriptions : [];
+export function prepareActorAdvantageContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
+  const system = isEditMode && sourceSystem ? sourceSystem : actor.system;
+  const advantageNamesRaw = Array.isArray(system.flexibleAdvantages) ? system.flexibleAdvantages : [];
+  const advantageDescriptionsRaw = Array.isArray(system.flexibleAdvantageDescriptions) ? system.flexibleAdvantageDescriptions : [];
   data.flexibleAdvantages = advantageNamesRaw.map((advantage, index) => {
     const name = (typeof advantage === "string")
       ? advantage

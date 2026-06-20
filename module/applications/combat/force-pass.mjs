@@ -5,6 +5,7 @@ import {
   getStressCapacityForSpendType,
   spendStressForForcePass
 } from "../../data/actor/stress.mjs";
+import { captureActorRollUndo } from "../chat-undo.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { isChainCancelledResult, showForcePassPromptDialog } from "./prompt-dialogs.mjs";
 import { markRollForcedPass } from "./roll-chat-updates.mjs";
@@ -104,7 +105,12 @@ export async function maybeForcePassFailedNotableRoll({
     return { forced: false, stressCost, spendType, reason: "insufficient-capacity" };
   }
 
-  const spendResult = await spendStressForForcePass(actor, spendType, stressCost);
+  const stressSpend = await captureActorRollUndo(
+    actor,
+    `${rollLabel || "Roll"} Force Pass Stress`,
+    () => spendStressForForcePass(actor, spendType, stressCost)
+  );
+  const spendResult = stressSpend.result;
   if (!spendResult?.ok) {
     ui.notifications?.warn?.(`Could not spend ${stressCost} ${getForcePassSpendTypeLabel(spendType)}.`);
     return { forced: false, stressCost, spendType, reason: "spend-failed" };
@@ -135,5 +141,11 @@ export async function maybeForcePassFailedNotableRoll({
     pcLog.debug("Peasant Core | Failed to restyle roll as forced pass", e);
   }
 
-  return { forced: true, stressCost, spendType, reason: isGlancingSuccess ? "glancing-success-upgraded" : "forced-pass" };
+  return {
+    forced: true,
+    stressCost,
+    spendType,
+    reason: isGlancingSuccess ? "glancing-success-upgraded" : "forced-pass",
+    undoRecords: stressSpend.undoRecords
+  };
 }

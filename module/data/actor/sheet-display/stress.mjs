@@ -40,13 +40,18 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
-export function prepareActorStressContext(data, actor, { isEditMode = false } = {}) {
+export function prepareActorStressContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
+  const editSystem = sourceSystem ?? actor.system;
   const physicalCountRaw = Number(actor.system.physicalStressCount);
   const mentalCountRaw = Number(actor.system.mentalStressCount);
   const generalCountRaw = Number(actor.system.generalStressCount);
   const physicalCount = Number.isFinite(physicalCountRaw) ? Math.max(0, Math.floor(physicalCountRaw)) : 4;
   const mentalCount = Number.isFinite(mentalCountRaw) ? Math.max(0, Math.floor(mentalCountRaw)) : 4;
   const generalCount = Number.isFinite(generalCountRaw) ? Math.max(0, Math.floor(generalCountRaw)) : 8;
+  const getCountInput = (key, fallback) => {
+    const value = Number(editSystem?.[key]);
+    return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+  };
 
   data.stress = {
     physical: [],
@@ -87,6 +92,9 @@ export function prepareActorStressContext(data, actor, { isEditMode = false } = 
   const physicalStressBar = buildStressBar(data.stress.physical);
   const mentalStressBar = buildStressBar(data.stress.mental);
   const generalStressBar = buildStressBar(data.stress.general);
+  physicalStressBar.countInput = getCountInput("physicalStressCount", physicalStressBar.count);
+  mentalStressBar.countInput = getCountInput("mentalStressCount", mentalStressBar.count);
+  generalStressBar.countInput = getCountInput("generalStressCount", generalStressBar.count);
   data.stressBars = {
     physical: physicalStressBar,
     mental: mentalStressBar,

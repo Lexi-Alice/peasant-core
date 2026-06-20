@@ -1,4 +1,10 @@
 import { PC_INITIATIVE_LOCKED_FLAG } from "../documents/combat.mjs";
+import {
+  PC_PHASE_MOVEMENT,
+  PC_PHASE_STANDARD,
+  getCombatPhase,
+  getSeizeEligibility
+} from "../data/combat-turn-order.mjs";
 import { requestSeizeTurnFromGM } from "../socket/remote-prompts.mjs";
 import { qsa, qs, toElement } from "./dom.mjs";
 
@@ -121,7 +127,10 @@ export function configureCombatTracker() {
     if (!currentCombatant) return;
 
     const currentIdx = combat.turn;
-    const currentPhase = combat.getFlag("peasant-core", "combatPhase") || 0;
+    const currentPhase = getCombatPhase(combat);
+    const history = combat.getFlag("peasant-core", "turnHistory");
+    const seizedMovementIds = combat.getFlag("peasant-core", "seizedMovement") || [];
+    const seizedStandardIds = combat.getFlag("peasant-core", "seizedStandard") || [];
     const root = toElement(html);
     if (!root) return;
 
@@ -132,26 +141,35 @@ export function configureCombatTracker() {
       if (!combatant || combatant.id === currentCombatant.id) continue;
       if (!userOwnsCombatantForSeize(game.user, combatant)) continue;
 
-      const myIdx = combat.turns.findIndex(c => c.id === id);
-      if (myIdx <= currentIdx) continue;
-
-      const seizedMove = (combat.getFlag("peasant-core", "seizedMovement") || []).includes(id);
-      const seizedStd = (combat.getFlag("peasant-core", "seizedStandard") || []).includes(id);
-
-      let movePassed = false;
-      let stdPassed = false;
-      if (currentPhase === 0) {
-        if (myIdx < currentIdx) movePassed = true;
-      } else {
-        movePassed = true;
-        stdPassed = true;
-      }
+      const moveEligibility = getSeizeEligibility({
+        turns: combat.turns,
+        round: combat.round,
+        history,
+        currentTurn: currentIdx,
+        currentPhase,
+        targetId: id,
+        targetPhase: PC_PHASE_MOVEMENT,
+        seizedMovementIds,
+        seizedStandardIds
+      });
+      const standardEligibility = getSeizeEligibility({
+        turns: combat.turns,
+        round: combat.round,
+        history,
+        currentTurn: currentIdx,
+        currentPhase,
+        targetId: id,
+        targetPhase: PC_PHASE_STANDARD,
+        seizedMovementIds,
+        seizedStandardIds
+      });
+      if (!moveEligibility.ok && !standardEligibility.ok) continue;
 
       const btnContainer = document.createElement("div");
       btnContainer.className = "seize-buttons";
       lockSeizeContainerSize(btnContainer);
 
-      if (!seizedMove && !movePassed) {
+      if (moveEligibility.ok) {
         const moveBtn = document.createElement("button");
         moveBtn.type = "button";
         moveBtn.className = "seize-btn seize-move";
@@ -163,7 +181,7 @@ export function configureCombatTracker() {
         btnContainer.append(moveBtn);
       }
 
-      if (!seizedStd && !stdPassed) {
+      if (standardEligibility.ok) {
         const stdBtn = document.createElement("button");
         stdBtn.type = "button";
         stdBtn.className = "seize-btn seize-std";

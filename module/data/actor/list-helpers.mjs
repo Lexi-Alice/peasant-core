@@ -1,10 +1,12 @@
+import { cloneActorSourceList } from "./source-system.mjs";
+
 export function cloneActorList(source, { normalizeEntry = null } = {}) {
   const list = JSON.parse(JSON.stringify(Array.isArray(source) ? source : []));
   return typeof normalizeEntry === "function" ? list.map(entry => normalizeEntry(entry)) : list;
 }
 
 export function cloneActorListForUpdate(actor, property, options = {}) {
-  return cloneActorList(actor?.system?.[property], options);
+  return cloneActorSourceList(actor, property, options);
 }
 
 export function parseActorListIndex(index) {

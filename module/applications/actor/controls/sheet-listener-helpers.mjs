@@ -1,5 +1,8 @@
 import { sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
+import { getActorSourceSystem } from "../../../data/actor/source-system.mjs";
 import { qsa, qs, toElement } from "../../dom.mjs";
+
+export { getActorSourceSystem };
 
 export function resolveRowIndex(row, attr) {
   const element = toElement(row);
@@ -73,11 +76,12 @@ export function createSheetUpdateQueue(sheet) {
 export function collectAdvantagesFromSheet(sheet) {
   const root = sheet._getSheetJQ?.()?.[0] ?? sheet.element ?? null;
   const items = qsa(root, ".advantages-list .advantage-item");
-  const actorNames = (JSON.parse(JSON.stringify(sheet.actor.system.flexibleAdvantages || [])) || []).map(entry => {
+  const sourceSystem = getActorSourceSystem(sheet.actor);
+  const actorNames = (JSON.parse(JSON.stringify(sourceSystem.flexibleAdvantages || [])) || []).map(entry => {
     if (typeof entry === "string") return entry;
     return String(entry?.name ?? "");
   });
-  const actorDescriptions = JSON.parse(JSON.stringify(sheet.actor.system.flexibleAdvantageDescriptions || []));
+  const actorDescriptions = JSON.parse(JSON.stringify(sourceSystem.flexibleAdvantageDescriptions || []));
   if (items.length === 0) {
     return {
       names: actorNames,

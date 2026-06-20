@@ -1,4 +1,5 @@
 import { normalizeAutomatedCombatHealType, rollAutomatedCombatHeal } from "./automated-heal-rolls.mjs";
+import { attachRollUndoToChatMessage } from "../chat-undo.mjs";
 import { requestIncomingHealApplicationForTarget } from "./incoming-hit.mjs";
 
 export async function resolveSuccessfulHealForTarget({
@@ -32,6 +33,9 @@ export async function resolveSuccessfulHealForTarget({
   if (application?.handled && !application?.applied) {
     ui.notifications?.warn?.(application?.applyResult?.message || `Could not apply healing to ${targetActor.name || "target"}.`);
   }
+  await attachRollUndoToChatMessage(healRoll?.chatMessage, application?.undoRecords, {
+    label: "Undo Heal Effects"
+  });
 
   return {
     handled: !!application?.handled,

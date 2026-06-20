@@ -146,6 +146,38 @@ export function normalizeCombatDefense(rawDefense) {
   };
 }
 
+export function normalizeShieldDurability(rawShield) {
+  return {
+    hp: Math.max(0, Number.parseInt(rawShield?.hp, 10) || 0),
+    hardness: Math.max(0, Number.parseInt(rawShield?.hardness, 10) || 0)
+  };
+}
+
+export function getShieldDurabilityEffectiveHardness(rawShield) {
+  const shield = normalizeShieldDurability(rawShield);
+  return Math.min(shield.hardness, shield.hp);
+}
+
+export function applyShieldDurabilityDamage(rawShield, hpDamage) {
+  const shield = normalizeShieldDurability(rawShield);
+  const damage = Math.max(0, Number.parseInt(hpDamage, 10) || 0);
+  const hpAfter = Math.max(0, shield.hp - damage);
+
+  if (hpAfter <= 0) {
+    return { hp: 0, hardness: 0 };
+  }
+
+  const hardnessDamage = Math.max(0, Math.min(shield.hp, shield.hardness) - hpAfter);
+  const hardnessAfter = Math.max(0, shield.hardness - hardnessDamage);
+  return { hp: hpAfter, hardness: hardnessAfter };
+}
+
+export function getShieldBlockEffectiveHardness(rawDefense) {
+  const defense = normalizeCombatDefense(rawDefense);
+  if (!defense.block || defense.blockType !== "Shield") return 0;
+  return getShieldDurabilityEffectiveHardness(defense);
+}
+
 export function getCombatDefenseSummary(rawDefense) {
   const defense = normalizeCombatDefense(rawDefense);
   return defense.responses.join("/");

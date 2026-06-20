@@ -1,6 +1,7 @@
 import { getAutomatedCombatDamageTypeLabel } from "../../data/actor/combat-damage.mjs";
-import { normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
+import { applyShieldDurabilityDamage, getShieldBlockEffectiveHardness, normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
 import { getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
+import { withPeasantActorSourceWriteContext } from "../../data/actor/source-system.mjs";
 import { applyCombatStressDamageForActor } from "../../data/actor/stress.mjs";
 import {
   getArmorChargeValue,
@@ -10,6 +11,7 @@ import {
 } from "../../data/actor/targeted-damage.mjs";
 import { PC_SOCKET_NAMESPACE, PC_SOCKET_PROMPT_INCOMING_HIT } from "../../socket/remote-prompts.mjs";
 import { pcLog } from "../../utils/logging.mjs";
+import { attachRollUndoToChatMessage, captureActorRollUndo, collectRollUndoRecords } from "../chat-undo.mjs";
 import { getPreferredDefensePromptRecipientUser, resolveDefensePromptActor } from "./actor-targets.mjs";
 import { withWaitingForDefenderResponse } from "./prompt-dialogs.mjs";
 import { applyTargetedDamageWorkflow } from "./targeted-damage-workflow.mjs";
@@ -35,8 +37,8 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
     return { handled: false, applied: false, reason: "invalidShieldBlockDefense" };
   }
 
-  const hardness = Math.max(0, Number.parseInt(defense.hardness, 10) || 0);
   const shieldHpBefore = Math.max(0, Number.parseInt(defense.hp, 10) || 0);
+  const hardness = getShieldBlockEffectiveHardness(defense);
   const damageAfterHardness = Math.max(0, damageAmount - hardness);
   const braced = !!shieldBlock.braced;
 
@@ -55,17 +57,20 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
   const shieldOverflowDamage = Math.max(0, incomingShieldDamage - shieldHpBefore);
   armDamage += shieldOverflowDamage;
 
-  const shieldHpAfter = Math.max(0, shieldHpBefore - shieldDamageApplied);
-  if (shieldHpAfter !== shieldHpBefore) {
+  const shieldDurabilityAfter = applyShieldDurabilityDamage(defense, shieldDamageApplied);
+  const shieldHpAfter = shieldDurabilityAfter.hp;
+  const shieldHardnessAfter = shieldDurabilityAfter.hardness;
+  if (shieldHpAfter !== shieldHpBefore || shieldHardnessAfter !== defense.hardness) {
     combat.defense = {
       ...defense,
-      hp: shieldHpAfter
+      hp: shieldHpAfter,
+      hardness: shieldHardnessAfter
     };
     combats[combatIndex] = combat;
     if (typeof defenderActor.setPeasantNotableCombats === "function") {
       await defenderActor.setPeasantNotableCombats(combats);
     } else {
-      await defenderActor.update({ "system.notableCombats": combats });
+      await defenderActor.update({ "system.notableCombats": combats }, withPeasantActorSourceWriteContext());
     }
   }
 
@@ -96,6 +101,8 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
     shieldOverflowDamage,
     shieldHpBefore,
     shieldHpAfter,
+    shieldHardnessBefore: defense.hardness,
+    shieldHardnessAfter,
     armDamage,
     armLocation: shieldArm,
     armLocationDisplay: getTargetedDamageLocationDisplay(shieldArm),
@@ -169,6 +176,31 @@ export async function applyIncomingHit(payload = {}) {
   const defenderActor = await resolveDefensePromptActor(payload);
   if (!defenderActor) return null;
 
+  const undoCapture = await captureActorRollUndo(
+    defenderActor,
+    `${payload.attackCombatName || "Incoming Hit"} Damage`,
+    () => applyIncomingHitToActor(defenderActor, payload)
+  );
+  if (!undoCapture.result || typeof undoCapture.result !== "object") return undoCapture.result;
+
+  const undoRecords = collectRollUndoRecords(undoCapture.undoRecords, undoCapture.result.undoRecords);
+  await attachIncomingHitUndoToCards(undoCapture.result, undoRecords);
+
+  return {
+    ...undoCapture.result,
+    undoRecords
+  };
+}
+
+async function attachIncomingHitUndoToCards(result, undoRecords) {
+  if (!undoRecords.length) return;
+  const label = "Undo Damage Effects";
+  await attachRollUndoToChatMessage(result?.applyResult?.chatMessage, undoRecords, { label });
+  await attachRollUndoToChatMessage(result?.armApplyResult?.chatMessage, undoRecords, { label });
+  await attachRollUndoToChatMessage(result?.overflowApplyResult?.chatMessage, undoRecords, { label });
+}
+
+async function applyIncomingHitToActor(defenderActor, payload = {}) {
   if (payload.shieldBlock && typeof payload.shieldBlock === "object") {
     return applyIncomingShieldBlock(defenderActor, payload);
   }
@@ -247,6 +279,20 @@ export async function applyIncomingHeal(payload = {}) {
   const targetActor = await resolveDefensePromptActor(payload);
   if (!targetActor) return null;
 
+  const undoCapture = await captureActorRollUndo(
+    targetActor,
+    `${payload.attackCombatName || "Incoming Heal"} Healing`,
+    () => applyIncomingHealToActor(targetActor, payload)
+  );
+  if (!undoCapture.result || typeof undoCapture.result !== "object") return undoCapture.result;
+
+  return {
+    ...undoCapture.result,
+    undoRecords: collectRollUndoRecords(undoCapture.undoRecords, undoCapture.result.undoRecords)
+  };
+}
+
+async function applyIncomingHealToActor(targetActor, payload = {}) {
   const healAmount = Number(payload.healAmount);
   if (!Number.isFinite(healAmount) || healAmount <= 0) {
     return { handled: false, applied: false, reason: "invalidHeal" };
@@ -529,7 +575,10 @@ export async function requestIncomingHitApplicationForTarget({
     try {
       const localApplication = await applyIncomingHit(payload);
       if (localApplication?.handled && localApplication?.applied) {
-        return localApplication;
+        return {
+          ...localApplication,
+          requestPayload: payload
+        };
       }
     } catch (error) {
       console.error("Peasant Core | Local incoming hit apply failed, falling back to remote application.", error);
@@ -547,10 +596,15 @@ export async function requestIncomingHitApplicationForTarget({
   const applicationHandled = !!(applicationResult && typeof applicationResult === "object" && applicationResult.handled);
   const applicationApplied = !!(applicationResult && typeof applicationResult === "object" && applicationResult.applied);
   if (applicationHandled && applicationApplied) {
-    return applicationResult;
+    return {
+      ...applicationResult,
+      requestPayload: payload
+    };
   }
 
-  return applicationResult;
+  return (applicationResult && typeof applicationResult === "object")
+    ? { ...applicationResult, requestPayload: payload }
+    : applicationResult;
 }
 
 export async function requestIncomingHealApplicationForTarget({

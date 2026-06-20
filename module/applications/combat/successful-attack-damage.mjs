@@ -14,9 +14,11 @@ import {
   getTargetedDamageLocationDisplay,
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
+import { attachRollUndoToChatMessage } from "../chat-undo.mjs";
 import { rollAoeReflexSaveForTarget } from "./aoe-reflex-save.mjs";
 import { resolveAttackLocationForTarget } from "./attack-locations.mjs";
 import { rollAutomatedCombatDamage } from "./automated-damage-rolls.mjs";
+import { attachLocationRollWorkflowData } from "./edge-location-rolls.mjs";
 import { requestIncomingHitApplicationForTarget, requestIncomingHitResolutionForTarget } from "./incoming-hit.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
 
@@ -90,6 +92,12 @@ function getAppliedDamageRollTotal(damageRoll) {
 
   const total = Number(damageRoll?.total);
   return Number.isFinite(total) ? total : 0;
+}
+
+async function attachDamageRollUndo(damageRoll, application) {
+  await attachRollUndoToChatMessage(damageRoll?.chatMessage, application?.undoRecords, {
+    label: "Undo Damage Effects"
+  });
 }
 
 export async function resolveSuccessfulAttackDamageForTarget({
@@ -167,6 +175,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
         braced: !!defensePromptResult?.shieldBlockBraced
       }
     });
+    await attachDamageRollUndo(damageRoll, application);
 
     return {
       handled: true,
@@ -234,6 +243,15 @@ export async function resolveSuccessfulAttackDamageForTarget({
         magnetismGrade: getWeaponMasteryMagnetismGrade(combat, defensePromptResult)
       }
     });
+    await attachDamageRollUndo(damageRoll, application);
+    await attachLocationRollWorkflowData(locationRoll, {
+      application,
+      target,
+      attackerActor: actor,
+      attackerToken,
+      combat,
+      defendedByReflex: doesPromptResultCountAsActiveDefense(defensePromptResult)
+    });
 
     return {
       handled: true,
@@ -299,6 +317,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       ignoreHaltReduction: true,
       locationlessDamage: true
     });
+    await attachDamageRollUndo(damageRoll, application);
 
     return {
       handled: true,
@@ -364,6 +383,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       woundLocation: "Torso",
       suppressLocationBreaks: true
     });
+    await attachDamageRollUndo(damageRoll, application);
 
     return {
       handled: true,
@@ -437,6 +457,15 @@ export async function resolveSuccessfulAttackDamageForTarget({
     incomingHitResolution: resolution,
     damageAmountOverride: damageAmount,
     ignoreHaltReduction: overkill
+  });
+  await attachDamageRollUndo(damageRoll, application);
+  await attachLocationRollWorkflowData(locationRoll, {
+    application,
+    target,
+    attackerActor: actor,
+    attackerToken,
+    combat,
+    defendedByReflex: doesPromptResultCountAsActiveDefense(defensePromptResult)
   });
 
   return {

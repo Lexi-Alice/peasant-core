@@ -114,6 +114,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
       defenseMatch: preferredDefenseMatch,
       isOverkillAttack,
       isShieldBlockDefenseMatch,
+      edgeChainContext: payload.edgeChainContext || null,
+      edgeExplodeReroll: payload.edgeExplodeReroll || null,
       rollNotableCombat
     });
     if (automaticResult) return automaticResult;
@@ -283,7 +285,9 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               rollOverrides: {
                 toHit: overrideToHit,
                 accuracy: overrideAccuracy
-              }
+              },
+              edgeChainContext: payload.edgeChainContext || null,
+              edgeExplodeReroll: payload.edgeExplodeReroll || null
             });
             if (isChainCancelledResult(defenseRoll)) {
               finalize({
@@ -428,6 +432,8 @@ async function rollAutomaticFavoriteDefense({
   defenseMatch,
   isOverkillAttack,
   isShieldBlockDefenseMatch,
+  edgeChainContext = null,
+  edgeExplodeReroll = null,
   rollNotableCombat
 } = {}) {
   if (typeof rollNotableCombat !== "function" || !defenderActor || !defenseMatch) return null;
@@ -447,7 +453,9 @@ async function rollAutomaticFavoriteDefense({
     promptForTargets: false,
     targetLabel: attackerName,
     cardClass: "pc-defense-roll-card",
-    rollOverrides
+    rollOverrides,
+    edgeChainContext,
+    edgeExplodeReroll
   });
   if (!defenseRoll) return null;
   const selectedDefense = normalizeCombatDefense(defenseMatch.defense);

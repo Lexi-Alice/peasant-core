@@ -17,10 +17,243 @@ import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, n
 import { getDefaultEdgeLabelMode, normalizeEdgeResourceEntry, sanitizeEdgeLabelMode } from "../data/actor/edge-resources.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor, parseOptionalInteger } from "../data/actor/helpers.mjs";
 import { cloneActorList, cloneActorListForUpdate, ensureActorListEntryAt, patchActorListEntry, removeActorListEntry, reorderActorListEntry } from "../data/actor/list-helpers.mjs";
+import { applyPeasantNumericActiveEffectChange, clampPeasantInteger } from "../data/active-effect/change-modes.mjs";
+import {
+  collectPeasantActiveEffectChangeKeys,
+  isPeasantActiveEffectDynamicKey,
+  isPeasantActiveEffectFoundryDynamicKey,
+  isPeasantActiveEffectVirtualDynamicKey
+} from "../data/active-effect/key-policy.mjs";
 import { parseHpValueCommand } from "../data/actor/hp-commands.mjs";
+import {
+  PEASANT_ACTOR_UPDATE_CONTEXT,
+  getActorSourceSystem,
+  getActorSourceValue,
+  hasPeasantActorUpdateContext,
+  withPeasantActorSourceWriteContext,
+  withPeasantActorStateWriteContext
+} from "../data/actor/source-system.mjs";
 import { applyCombatStressDamageForActor } from "../data/actor/stress.mjs";
 import { TARGETED_DAMAGE_HALT_INDEX_MAP, TARGETED_DAMAGE_HARD_FLAG_MAP, getArmorChargeMultiplier, getArmorChargeValue, getTargetedDamageConditionKey, getTargetedDamageLocationDisplay, getWoundThresholdMultipliers, normalizeAppliedDamageType } from "../data/actor/targeted-damage.mjs";
 import { pcLog } from "../utils/logging.mjs";
+
+function getPeasantActorSourceHp(actor) {
+  return getActorSourceSystem(actor)?.hp ?? actor?.system?.hp ?? {};
+}
+
+function normalizePeasantHpDimension(value, fallback = 1) {
+  const number = Number(value);
+  if (Number.isFinite(number)) return Math.max(1, Math.floor(number));
+  const fallbackNumber = Number(fallback);
+  return Number.isFinite(fallbackNumber) ? Math.max(1, Math.floor(fallbackNumber)) : 1;
+}
+
+function getPeasantHpDimensions(hp, fallbackHp = null) {
+  return {
+    rows: normalizePeasantHpDimension(hp?.rows, fallbackHp?.rows),
+    cols: normalizePeasantHpDimension(hp?.cols, fallbackHp?.cols)
+  };
+}
+
+function normalizePeasantHpGrid(grid, rows, cols) {
+  return Array.from({ length: rows }, (_, rowIndex) => {
+    const row = Array.isArray(grid?.[rowIndex]) ? grid[rowIndex] : [];
+    return Array.from({ length: cols }, (_, colIndex) => {
+      const value = Number(row[colIndex]) || 0;
+      return Math.max(0, Math.min(3, value));
+    });
+  });
+}
+
+function countPeasantRegularHpCellsInDimensions(grid, rows, cols) {
+  let regularCells = 0;
+  for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+    const row = Array.isArray(grid?.[rowIndex]) ? grid[rowIndex] : [];
+    for (let colIndex = 0; colIndex < cols; colIndex++) {
+      if ((Number(row[colIndex]) || 0) === 0) regularCells++;
+    }
+  }
+  return regularCells;
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectUpdateLeafPaths(data, prefix = "", paths = []) {
+  if (!isPlainObject(data)) return paths;
+  for (const [key, value] of Object.entries(data)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (isPlainObject(value)) collectUpdateLeafPaths(value, path, paths);
+    else paths.push(path);
+  }
+  return paths;
+}
+
+function getPathValue(root, path) {
+  if (root && typeof root === "object" && Object.prototype.hasOwnProperty.call(root, path)) return root[path];
+  const getProperty = globalThis.foundry?.utils?.getProperty;
+  if (typeof getProperty === "function") return getProperty(root, path);
+  return String(path).split(".").filter(Boolean).reduce((value, part) => value?.[part], root);
+}
+
+function deletePathValue(root, path) {
+  if (!root || typeof root !== "object") return;
+  if (Object.prototype.hasOwnProperty.call(root, path)) {
+    delete root[path];
+    return;
+  }
+
+  const deleteProperty = globalThis.foundry?.utils?.deleteProperty;
+  if (typeof deleteProperty === "function") {
+    deleteProperty(root, path);
+    return;
+  }
+
+  const parts = String(path).split(".").filter(Boolean);
+  const key = parts.pop();
+  const parent = parts.reduce((value, part) => value?.[part], root);
+  if (parent && key) delete parent[key];
+}
+
+function pruneEmptyUpdateObjects(value) {
+  if (!isPlainObject(value)) return false;
+  for (const [key, child] of Object.entries(value)) {
+    if (isPlainObject(child) && pruneEmptyUpdateObjects(child)) delete value[key];
+  }
+  return Object.keys(value).length === 0;
+}
+
+function valuesEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch (error) {
+    return false;
+  }
+}
+
+function isPathManagedByEffect(path, effectKeys) {
+  for (const key of effectKeys) {
+    if (path === key || path.startsWith(`${key}.`) || key.startsWith(`${path}.`)) return true;
+  }
+  return false;
+}
+
+function getPeasantEffectIterable(collection) {
+  if (!collection || typeof collection === "function") return [];
+  if (typeof collection[Symbol.iterator] === "function") return collection;
+  if (typeof collection.values === "function") return collection.values();
+  if (Array.isArray(collection.contents)) return collection.contents;
+  return [];
+}
+
+function collectPeasantActiveEffectDocuments(actor) {
+  const collections = [
+    actor?.effects?.contents ?? actor?.effects,
+    actor?.temporaryEffects,
+    actor?.appliedEffects
+  ];
+
+  if (typeof actor?.allApplicableEffects === "function") {
+    try {
+      collections.push(actor.allApplicableEffects());
+    } catch (error) {
+      /* Fall back to the known effect collections above. */
+    }
+  }
+
+  const effects = [];
+  const seen = new Set();
+  for (const collection of collections) {
+    for (const effect of getPeasantEffectIterable(collection)) {
+      if (!effect || seen.has(effect)) continue;
+      seen.add(effect);
+      effects.push(effect);
+    }
+  }
+  return effects;
+}
+
+function filterPeasantFoundryActiveEffectChanges(actor) {
+  const restorations = [];
+  for (const effect of collectPeasantActiveEffectDocuments(actor)) {
+    const changes = effect?.changes;
+    if (!Array.isArray(changes)) continue;
+
+    const filtered = changes.filter(change => isPeasantActiveEffectFoundryDynamicKey(change?.key));
+    if (filtered.length === changes.length) continue;
+
+    const original = [...changes];
+    try {
+      changes.splice(0, changes.length, ...filtered);
+      restorations.push({ changes, original });
+    } catch (error) {
+      /* Leave immutable change collections untouched. */
+    }
+  }
+  return restorations;
+}
+
+function restorePeasantActiveEffectChanges(restorations) {
+  for (const restoration of restorations.reverse()) {
+    try {
+      restoration.changes.splice(0, restoration.changes.length, ...restoration.original);
+    } catch (error) {
+      /* The effect document will retain its source changes even if local restoration fails. */
+    }
+  }
+}
+
+const VIRTUAL_HALT_LOCATION_INDEXES = Object.freeze({
+  head: 0,
+  arms: 1,
+  legs: 2,
+  torso: 3
+});
+
+function getPeasantVirtualHaltTarget(path) {
+  const key = String(path ?? "").trim();
+  if (!isPeasantActiveEffectVirtualDynamicKey(key)) return null;
+  const match = key.match(/^system\.(haltValues|naturalHaltValues|naturalhaltValues)\.(head|arms|legs|torso)$/);
+  if (!match) return null;
+  return {
+    field: match[1] === "naturalhaltValues" ? "naturalHaltValues" : match[1],
+    index: VIRTUAL_HALT_LOCATION_INDEXES[match[2]]
+  };
+}
+
+function guardPeasantStateUpdateFromPreparedEffectWrites(actor, changed, options) {
+  if (!hasPeasantActorUpdateContext(options, PEASANT_ACTOR_UPDATE_CONTEXT.STATE_WRITE)) return true;
+  if (hasPeasantActorUpdateContext(options, PEASANT_ACTOR_UPDATE_CONTEXT.SOURCE_WRITE)) return true;
+
+  const effectKeys = new Set([...collectPeasantActiveEffectChangeKeys(actor)].filter(isPeasantActiveEffectDynamicKey));
+  if (!effectKeys.size) return true;
+
+  const removed = [];
+  for (const path of collectUpdateLeafPaths(changed)) {
+    if (!String(path).startsWith("system.")) continue;
+    if (!isPathManagedByEffect(path, effectKeys)) continue;
+
+    const sourceValue = getActorSourceValue(actor, path);
+    const preparedValue = getPathValue(actor?.system, path.replace(/^system\./, ""));
+    const updateValue = getPathValue(changed, path);
+    if (valuesEqual(sourceValue, preparedValue)) continue;
+    if (!valuesEqual(updateValue, preparedValue)) continue;
+
+    deletePathValue(changed, path);
+    removed.push(path);
+  }
+
+  pruneEmptyUpdateObjects(changed);
+  if (removed.length) {
+    console.warn("Peasant Core prevented a state update from saving active-effect prepared values into actor source data.", {
+      actor: actor?.name,
+      paths: removed
+    });
+  }
+  return collectUpdateLeafPaths(changed).length > 0;
+}
 
 export class PeasantActor extends Actor {
   static RESOURCE_NAMES = Object.freeze(["stamina", "attunement", "capacity", "edge", "armorCharge"]);
@@ -58,8 +291,43 @@ export class PeasantActor extends Actor {
     return combats;
   }
 
+  applyActiveEffects(...args) {
+    const restorations = filterPeasantFoundryActiveEffectChanges(this);
+    try {
+      return super.applyActiveEffects(...args);
+    } finally {
+      restorePeasantActiveEffectChanges(restorations);
+    }
+  }
+
+  _applyPeasantVirtualActiveEffectChanges() {
+    const haltValues = normalizeHaltValues(this.system?.haltValues);
+    const naturalHaltValues = normalizeHaltValues(this.system?.naturalHaltValues);
+    const valuesByField = { haltValues, naturalHaltValues };
+    let changed = false;
+
+    for (const effect of collectPeasantActiveEffectDocuments(this)) {
+      if (effect.disabled) continue;
+      for (const change of effect.changes ?? effect._source?.changes ?? []) {
+        const target = getPeasantVirtualHaltTarget(change?.key);
+        if (!target) continue;
+        const values = valuesByField[target.field];
+        values[target.index] = clampPeasantInteger(
+          applyPeasantNumericActiveEffectChange(values[target.index], change.value, change.mode),
+          { min: 0 }
+        );
+        changed = true;
+      }
+    }
+
+    if (!changed) return;
+    this.system.haltValues = haltValues;
+    this.system.naturalHaltValues = naturalHaltValues;
+  }
+
   prepareDerivedData() {
     super.prepareDerivedData();
+    this._applyPeasantVirtualActiveEffectChanges();
 
     pcLog.debug("prepareDerivedData called for actor:", this.name, "type:", this.type);
 
@@ -82,14 +350,9 @@ export class PeasantActor extends Actor {
         max: tempHpMax
       };
     } else if (isPeasantCharacterType(this.type) && this.system.hp && this.system.hp.grid) {
-      const totalCells = this.system.hp.rows * this.system.hp.cols;
-      let regularCells = 0;
-
-      for (let row of this.system.hp.grid) {
-        for (let cell of row) {
-          if (cell === 0) regularCells++;
-        }
-      }
+      const { rows, cols } = getPeasantHpDimensions(this.system.hp);
+      const totalCells = rows * cols;
+      const regularCells = countPeasantRegularHpCellsInDimensions(this.system.hp.grid, rows, cols);
 
       this.system.health = {
         value: regularCells,
@@ -107,6 +370,20 @@ export class PeasantActor extends Actor {
     } else {
       pcLog.debug("Health NOT calculated - type:", this.type, "has hp:", !!this.system.hp, "has grid:", !!this.system.hp?.grid);
     }
+  }
+
+  async _preUpdate(changed, options, user) {
+    const result = await super._preUpdate(changed, options, user);
+    if (result === false) return false;
+    return guardPeasantStateUpdateFromPreparedEffectWrites(this, changed, options);
+  }
+
+  async updatePeasantSourceData(updateData, options = {}) {
+    return this.update(updateData, withPeasantActorSourceWriteContext(options));
+  }
+
+  async updatePeasantStateData(updateData, options = {}) {
+    return this.update(updateData, withPeasantActorStateWriteContext(options));
   }
 
   async _applyPeasantSimplifiedHpDamageValue(scaledDamage) {
@@ -138,7 +415,7 @@ export class PeasantActor extends Actor {
     const newTempHpValue = Math.min(tempHp, newTempHpMax);
     const bolsteredCap = getActorBolsteredMax(this);
 
-    await this.update({
+    await this.updatePeasantStateData({
       "system.health.value": newHealth,
       "system.health.max": maxHealth,
       "system.temporaryHp.value": newTempHpValue,
@@ -183,13 +460,13 @@ export class PeasantActor extends Actor {
 
     if (remaining > 0) hp.applyDamage(dmgType, remaining, hardLocation);
 
-    const totalCells = hp.rows * hp.cols;
-    let regularCells = 0;
-    for (let row of hp.grid) for (let cell of row) if (cell === 0) regularCells++;
+    const { rows, cols } = getPeasantHpDimensions(hp);
+    const totalCells = rows * cols;
+    const regularCells = countPeasantRegularHpCellsInDimensions(hp.grid, rows, cols);
     const newTempHpMax = totalCells - regularCells;
     const newTempHpValue = Math.min(tempHp, newTempHpMax);
 
-    await this.update({
+    await this.updatePeasantStateData({
       "system.hp.grid": hp.grid.map(row => [...row]),
       "system.health.value": regularCells,
       "system.health.max": totalCells,
@@ -357,7 +634,7 @@ export class PeasantActor extends Actor {
     const conditionUpdates = {};
     if (newWoundedState !== isAlreadyWounded) conditionUpdates["system.conditions.wounded"] = newWoundedState;
     if (!suppressLocationBreaks && newLocStatus !== currentLocStatus) conditionUpdates[`system.conditions.${locKey}`] = newLocStatus;
-    if (Object.keys(conditionUpdates).length > 0) await this.update(conditionUpdates);
+    if (Object.keys(conditionUpdates).length > 0) await this.updatePeasantStateData(conditionUpdates);
 
     const gridDamageType = isHybrid ? "lethal" : normalizedType;
     if (damageToGrid > 0) {
@@ -376,18 +653,14 @@ export class PeasantActor extends Actor {
       }
     }
 
-    const totalCells = hp.rows * hp.cols;
-    let regularCells = 0;
-    for (const rowData of hp.grid) {
-      for (const cellState of rowData) {
-        if (cellState === 0) regularCells++;
-      }
-    }
+    const { rows, cols } = getPeasantHpDimensions(hp);
+    const totalCells = rows * cols;
+    const regularCells = countPeasantRegularHpCellsInDimensions(hp.grid, rows, cols);
 
     const newTempHpMax = totalCells - regularCells;
     const newTempHpValue = Math.min(tempHp, newTempHpMax);
 
-    await this.update({
+    await this.updatePeasantStateData({
       "system.hp.grid": hp.grid.map(row => [...row]),
       "system.health.value": regularCells,
       "system.health.max": totalCells,
@@ -483,18 +756,14 @@ export class PeasantActor extends Actor {
     if (remainingCounts.lethal > 0) hp.applyDamage("lethal", remainingCounts.lethal, false);
     if (remainingCounts.blunt > 0) hp.applyDamage("blunt", remainingCounts.blunt, false);
 
-    const totalCells = hp.rows * hp.cols;
-    let regularCells = 0;
-    for (const rowData of hp.grid) {
-      for (const cellState of rowData) {
-        if (cellState === 0) regularCells++;
-      }
-    }
+    const { rows, cols } = getPeasantHpDimensions(hp);
+    const totalCells = rows * cols;
+    const regularCells = countPeasantRegularHpCellsInDimensions(hp.grid, rows, cols);
 
     const newTempHpMax = totalCells - regularCells;
     const newTempHpValue = Math.min(tempHp, newTempHpMax);
 
-    await this.update({
+    await this.updatePeasantStateData({
       "system.hp.grid": hp.grid.map(row => [...row]),
       "system.health.value": regularCells,
       "system.health.max": totalCells,
@@ -550,7 +819,7 @@ export class PeasantActor extends Actor {
         updates["system.temporaryHp.max"] = tempHpMax;
         updates["system.health.value"] = currentHealth;
         updates["system.health.max"] = maxHealth;
-        await this.update(updates);
+        await this.updatePeasantStateData(updates);
         return {
           ok: true,
           value: currentHealth,
@@ -588,7 +857,7 @@ export class PeasantActor extends Actor {
       updates["system.temporaryHp.value"] = newTempHpValue;
       updates["system.temporaryHp.max"] = newTempHpMax;
       updates["system.bolsteredHp"] = newBolsteredHp;
-      await this.update(updates);
+      await this.updatePeasantStateData(updates);
       return {
         ok: true,
         value: newHealth,
@@ -604,9 +873,9 @@ export class PeasantActor extends Actor {
     }
 
     const hp = JSON.parse(JSON.stringify(hpData || { rows: 0, cols: 0, grid: [] }));
-    const totalCells = hp.rows * hp.cols;
-    let regularCells = 0;
-    for (let row of hp.grid) for (let cell of row) if (cell === 0) regularCells++;
+    const { rows, cols } = getPeasantHpDimensions(hp);
+    const totalCells = rows * cols;
+    let regularCells = countPeasantRegularHpCellsInDimensions(hp.grid, rows, cols);
 
     const tempHpMax = totalCells - regularCells;
     const currentTempHp = this.system.temporaryHp?.value || 0;
@@ -627,8 +896,8 @@ export class PeasantActor extends Actor {
       tempHpGranted = Math.min(remaining, canGrantTempHp);
       remaining -= tempHpGranted;
 
-      for (let r = hp.rows - 1; r >= 0 && remaining > 0; r--) {
-        for (let c = hp.cols - 1; c >= 0 && remaining > 0; c--) {
+      for (let r = rows - 1; r >= 0 && remaining > 0; r--) {
+        for (let c = cols - 1; c >= 0 && remaining > 0; c--) {
           if (hp.grid[r][c] > 0) {
             const healedCell = Number(hp.grid[r][c]) || 0;
             if (healedCell === 1) healedDamageCounts.blunt += 1;
@@ -643,13 +912,12 @@ export class PeasantActor extends Actor {
       const previousBolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
       let newBolsteredHp = previousBolsteredHp;
       if (remaining > 0) {
-        const bolsteredHpGenerated = Math.min(Math.floor(remaining / 2), hp.cols);
+        const bolsteredHpGenerated = Math.min(Math.floor(remaining / 2), cols);
         newBolsteredHp = Math.min(getActorBolsteredMax(this), previousBolsteredHp + bolsteredHpGenerated);
       }
       bolsteredHpGained = Math.max(0, newBolsteredHp - previousBolsteredHp);
 
-      regularCells = 0;
-      for (let row of hp.grid) for (let cell of row) if (cell === 0) regularCells++;
+      regularCells = countPeasantRegularHpCellsInDimensions(hp.grid, rows, cols);
       const newTempHpMax = totalCells - regularCells;
       const newTempHpValue = Math.min(currentTempHp + tempHpGranted, newTempHpMax);
 
@@ -661,7 +929,7 @@ export class PeasantActor extends Actor {
       if (newBolsteredHp !== previousBolsteredHp) updates["system.bolsteredHp"] = newBolsteredHp;
     }
 
-    await this.update(updates);
+    await this.updatePeasantStateData(updates);
     return {
       ok: true,
       value: regularCells,
@@ -712,10 +980,10 @@ export class PeasantActor extends Actor {
         case "Stamina": {
           const currentStamina = this.system?.stamina?.value || 0;
           if (currentStamina >= remaining) {
-            await this.update({ "system.stamina.value": currentStamina - remaining });
+            await this.updatePeasantStateData({ "system.stamina.value": currentStamina - remaining });
           } else {
             if (currentStamina > 0) {
-              await this.update({ "system.stamina.value": 0 });
+              await this.updatePeasantStateData({ "system.stamina.value": 0 });
               remaining -= currentStamina;
             }
             if (remaining > 0) {
@@ -731,20 +999,20 @@ export class PeasantActor extends Actor {
         case "Attunement": {
           const currentAttunement = this.system?.attunement?.value || 0;
           if (currentAttunement >= remaining) {
-            await this.update({ "system.attunement.value": currentAttunement - remaining });
+            await this.updatePeasantStateData({ "system.attunement.value": currentAttunement - remaining });
           } else {
             if (currentAttunement > 0) {
-              await this.update({ "system.attunement.value": 0 });
+              await this.updatePeasantStateData({ "system.attunement.value": 0 });
               remaining -= currentAttunement;
             }
 
             const currentCapacity = this.system?.capacity?.value || 0;
             if (currentCapacity >= remaining) {
-              await this.update({ "system.capacity.value": currentCapacity - remaining });
+              await this.updatePeasantStateData({ "system.capacity.value": currentCapacity - remaining });
               remaining = 0;
             } else {
               if (currentCapacity > 0) {
-                await this.update({ "system.capacity.value": 0 });
+                await this.updatePeasantStateData({ "system.capacity.value": 0 });
                 remaining -= currentCapacity;
               }
 
@@ -796,14 +1064,10 @@ export class PeasantActor extends Actor {
     const hp = this.system?.hp;
     if (hp?.applyDamage) {
       hp.applyDamage(dmgType, amount, false);
-      const totalCells = hp.rows * hp.cols;
-      let regularCells = 0;
-      for (const row of hp.grid) {
-        for (const cell of row) {
-          if (cell === 0) regularCells++;
-        }
-      }
-      await this.update({
+      const { rows, cols } = getPeasantHpDimensions(hp);
+      const totalCells = rows * cols;
+      const regularCells = countPeasantRegularHpCellsInDimensions(hp.grid, rows, cols);
+      await this.updatePeasantStateData({
         "system.hp.grid": hp.grid.map((row) => [...row]),
         "system.health.value": regularCells,
         "system.health.max": totalCells
@@ -814,7 +1078,8 @@ export class PeasantActor extends Actor {
   }
 
   async consumePeasantCombatUse(combatIndex) {
-    const combats = JSON.parse(JSON.stringify(this.system?.notableCombats || []));
+    const system = getActorSourceSystem(this);
+    const combats = JSON.parse(JSON.stringify(system?.notableCombats || []));
     if (!combats[combatIndex]) return { ok: false, changed: false };
 
     let changed = false;
@@ -837,7 +1102,7 @@ export class PeasantActor extends Actor {
 
     if (!changed) return { ok: true, changed: false };
 
-    await this.update({ "system.notableCombats": combats });
+    await this.updatePeasantStateData({ "system.notableCombats": combats });
     return { ok: true, changed: true };
   }
 
@@ -924,7 +1189,7 @@ export class PeasantActor extends Actor {
   async setPeasantNotableCombats(combats, options = {}) {
     const list = cloneActorList(combats);
     PeasantActor.ensurePeasantNotableCombatIds(list);
-    await this.update({ "system.notableCombats": list }, options);
+    await this.updatePeasantSourceData({ "system.notableCombats": list }, options);
     return { ok: true, changed: true, combats: list };
   }
 
@@ -1355,7 +1620,7 @@ export class PeasantActor extends Actor {
     if (fillOnlyWhenEmpty && currentValue > 0) return { ok: true, changed: false, value: currentValue, max };
 
     const nextValue = currentValue <= 0 ? max : Math.min(currentValue, max);
-    await this.update({
+    await this.updatePeasantSourceData({
       [`system.${resourceName}.value`]: nextValue,
       [`system.${resourceName}.max`]: max
     });
@@ -1368,7 +1633,7 @@ export class PeasantActor extends Actor {
 
     const max = Math.max(0, Number(this.system?.[resourceName]?.max) || 0);
     const value = Math.max(0, Math.min(Number.parseInt(rawValue, 10) || 0, max));
-    await this.update({ [`system.${resourceName}.value`]: value });
+    await this.updatePeasantStateData({ [`system.${resourceName}.value`]: value });
     return { ok: true, changed: true, value, max };
   }
 
@@ -1377,14 +1642,14 @@ export class PeasantActor extends Actor {
     if (!resourceName) return { ok: false, message: "Unknown resource." };
 
     const max = Math.max(0, Number(this.system?.[resourceName]?.max) || 0);
-    await this.update({ [`system.${resourceName}.value`]: max });
+    await this.updatePeasantStateData({ [`system.${resourceName}.value`]: max });
     return { ok: true, changed: true, value: max, max };
   }
 
   async setPeasantBolsteredHp(rawValue) {
     const max = getActorBolsteredMax(this);
     const value = Math.max(0, Math.min(Number.parseInt(rawValue, 10) || 0, max));
-    await this.update({ "system.bolsteredHp": value });
+    await this.updatePeasantStateData({ "system.bolsteredHp": value });
     return { ok: true, changed: true, value, max };
   }
 
@@ -1395,7 +1660,7 @@ export class PeasantActor extends Actor {
     const value = Math.min(requested, max);
     const update = { "system.temporaryHp.value": value };
     if (expandMax) update["system.temporaryHp.max"] = max;
-    await this.update(update);
+    await this.updatePeasantStateData(update);
     return { ok: true, changed: true, value, max };
   }
 
@@ -1409,7 +1674,7 @@ export class PeasantActor extends Actor {
     const tempMax = Math.max(0, max - value);
     const bolstered = Math.max(0, Number(this.system?.bolsteredHp) || 0);
 
-    await this.update({
+    await this.updatePeasantSourceData({
       "system.health.max": max,
       "system.health.value": value,
       "system.temporaryHp.max": tempMax,
@@ -1426,7 +1691,7 @@ export class PeasantActor extends Actor {
     const value = Math.max(0, Math.min(Number.parseInt(rawValue, 10) || 0, max));
     const currentTemp = Math.max(0, Number(this.system?.temporaryHp?.value) || 0);
     const tempMax = Math.max(0, max - value);
-    await this.update({
+    await this.updatePeasantStateData({
       "system.health.value": value,
       "system.temporaryHp.max": tempMax,
       "system.temporaryHp.value": Math.min(currentTemp, tempMax)
@@ -1434,75 +1699,63 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true, value, max, tempMax };
   }
 
-  async updatePeasantHpGrid(grid, rows, cols) {
+  async updatePeasantHpGrid(grid, rows, cols, { persistDimensions = true } = {}) {
     if (isSimplifiedHpActor(this)) return { ok: false, message: "Actor uses simplified HP." };
 
-    const safeRows = Math.max(1, Number(rows) || 1);
-    const safeCols = Math.max(1, Number(cols) || 1);
-    const safeGrid = Array.from({ length: safeRows }, (_, rowIndex) => {
-      const row = Array.isArray(grid?.[rowIndex]) ? grid[rowIndex] : [];
-      return Array.from({ length: safeCols }, (_, colIndex) => {
-        const value = Number(row[colIndex]) || 0;
-        return Math.max(0, Math.min(3, value));
-      });
-    });
+    const safeRows = normalizePeasantHpDimension(rows);
+    const safeCols = normalizePeasantHpDimension(cols);
+    const safeGrid = normalizePeasantHpGrid(grid, safeRows, safeCols);
 
     const totalCells = safeRows * safeCols;
-    let regularCells = 0;
-    for (const row of safeGrid) {
-      for (const cell of row) {
-        if (cell === 0) regularCells++;
-      }
-    }
+    const regularCells = countPeasantRegularHpCellsInDimensions(safeGrid, safeRows, safeCols);
 
     const tempMax = Math.max(0, totalCells - regularCells);
     const currentTemp = Math.max(0, Number(this.system?.temporaryHp?.value) || 0);
 
-    await this.update({
-      "system.hp.rows": safeRows,
-      "system.hp.cols": safeCols,
+    const updateData = {
       "system.hp.grid": safeGrid.map(row => [...row]),
       "system.health.value": regularCells,
       "system.health.max": totalCells,
       "system.temporaryHp.value": Math.min(currentTemp, tempMax),
       "system.temporaryHp.max": tempMax
-    });
+    };
+
+    if (persistDimensions) {
+      updateData["system.hp.rows"] = safeRows;
+      updateData["system.hp.cols"] = safeCols;
+    }
+
+    if (persistDimensions) await this.updatePeasantSourceData(updateData);
+    else await this.updatePeasantStateData(updateData);
 
     return { ok: true, changed: true, rows: safeRows, cols: safeCols, grid: safeGrid, value: regularCells, max: totalCells, tempMax };
   }
 
   async resizePeasantHpGrid(rowDelta = 0, colDelta = 0) {
-    const hp = this.system?.hp ?? {};
-    const currentRows = Math.max(1, Number(hp.rows) || 1);
-    const currentCols = Math.max(1, Number(hp.cols) || 1);
+    const hp = getPeasantActorSourceHp(this);
+    const { rows: currentRows, cols: currentCols } = getPeasantHpDimensions(hp);
     const rows = Math.max(1, currentRows + (Number(rowDelta) || 0));
     const cols = Math.max(1, currentCols + (Number(colDelta) || 0));
     const sourceGrid = Array.isArray(hp.grid) ? hp.grid : [];
-    const grid = Array.from({ length: rows }, (_, rowIndex) => {
-      const row = Array.isArray(sourceGrid[rowIndex]) ? sourceGrid[rowIndex] : [];
-      return Array.from({ length: cols }, (_, colIndex) => Number(row[colIndex]) || 0);
-    });
+    const grid = normalizePeasantHpGrid(sourceGrid, rows, cols);
 
     return this.updatePeasantHpGrid(grid, rows, cols);
   }
 
   async setPeasantHpGridCell(row, col, rawValue) {
     const hp = this.system?.hp ?? {};
-    const rows = Math.max(1, Number(hp.rows) || 1);
-    const cols = Math.max(1, Number(hp.cols) || 1);
+    const { rows, cols } = getPeasantHpDimensions(hp);
     const numericRow = Number.parseInt(row, 10);
     const numericCol = Number.parseInt(col, 10);
     if (!Number.isFinite(numericRow) || !Number.isFinite(numericCol)) return { ok: false, changed: false };
     if (numericRow < 0 || numericCol < 0 || numericRow >= rows || numericCol >= cols) return { ok: false, changed: false };
 
-    const sourceGrid = Array.isArray(hp.grid) ? hp.grid : [];
-    const grid = Array.from({ length: rows }, (_, rowIndex) => {
-      const sourceRow = Array.isArray(sourceGrid[rowIndex]) ? sourceGrid[rowIndex] : [];
-      return Array.from({ length: cols }, (_, colIndex) => Number(sourceRow[colIndex]) || 0);
-    });
+    const sourceHp = getPeasantActorSourceHp(this);
+    const sourceGrid = Array.isArray(sourceHp.grid) ? sourceHp.grid : (Array.isArray(hp.grid) ? hp.grid : []);
+    const grid = normalizePeasantHpGrid(sourceGrid, rows, cols);
     grid[numericRow][numericCol] = Math.max(0, Math.min(3, Number(rawValue) || 0));
 
-    return this.updatePeasantHpGrid(grid, rows, cols);
+    return this.updatePeasantHpGrid(grid, rows, cols, { persistDimensions: false });
   }
 
   async cyclePeasantHpGridCell(row, col) {
@@ -1522,24 +1775,25 @@ export class PeasantActor extends Actor {
   async setPeasantStressGridSize(rawType, rawCount = 0) {
     const type = this.getPeasantStressType(rawType);
     const countField = `${type}StressCount`;
-    const currentCount = Math.max(0, Number(this.system?.[countField]) || 0);
+    const sourceSystem = getActorSourceSystem(this);
+    const currentCount = Math.max(0, Number(sourceSystem?.[countField]) || 0);
     const count = Math.max(0, Number.parseInt(rawCount, 10) || 0);
     const updateData = { [`system.${countField}`]: count };
 
     for (let index = currentCount; index < count; index++) {
-      if (this.system?.[`${type}${index}`] === undefined) {
+      if (sourceSystem?.[`${type}${index}`] === undefined) {
         updateData[`system.${type}${index}`] = 0;
       }
     }
 
-    await this.update(updateData);
+    await this.updatePeasantSourceData(updateData);
     return { ok: true, changed: true, type, count };
   }
 
   async resizePeasantStressGrid(rawType, delta = 0) {
     const type = this.getPeasantStressType(rawType);
     const countField = `${type}StressCount`;
-    const currentCount = Math.max(0, Number(this.system?.[countField]) || 0);
+    const currentCount = Math.max(0, Number(getActorSourceSystem(this)?.[countField]) || 0);
     return this.setPeasantStressGridSize(type, currentCount + (Number(delta) || 0));
   }
 
@@ -1550,7 +1804,7 @@ export class PeasantActor extends Actor {
     if (!Number.isFinite(index) || index < 0 || index >= count) return { ok: false, changed: false };
 
     const value = Math.max(0, Math.min(3, Number(rawValue) || 0));
-    await this.update({ [`system.${type}${index}`]: value });
+    await this.updatePeasantStateData({ [`system.${type}${index}`]: value });
     return { ok: true, changed: true, type, index, value };
   }
 
@@ -1568,7 +1822,7 @@ export class PeasantActor extends Actor {
     const count = Math.max(0, Number(this.system?.[`${type}StressCount`]) || 0);
     const updateData = {};
     for (let index = 0; index < count; index++) updateData[`system.${type}${index}`] = 0;
-    if (Object.keys(updateData).length) await this.update(updateData);
+    if (Object.keys(updateData).length) await this.updatePeasantStateData(updateData);
     return { ok: true, changed: Object.keys(updateData).length > 0, type, count };
   }
 
@@ -1604,7 +1858,7 @@ export class PeasantActor extends Actor {
     states.forEach((value, index) => {
       updates[`system.${type}${index}`] = value;
     });
-    if (Object.keys(updates).length) await this.update(updates);
+    if (Object.keys(updates).length) await this.updatePeasantStateData(updates);
     return { ok: true, changed: Object.keys(updates).length > 0, type, remaining };
   }
 
@@ -1649,7 +1903,11 @@ export class PeasantActor extends Actor {
     return updateData;
   }
 
-  countPeasantRegularHpCells(grid) {
+  countPeasantRegularHpCells(grid, rows = null, cols = null) {
+    if (Number.isFinite(rows) && Number.isFinite(cols)) {
+      return countPeasantRegularHpCellsInDimensions(grid, Math.max(0, Math.floor(rows)), Math.max(0, Math.floor(cols)));
+    }
+
     let regularCells = 0;
     for (const row of grid) {
       if (!Array.isArray(row)) continue;
@@ -1701,7 +1959,7 @@ export class PeasantActor extends Actor {
     else if (hasLethal) healCells(2, 1);
 
     const totalCells = rows * cols;
-    const regularCells = this.countPeasantRegularHpCells(grid);
+    const regularCells = this.countPeasantRegularHpCells(grid, rows, cols);
     const tempMax = Math.max(0, totalCells - regularCells);
 
     updateData["system.hp.grid"] = grid.map(row => [...row]);
@@ -1717,7 +1975,7 @@ export class PeasantActor extends Actor {
     this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "armorCharge"]);
     this.addPeasantStressClearUpdates(updateData, ["physical", "mental"]);
 
-    await this.update(updateData);
+    await this.updatePeasantStateData(updateData);
     return { ok: true, changed: true };
   }
 
@@ -1728,7 +1986,7 @@ export class PeasantActor extends Actor {
     this.addPeasantLongRestHpRecoveryUpdates(updateData);
     this.addPeasantStressRecoveryUpdates(updateData, "general", 3);
 
-    await this.update(updateData);
+    await this.updatePeasantStateData(updateData);
     return { ok: true, changed: true };
   }
 
@@ -1760,7 +2018,7 @@ export class PeasantActor extends Actor {
     updateData["system.temporaryHp.value"] = 0;
     updateData["system.temporaryHp.max"] = 0;
 
-    await this.update(updateData);
+    await this.updatePeasantStateData(updateData);
     return { ok: true, changed: true };
   }
 
@@ -1784,14 +2042,14 @@ export class PeasantActor extends Actor {
     const update = key === "wounded"
       ? { "system.conditions.wounded": false }
       : { [`system.conditions.${key}`]: "" };
-    await this.update(update);
+    await this.updatePeasantStateData(update);
     return { ok: true, changed: true, hasConditions: this.hasPeasantConditions() };
   }
 
   async addPeasantWound(rawWoundType) {
     const woundType = String(rawWoundType ?? "").trim();
     if (woundType === "wounded") {
-      await this.update({ "system.conditions.wounded": true });
+      await this.updatePeasantStateData({ "system.conditions.wounded": true });
       return { ok: true, changed: true, hasConditions: true };
     }
 
@@ -1802,7 +2060,7 @@ export class PeasantActor extends Actor {
       return { ok: false, changed: false };
     }
 
-    await this.update({ [`system.conditions.${location}`]: status });
+    await this.updatePeasantStateData({ [`system.conditions.${location}`]: status });
     return { ok: true, changed: true, hasConditions: true, location, status };
   }
 
@@ -1811,7 +2069,7 @@ export class PeasantActor extends Actor {
     for (const key of PeasantActor.CONDITION_KEYS) {
       if (key !== "wounded") update[`system.conditions.${key}`] = "";
     }
-    await this.update(update);
+    await this.updatePeasantStateData(update);
     return { ok: true, changed: true };
   }
 
@@ -1822,7 +2080,7 @@ export class PeasantActor extends Actor {
     const safeTarget = safeType && PeasantActor.BLESSING_TARGETS.includes(target) ? target : "";
 
     const blessing = safeType ? { type: safeType, target: safeTarget } : { type: "", target: "" };
-    await this.update({ "system.blessing": blessing });
+    await this.updatePeasantStateData({ "system.blessing": blessing });
     return { ok: true, changed: true, blessing };
   }
 
@@ -1842,7 +2100,7 @@ export class PeasantActor extends Actor {
     } catch (e) {
       // Ignore local model write failures; update below remains authoritative.
     }
-    await this.update({ "system.toHitPenaltyTarget": target });
+    await this.updatePeasantStateData({ "system.toHitPenaltyTarget": target });
     return { ok: true, changed: true, target };
   }
 
@@ -1855,7 +2113,7 @@ export class PeasantActor extends Actor {
   async setPeasantReflexAoeSave(enabled, rawTarget = "", options = {}) {
     const isEnabled = !!enabled;
     const target = isEnabled ? parseOptionalInteger(rawTarget, { min: 1 }) : null;
-    await this.update({
+    await this.updatePeasantSourceData({
       "system.reflexAoeSaveEnabled": isEnabled,
       "system.reflexAoeSaveTarget": target
     }, options);
@@ -1870,26 +2128,26 @@ export class PeasantActor extends Actor {
       ? `naturalHard${location}`
       : `hard${location}`;
     const value = !this.system?.[field];
-    await this.update({ [`system.${field}`]: value });
+    await this.updatePeasantSourceData({ [`system.${field}`]: value });
     return { ok: true, changed: true, field, value };
   }
 
   async setPeasantMovement(rawValue) {
     const movement = Math.max(0, Number.parseInt(rawValue, 10) || 0);
-    await this.update({ "system.movement": movement });
+    await this.updatePeasantSourceData({ "system.movement": movement });
     return { ok: true, changed: true, movement };
   }
 
   async setPeasantInitiative(rawValue, options = {}) {
     const initiative = parseOptionalInteger(rawValue, { allowSign: true });
-    await this.update({ "system.initiative": initiative }, options);
+    await this.updatePeasantSourceData({ "system.initiative": initiative }, options);
     return { ok: true, changed: true, initiative };
   }
 
   async setPeasantHaltValues(rawValues, { natural = false, render } = {}) {
     const field = natural ? "naturalHaltValues" : "haltValues";
     const values = normalizeHaltValues(rawValues);
-    await this.update({ [`system.${field}`]: values }, { render });
+    await this.updatePeasantSourceData({ [`system.${field}`]: values }, { render });
     return { ok: true, changed: true, field, values };
   }
 
@@ -1911,7 +2169,7 @@ export class PeasantActor extends Actor {
       if (key !== "wounded") conditionUpdates[`system.conditions.${key}`] = "";
     }
 
-    await this.update({
+    await this.updatePeasantSourceData({
       "system.health.value": value,
       "system.health.max": max,
       "system.temporaryHp.value": tempValue,
@@ -1924,7 +2182,8 @@ export class PeasantActor extends Actor {
   }
 
   getPeasantCombatHaltBuffsForUpdate() {
-    return sanitizeCombatHaltBuffs(this.system?.combatMods?.haltBuffs);
+    const system = getActorSourceSystem(this);
+    return sanitizeCombatHaltBuffs(system?.combatMods?.haltBuffs);
   }
 
   hasPeasantCombatHaltBuffType(buffs, rawType) {
@@ -1962,7 +2221,7 @@ export class PeasantActor extends Actor {
     }
 
     buffs.push(entry);
-    await this.update({ "system.combatMods.haltBuffs": sanitizeCombatHaltBuffs(buffs) }, options);
+    await this.updatePeasantSourceData({ "system.combatMods.haltBuffs": sanitizeCombatHaltBuffs(buffs) }, options);
     return { ok: true, changed: true, entry, buffs };
   }
 
@@ -1974,7 +2233,7 @@ export class PeasantActor extends Actor {
     if (numericIndex >= buffs.length) return { ok: false, changed: false };
 
     const [removed] = buffs.splice(numericIndex, 1);
-    await this.update({ "system.combatMods.haltBuffs": buffs }, options);
+    await this.updatePeasantSourceData({ "system.combatMods.haltBuffs": buffs }, options);
     return { ok: true, changed: true, removed, buffs };
   }
 
@@ -1987,7 +2246,7 @@ export class PeasantActor extends Actor {
 
     buffs[numericIndex] = { ...buffs[numericIndex], ...patch };
     const sanitized = sanitizeCombatHaltBuffs(buffs);
-    await this.update({ "system.combatMods.haltBuffs": sanitized }, options);
+    await this.updatePeasantSourceData({ "system.combatMods.haltBuffs": sanitized }, options);
     return { ok: true, changed: true, entry: sanitized[numericIndex], buffs: sanitized };
   }
 
@@ -2067,7 +2326,7 @@ export class PeasantActor extends Actor {
 
   async setPeasantSkills(skills, options = {}) {
     const list = cloneActorList(skills, { normalizeEntry: PeasantActor.createDefaultPeasantSkillEntry });
-    await this.update({ "system.skills": list }, options);
+    await this.updatePeasantSourceData({ "system.skills": list }, options);
     return { ok: true, changed: true, skills: list };
   }
 
@@ -2191,15 +2450,16 @@ export class PeasantActor extends Actor {
     if (current <= 0) return { ok: true, changed: false, skills };
 
     skills[numericIndex].usesCurrent = Math.max(0, current - 1);
-    await this.update({ "system.skills": skills }, options);
+    await this.updatePeasantStateData({ "system.skills": skills }, options);
     return { ok: true, changed: true, skills };
   }
 
   getPeasantFlexibleAdvantagesForUpdate(names = null, descriptions = null) {
-    const sourceNames = Array.isArray(names) ? names : (Array.isArray(this.system?.flexibleAdvantages) ? this.system.flexibleAdvantages : []);
+    const system = getActorSourceSystem(this);
+    const sourceNames = Array.isArray(names) ? names : (Array.isArray(system?.flexibleAdvantages) ? system.flexibleAdvantages : []);
     const sourceDescriptions = Array.isArray(descriptions)
       ? descriptions
-      : (Array.isArray(this.system?.flexibleAdvantageDescriptions) ? this.system.flexibleAdvantageDescriptions : []);
+      : (Array.isArray(system?.flexibleAdvantageDescriptions) ? system.flexibleAdvantageDescriptions : []);
     const safeNames = sourceNames.map(entry => {
       if (typeof entry === "string") return entry;
       return String(entry?.name ?? "");
@@ -2212,7 +2472,7 @@ export class PeasantActor extends Actor {
 
   async setPeasantFlexibleAdvantages(names, descriptions, options = {}) {
     const safe = this.getPeasantFlexibleAdvantagesForUpdate(names, descriptions);
-    await this.update({
+    await this.updatePeasantSourceData({
       "system.flexibleAdvantages": safe.names,
       "system.flexibleAdvantageDescriptions": safe.descriptions
     }, options);
@@ -2263,12 +2523,14 @@ export class PeasantActor extends Actor {
   }
 
   getPeasantEdgeBaseMode() {
-    return sanitizeEdgeLabelMode(this.system?.edgeLabelMode, getDefaultEdgeLabelMode(this));
+    const system = getActorSourceSystem(this);
+    return sanitizeEdgeLabelMode(system?.edgeLabelMode, getDefaultEdgeLabelMode(this));
   }
 
   getPeasantEdgeResourcesForUpdate() {
     const baseMode = this.getPeasantEdgeBaseMode();
-    const existing = Array.isArray(this.system?.edgeResources) ? this.system.edgeResources : [];
+    const system = getActorSourceSystem(this);
+    const existing = Array.isArray(system?.edgeResources) ? system.edgeResources : [];
     return existing.map(entry => normalizeEdgeResourceEntry(entry, baseMode));
   }
 
@@ -2283,7 +2545,7 @@ export class PeasantActor extends Actor {
     const resources = this.getPeasantEdgeResourcesForUpdate();
     const baseMode = this.getPeasantEdgeBaseMode();
     resources.push({ labelMode: baseMode, customLabel: "", value: 0, max: 0 });
-    await this.update({ "system.edgeResources": resources });
+    await this.updatePeasantSourceData({ "system.edgeResources": resources });
     return { ok: true, changed: true, resources };
   }
 
@@ -2293,19 +2555,19 @@ export class PeasantActor extends Actor {
     const resources = this.getPeasantEdgeResourcesForUpdate();
     if (numericIndex >= resources.length) return { ok: false, changed: false };
     resources.splice(numericIndex, 1);
-    await this.update({ "system.edgeResources": resources });
+    await this.updatePeasantSourceData({ "system.edgeResources": resources });
     return { ok: true, changed: true, resources };
   }
 
   async setPeasantEdgeLabelMode(rawMode) {
     const mode = sanitizeEdgeLabelMode(rawMode, getDefaultEdgeLabelMode(this));
-    await this.update({ "system.edgeLabelMode": mode });
+    await this.updatePeasantSourceData({ "system.edgeLabelMode": mode });
     return { ok: true, changed: true, mode };
   }
 
   async setPeasantEdgeCustomLabel(rawLabel) {
     const label = String(rawLabel ?? "").trim();
-    await this.update({ "system.edgeCustomLabel": label });
+    await this.updatePeasantSourceData({ "system.edgeCustomLabel": label });
     return { ok: true, changed: true, label };
   }
 
@@ -2317,7 +2579,7 @@ export class PeasantActor extends Actor {
 
     const baseMode = this.getPeasantEdgeBaseMode();
     resources[numericIndex] = normalizeEdgeResourceEntry({ ...resources[numericIndex], ...patch }, baseMode);
-    await this.update({ "system.edgeResources": resources }, options);
+    await this.updatePeasantSourceData({ "system.edgeResources": resources }, options);
     return { ok: true, changed: true, entry: resources[numericIndex], resources };
   }
 

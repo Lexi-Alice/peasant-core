@@ -47,8 +47,21 @@ export class HPGridModel extends foundry.abstract.DataModel {
     };
   }
 
+  getCell(row, col) {
+    return Math.max(DAMAGE.REGULAR, Math.min(DAMAGE.CRITICAL, Number(this.grid?.[row]?.[col]) || DAMAGE.REGULAR));
+  }
+
+  setCell(row, col, value) {
+    if (!Array.isArray(this.grid[row])) this.grid[row] = [];
+    this.grid[row][col] = Math.max(DAMAGE.REGULAR, Math.min(DAMAGE.CRITICAL, Number(value) || DAMAGE.REGULAR));
+  }
+
   canOverwrite(existing, incoming) {
-    return incoming > existing;
+    return incoming > this.getCellValue(existing);
+  }
+
+  getCellValue(value) {
+    return Math.max(DAMAGE.REGULAR, Math.min(DAMAGE.CRITICAL, Number(value) || DAMAGE.REGULAR));
   }
 
   applyBlunt(amount) {
@@ -56,8 +69,8 @@ export class HPGridModel extends foundry.abstract.DataModel {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (!remaining) return remaining;
-        if (this.canOverwrite(this.grid[r][c], DAMAGE.BLUNT)) {
-          this.grid[r][c] = DAMAGE.BLUNT;
+        if (this.canOverwrite(this.getCell(r, c), DAMAGE.BLUNT)) {
+          this.setCell(r, c, DAMAGE.BLUNT);
           remaining--;
         }
       }
@@ -70,8 +83,8 @@ export class HPGridModel extends foundry.abstract.DataModel {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (!remaining) return remaining;
-        if (this.canOverwrite(this.grid[r][c], DAMAGE.LETHAL)) {
-          this.grid[r][c] = DAMAGE.LETHAL;
+        if (this.canOverwrite(this.getCell(r, c), DAMAGE.LETHAL)) {
+          this.setCell(r, c, DAMAGE.LETHAL);
           remaining--;
         }
       }
@@ -84,8 +97,8 @@ export class HPGridModel extends foundry.abstract.DataModel {
     for (let c = this.cols - 1; c >= 0; c--) {
       for (let r = this.rows - 1; r >= 0; r--) {
         if (!remaining) return remaining;
-        if (this.canOverwrite(this.grid[r][c], DAMAGE.CRITICAL)) {
-          this.grid[r][c] = DAMAGE.CRITICAL;
+        if (this.canOverwrite(this.getCell(r, c), DAMAGE.CRITICAL)) {
+          this.setCell(r, c, DAMAGE.CRITICAL);
           remaining--;
         }
       }
@@ -123,7 +136,9 @@ export class HPGridModel extends foundry.abstract.DataModel {
 
   get worstRow() {
     for (let r = this.rows - 1; r >= 0; r--) {
-      if (this.grid[r].some(v => v > DAMAGE.REGULAR)) return r + 1;
+      for (let c = 0; c < this.cols; c++) {
+        if (this.getCell(r, c) > DAMAGE.REGULAR) return r + 1;
+      }
     }
     return 0;
   }
@@ -140,7 +155,7 @@ export class HPGridModel extends foundry.abstract.DataModel {
       for (let c = this.cols - 1; c >= 0; c--) {
         if (!remaining) return;
         
-        const current = this.grid[r][c];
+        const current = this.getCell(r, c);
         
         // Skip critical damage if we can't heal it
         if (current === DAMAGE.CRITICAL && !canHealCritical) {
@@ -149,7 +164,7 @@ export class HPGridModel extends foundry.abstract.DataModel {
         
         // Heal any damage that isn't REGULAR
         if (current > DAMAGE.REGULAR) {
-          this.grid[r][c] = DAMAGE.REGULAR;
+          this.setCell(r, c, DAMAGE.REGULAR);
           remaining--;
         }
       }

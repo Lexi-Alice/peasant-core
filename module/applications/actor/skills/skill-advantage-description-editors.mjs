@@ -1,5 +1,5 @@
 import { renderPeasantDescriptionEditor } from "../controls/description-editor-app.mjs";
-import { resolveRowIndex } from "../controls/sheet-listener-helpers.mjs";
+import { getActorSourceSystem, resolveRowIndex } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
@@ -29,10 +29,11 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html, { enqueueShee
       if (Number.isNaN(index) || index === undefined || index === null) return;
 
       pcLog.debug("Opening skill description editor for index:", index);
-      pcLog.debug("Actor system.skills:", sheet.actor.system.skills);
-      pcLog.debug("Skill at index:", sheet.actor.system.skills?.[index]);
+      const sourceSystem = getActorSourceSystem(sheet.actor);
+      pcLog.debug("Actor source skills:", sourceSystem.skills);
+      pcLog.debug("Skill at index:", sourceSystem.skills?.[index]);
 
-      const skillData = sheet.actor.system.skills?.[index] || {};
+      const skillData = sourceSystem.skills?.[index] || {};
       const existing = skillData.description || "";
       const skillName = skillData.name || "Skill";
 
@@ -81,12 +82,13 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html, { enqueueShee
     try {
       if (Number.isNaN(index) || index === undefined || index === null) return;
 
-      const advantageEntry = sheet.actor.system.flexibleAdvantages?.[index];
+      const sourceSystem = getActorSourceSystem(sheet.actor);
+      const advantageEntry = sourceSystem.flexibleAdvantages?.[index];
       const advantageName = (typeof advantageEntry === "string"
         ? advantageEntry
         : String(advantageEntry?.name ?? "")
       ).trim() || "Flexible Advantage";
-      const existingDescription = String(sheet.actor.system.flexibleAdvantageDescriptions?.[index] ?? "");
+      const existingDescription = String(sourceSystem.flexibleAdvantageDescriptions?.[index] ?? "");
 
       renderPeasantDescriptionEditor(sheet, `advantage-desc-${index}`, {
         id: `peasant-adv-desc-${sheet.id}-${index}`,
@@ -111,7 +113,7 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html, { enqueueShee
             : await saveDescription();
           const savedDescriptions = Array.isArray(result?.descriptions)
             ? result.descriptions
-            : sheet.actor.system.flexibleAdvantageDescriptions;
+            : getActorSourceSystem(sheet.actor).flexibleAdvantageDescriptions;
           syncAdvantageDescriptionHiddenInput(sheet, root, index, savedDescriptions?.[index] ?? description);
           if (savedDescriptions) {
             sheet._lastFlexibleAdvantageDescriptionsSnapshot = JSON.parse(JSON.stringify(savedDescriptions));

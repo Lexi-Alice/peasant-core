@@ -34,9 +34,15 @@
         <div class="pc-item-sunder" aria-label="Sunder">
           <div class="pc-item-sunder-heading">Sunder</div>
           <div class="pc-item-sunder-box skill-uses-box">
-            <input type="number" name="system.sunder.current" value="{{sunderCurrentInput}}" class="pc-item-sunder-current skill-uses-current pc-input-plain" min="0" step="1" inputmode="numeric" aria-label="Sunder Current" {{#unless canEdit}}disabled{{/unless}}>
-            <span class="uses-separator">/</span>
-            <input type="number" name="system.sunder.max" value="{{sunderMaxInput}}" class="pc-item-sunder-max skill-uses-current pc-input-plain" min="0" step="1" inputmode="numeric" aria-label="Sunder Maximum" {{#unless editable}}disabled{{/unless}}>
+            {{#if isShieldEquipment}}
+              <input type="text" value="NA" class="pc-item-sunder-current skill-uses-current pc-input-plain pc-item-sunder-unavailable" aria-label="Sunder Current" disabled>
+              <span class="uses-separator">/</span>
+              <input type="text" value="NA" class="pc-item-sunder-max skill-uses-current pc-input-plain pc-item-sunder-unavailable" aria-label="Sunder Maximum" disabled>
+            {{else}}
+              <input type="number" name="system.sunder.current" value="{{sunderCurrentInput}}" class="pc-item-sunder-current skill-uses-current pc-input-plain" min="0" step="1" inputmode="numeric" aria-label="Sunder Current" {{#unless canEdit}}disabled{{/unless}}>
+              <span class="uses-separator">/</span>
+              <input type="number" name="system.sunder.max" value="{{sunderMaxInput}}" class="pc-item-sunder-max skill-uses-current pc-input-plain" min="0" step="1" inputmode="numeric" aria-label="Sunder Maximum" {{#unless editable}}disabled{{/unless}}>
+            {{/if}}
           </div>
         </div>
         <div class="pc-item-measure-fields">

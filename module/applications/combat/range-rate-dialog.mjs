@@ -13,6 +13,8 @@ export async function showRangeRatePrompt({
   selectedDamageType = null,
   cardClass = "",
   rollMode = "",
+  edgeChainContext = null,
+  edgeExplodeReroll = null,
   rollNotableCombat = null
 } = {}) {
   const rrValues = normalizeRangeRateValue(combat?.rangeRate);
@@ -75,7 +77,9 @@ export async function showRangeRatePrompt({
               targetLabel,
               selectedDamageType,
               cardClass,
-              rollMode
+              rollMode,
+              edgeChainContext,
+              edgeExplodeReroll
             });
             finalize(result);
             return true;

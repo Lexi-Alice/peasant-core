@@ -81,6 +81,16 @@ function getItemMetric({ kind, label, current, max }) {
 
 function getItemSunder(item) {
   if (!["weapon", "equipment", "tool"].includes(item.type)) return getEmptyItemMetric("Sunder");
+  if (item.type === "equipment" && item.system?.category === "shield") {
+    return {
+      kind: "none",
+      label: "Sunder",
+      hasValue: false,
+      unavailable: true,
+      current: "NA",
+      max: "NA"
+    };
+  }
   return getItemMetric({
     kind: "sunder",
     label: "Sunder",
@@ -137,13 +147,18 @@ function sortPreparedItems(left, right) {
   return String(left?.name ?? "").localeCompare(String(right?.name ?? ""));
 }
 
-export async function prepareActorInventoryContext(data, actor) {
+export async function prepareActorInventoryContext(data, actor, { sourceSystem = null } = {}) {
   const items = Array.from(actor?.items ?? []);
   const currency = actor?.system?.currency ?? {};
+  const editCurrency = sourceSystem?.currency ?? currency;
   const uselessCollectionRaw = actor?.system?.uselessCollection;
   const uselessCollection = (uselessCollectionRaw && typeof uselessCollectionRaw === "object")
     ? uselessCollectionRaw.value
     : uselessCollectionRaw;
+  const editUselessCollectionRaw = sourceSystem?.uselessCollection;
+  const editUselessCollection = (editUselessCollectionRaw && typeof editUselessCollectionRaw === "object")
+    ? editUselessCollectionRaw.value
+    : editUselessCollectionRaw;
   const sections = [];
 
   for (const definition of PC_INVENTORY_SECTION_DEFINITIONS) {
@@ -173,7 +188,9 @@ export async function prepareActorInventoryContext(data, actor) {
   data.inventoryDropEnabled = !!data.editable;
   data.inventoryCurrency = INVENTORY_CURRENCY_DEFINITIONS.map((entry) => ({
     ...entry,
-    value: Math.max(0, Number.parseInt(currency[entry.key], 10) || 0)
+    value: Math.max(0, Number.parseInt(currency[entry.key], 10) || 0),
+    inputValue: Math.max(0, Number.parseInt(editCurrency[entry.key], 10) || 0)
   }));
   data.inventoryUselessCollection = Math.max(0, Number.parseInt(uselessCollection, 10) || 0);
+  data.inventoryUselessCollectionInput = Math.max(0, Number.parseInt(editUselessCollection, 10) || 0);
 }

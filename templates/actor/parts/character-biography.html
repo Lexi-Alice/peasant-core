@@ -4,7 +4,7 @@
     <label class="pc-bio-field">
       <span>Faith</span>
       {{#if @root.editable}}
-        <input type="text" name="system.faith" value="{{actor.system.faith}}" class="pc-input">
+        <input type="text" name="system.faith" value="{{source.system.faith}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.faith}}</div>
       {{/if}}
@@ -12,7 +12,7 @@
     <label class="pc-bio-field">
       <span>Eyes</span>
       {{#if @root.editable}}
-        <input type="text" name="system.eyes" value="{{actor.system.eyes}}" class="pc-input">
+        <input type="text" name="system.eyes" value="{{source.system.eyes}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.eyes}}</div>
       {{/if}}
@@ -20,7 +20,7 @@
     <label class="pc-bio-field">
       <span>Height</span>
       {{#if @root.editable}}
-        <input type="text" name="system.height" value="{{actor.system.height}}" class="pc-input">
+        <input type="text" name="system.height" value="{{source.system.height}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.height}}</div>
       {{/if}}
@@ -28,7 +28,7 @@
     <label class="pc-bio-field">
       <span>Gender</span>
       {{#if @root.editable}}
-        <input type="text" name="system.gender" value="{{actor.system.gender}}" class="pc-input">
+        <input type="text" name="system.gender" value="{{source.system.gender}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.gender}}</div>
       {{/if}}
@@ -36,7 +36,7 @@
     <label class="pc-bio-field">
       <span>Hair</span>
       {{#if @root.editable}}
-        <input type="text" name="system.hair" value="{{actor.system.hair}}" class="pc-input">
+        <input type="text" name="system.hair" value="{{source.system.hair}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.hair}}</div>
       {{/if}}
@@ -44,7 +44,7 @@
     <label class="pc-bio-field">
       <span>Weight</span>
       {{#if @root.editable}}
-        <input type="text" name="system.weight" value="{{actor.system.weight}}" class="pc-input">
+        <input type="text" name="system.weight" value="{{source.system.weight}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.weight}}</div>
       {{/if}}
@@ -52,7 +52,7 @@
     <label class="pc-bio-field">
       <span>Skin</span>
       {{#if @root.editable}}
-        <input type="text" name="system.skin" value="{{actor.system.skin}}" class="pc-input">
+        <input type="text" name="system.skin" value="{{source.system.skin}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.skin}}</div>
       {{/if}}
@@ -60,7 +60,7 @@
     <label class="pc-bio-field">
       <span>Age</span>
       {{#if @root.editable}}
-        <input type="text" name="system.age" value="{{actor.system.age}}" class="pc-input">
+        <input type="text" name="system.age" value="{{source.system.age}}" class="pc-input">
       {{else}}
         <div class="pc-bio-value">{{actor.system.age}}</div>
       {{/if}}
@@ -74,7 +74,7 @@
       <label class="pc-bio-note">
         <span><i class="fa-solid fa-seedling" aria-hidden="true"></i> Ideals</span>
         {{#if @root.editable}}
-          <textarea name="system.ideals" rows="2" class="pc-textarea">{{actor.system.ideals}}</textarea>
+          <textarea name="system.ideals" rows="2" class="pc-textarea">{{source.system.ideals}}</textarea>
         {{else}}
           <div class="pc-bio-note-value">{{actor.system.ideals}}</div>
         {{/if}}
@@ -82,7 +82,7 @@
       <label class="pc-bio-note">
         <span><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i> Personality Traits</span>
         {{#if @root.editable}}
-          <textarea name="system.personalityTraits" rows="2" class="pc-textarea">{{actor.system.personalityTraits}}</textarea>
+          <textarea name="system.personalityTraits" rows="2" class="pc-textarea">{{source.system.personalityTraits}}</textarea>
         {{else}}
           <div class="pc-bio-note-value">{{actor.system.personalityTraits}}</div>
         {{/if}}
@@ -90,7 +90,7 @@
       <label class="pc-bio-note">
         <span><i class="fa-solid fa-link" aria-hidden="true"></i> Bonds</span>
         {{#if @root.editable}}
-          <textarea name="system.bonds" rows="2" class="pc-textarea">{{actor.system.bonds}}</textarea>
+          <textarea name="system.bonds" rows="2" class="pc-textarea">{{source.system.bonds}}</textarea>
         {{else}}
           <div class="pc-bio-note-value">{{actor.system.bonds}}</div>
         {{/if}}
@@ -98,7 +98,7 @@
       <label class="pc-bio-note">
         <span><i class="fa-solid fa-scroll" aria-hidden="true"></i> Appearance</span>
         {{#if @root.editable}}
-          <textarea name="system.appearance" rows="2" class="pc-textarea">{{actor.system.appearance}}</textarea>
+          <textarea name="system.appearance" rows="2" class="pc-textarea">{{source.system.appearance}}</textarea>
         {{else}}
           <div class="pc-bio-note-value">{{actor.system.appearance}}</div>
         {{/if}}
@@ -106,7 +106,7 @@
       <label class="pc-bio-note">
         <span><i class="fa-solid fa-heart-crack" aria-hidden="true"></i> Flaws</span>
         {{#if @root.editable}}
-          <textarea name="system.flaws" rows="2" class="pc-textarea">{{actor.system.flaws}}</textarea>
+          <textarea name="system.flaws" rows="2" class="pc-textarea">{{source.system.flaws}}</textarea>
         {{else}}
           <div class="pc-bio-note-value">{{actor.system.flaws}}</div>
         {{/if}}
@@ -115,7 +115,7 @@
         <span><i class="fa-solid fa-feather" aria-hidden="true"></i> Biography</span>
         {{#if @root.editable}}
           <div class="inventory-container pc-biography-editor-container">
-            <prose-mirror name="system.biography" class="inventory-editor pc-biography-editor" value="{{actor.system.biography}}" data-document-uuid="{{actor.uuid}}"></prose-mirror>
+            <prose-mirror name="system.biography" class="inventory-editor pc-biography-editor" value="{{source.system.biography}}" data-document-uuid="{{actor.uuid}}"></prose-mirror>
           </div>
         {{else}}
           <div class="pc-bio-note-value pc-bio-biography-value">{{#if hasBiographyText}}{{{biographyHTML}}}{{/if}}</div>
