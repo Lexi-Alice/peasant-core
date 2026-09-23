@@ -7,6 +7,7 @@ import {
   parseCombatDefenseMosPer
 } from "../../../data/actor/combat-defense.mjs";
 import { hasRangeRateValue, normalizeCombatTargetingType, normalizeRangeRateValue } from "../../../data/actor/combat-tags.mjs";
+import { parseHaltSlashValues } from "../../../data/actor/combat-modifiers.mjs";
 import { parseCombatDiceValue } from "../../../dice/combat-dice.mjs";
 import { qs, qsa, toElement } from "../../dom.mjs";
 
@@ -93,18 +94,35 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
         }
       });
     }
-    case "manifest": {
-      const maniDice = fieldInt(root, ".tag-mani-dice", Number.NaN);
-      const maniValueData = fieldCombatDiceValue(root, ".tag-mani-value");
+    case "manifest":
+    case "manifestDome":
+    case "manifestResistance": {
+      const inputPrefix = tagType === "manifest" ? "mani" : tagType;
+      const maniDice = fieldInt(root, `.tag-${inputPrefix}-dice`, Number.NaN);
+      const maniValueData = fieldCombatDiceValue(root, `.tag-${inputPrefix}-value`);
       const maniValue = maniValueData.diceValue;
-      if (!Number.isFinite(maniDice) || maniDice < 0 || !Number.isFinite(maniValue) || maniValue < 0) return invalidTagData();
+      const duration = tagType === "manifestDome"
+        ? fieldInt(root, ".tag-manifestDome-duration", Number.NaN)
+        : null;
+      if (
+        !Number.isFinite(maniDice)
+        || maniDice < 0
+        || !Number.isFinite(maniValue)
+        || maniValue < 0
+        || (tagType === "manifestDome" && (!Number.isFinite(duration) || duration < 1))
+      ) return invalidTagData();
+      const manifestData = {
+        diceCount: maniDice,
+        diceValue: maniValue,
+        diceBonus: maniValueData.diceBonus,
+        flat: fieldInt(root, `.tag-${inputPrefix}-flat`)
+      };
+      if (tagType === "manifestDome") manifestData.duration = duration;
+      if (tagType === "manifestResistance") {
+        manifestData.haltValues = parseHaltSlashValues(fieldValue(root, ".tag-manifestResistance-halt", "1/1/1/1"));
+      }
       return validTagData({
-        manifest: {
-          diceCount: maniDice,
-          diceValue: maniValue,
-          diceBonus: maniValueData.diceBonus,
-          flat: fieldInt(root, ".tag-mani-flat")
-        }
+        [tagType]: manifestData
       });
     }
     case "tagUses": {
@@ -154,11 +172,22 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
         if (defense.blockType === "Shield" || defense.blockType === "Weapon") {
           defense.hardness = Math.max(0, fieldInt(root, ".tag-defense-hardness"));
         }
-        defense.hp = defense.blockType === "Weapon" ? 0 : Math.max(0, fieldInt(root, ".tag-defense-hp"));
+        if (defense.blockType === "Shield") defense.hp = Math.max(0, fieldInt(root, ".tag-defense-hp"));
+        else delete defense.hp;
+        if (defense.blockType === "Mage") {
+          const currentMaxHp = Number.parseInt(combatData.defense?.maxHp, 10) || 40;
+          defense.maxHp = Math.max(1, fieldInt(root, ".tag-defense-max-hp", currentMaxHp));
+          delete defense.mageBarrierInitialized;
+        }
         defense.masteryBonus = defense.blockType === "Weapon" && fieldChecked(root, ".tag-defense-mastery-bonus");
       }
 
-      return validTagData({ defense: normalizeCombatDefense(defense) });
+      const normalizedDefense = normalizeCombatDefense(defense);
+      if (normalizedDefense.blockType === "Mage") {
+        delete normalizedDefense.hp;
+        delete normalizedDefense.mageBarrierInitialized;
+      }
+      return validTagData({ defense: normalizedDefense });
     }
     case "reach": {
       const reachVal = fieldInt(root, ".tag-reach", Number.NaN);

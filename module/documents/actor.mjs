@@ -1,4 +1,12 @@
 import { absorbBolsteredFromCounts, absorbTempHpFromCounts, applyDamageResistanceToCounts, splitDamageCounts, sumDamageCounts, toSimplifiedHpDamageFromCounts, toSimplifiedHpDamageFromCountsWithResistance, toSimplifiedHpDamageWithResistance } from "../data/actor/damage.mjs";
+import { absorbActorSpellEffect } from "../data/active-effect/spell-effects.mjs";
+import {
+  createMageBlockEffects,
+  getMageBlockBarrierEffect,
+  getMageBlockBarrierHp,
+  getMageBlockDefenseIdentity,
+  getMageBlockDuressEffect
+} from "../data/active-effect/mage-block-effects.mjs";
 import {
   COMBAT_HALT_BUFF_TYPE_COST,
   COMBAT_HALT_BUFF_TYPE_CUSTOM,
@@ -13,15 +21,37 @@ import {
   sanitizeCombatHaltBuffType
 } from "../data/actor/combat-modifiers.mjs";
 import { createDefaultCombatDefense, normalizeCombatDefense } from "../data/actor/combat-defense.mjs";
+import { getNotableCombatEffectImage } from "../data/actor/notable-combat-image.mjs";
 import { COMBAT_FULL_TAG_ORDER, getCombatCustomTags, normalizeCombatMagnetism, normalizeCombatTargetingType, normalizeRangeRateValue, syncCombatCustomTags } from "../data/actor/combat-tags.mjs";
+import { findPassiveSkillEffectSource, hasExpiringSkillEffectDuration, isPassiveSkillEffectDefinition, isSkillEditorDefinition } from "../data/actor/skill-entry-conditions.mjs";
+import {
+  SKILL_MECHANIC_DEFAULTS,
+  addSkillUsage,
+  clearSkillUsage,
+  deleteSkillUsage,
+  duplicateSkillUsage,
+  normalizeSkillEntry,
+  removeSkillEffectLink,
+  removeSkillEffectReferences,
+  renameSkillUsage,
+  setDefaultSkillUsage,
+  upsertSkillEffectLink,
+  setSkillTagCondition,
+  setSkillUsageCounterScope,
+  setSkillTagData
+} from "../data/actor/skill-entries.mjs";
+import { isSignatureSkillType, isSkillProgressionType, normalizeSkillTypeForCategory } from "../data/actor/skill-entry-types.mjs";
 import { getDefaultEdgeLabelMode, normalizeEdgeResourceEntry, sanitizeEdgeLabelMode } from "../data/actor/edge-resources.mjs";
+import { addEquippedArmorHalt, getEquippedArmorEffects, removeEquippedArmorAoeSaveModifier, removeEquippedArmorHalt, removeEquippedArmorMovement } from "../data/actor/equipped-armor.mjs";
+import { canSpendActiveArmorCharge, getActiveArmorChargeCapacity, getActiveArmorTraining, getUntrainedArmorMovementPenalty } from "../data/actor/active-armor.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isPeasantCharacterType, isSimplifiedHpActor, parseOptionalInteger } from "../data/actor/helpers.mjs";
 import { cloneActorList, cloneActorListForUpdate, ensureActorListEntryAt, patchActorListEntry, removeActorListEntry, reorderActorListEntry } from "../data/actor/list-helpers.mjs";
-import { applyPeasantNumericActiveEffectChange, clampPeasantInteger } from "../data/active-effect/change-modes.mjs";
+import { applyPeasantGridHealthMaxChanges, applyPeasantNumericActiveEffectChange, clampPeasantInteger, mergePeasantGridHealthEffectUpdate } from "../data/active-effect/change-modes.mjs";
 import {
   collectPeasantActiveEffectChangeKeys,
   isPeasantActiveEffectDynamicKey,
   isPeasantActiveEffectFoundryDynamicKey,
+  isPeasantActiveEffectStateKey,
   isPeasantActiveEffectVirtualDynamicKey
 } from "../data/active-effect/key-policy.mjs";
 import { parseHpValueCommand } from "../data/actor/hp-commands.mjs";
@@ -34,7 +64,8 @@ import {
   withPeasantActorStateWriteContext
 } from "../data/actor/source-system.mjs";
 import { applyCombatStressDamageForActor } from "../data/actor/stress.mjs";
-import { TARGETED_DAMAGE_HALT_INDEX_MAP, TARGETED_DAMAGE_HARD_FLAG_MAP, getArmorChargeMultiplier, getArmorChargeValue, getTargetedDamageConditionKey, getTargetedDamageLocationDisplay, getWoundThresholdMultipliers, normalizeAppliedDamageType } from "../data/actor/targeted-damage.mjs";
+import { TARGETED_DAMAGE_HALT_INDEX_MAP, TARGETED_DAMAGE_HARD_FLAG_MAP, getArmorChargeMultiplier, getArmorChargeValue, getTargetedDamageConditionKey, getTargetedDamageLocationDisplay, normalizeAppliedDamageType } from "../data/actor/targeted-damage.mjs";
+import { getDevastatingWoundCount, getEffectiveWoundThresholds } from "../data/actor/wounds.mjs";
 import { pcLog } from "../utils/logging.mjs";
 
 function getPeasantActorSourceHp(actor) {
@@ -46,6 +77,19 @@ function normalizePeasantHpDimension(value, fallback = 1) {
   if (Number.isFinite(number)) return Math.max(1, Math.floor(number));
   const fallbackNumber = Number(fallback);
   return Number.isFinite(fallbackNumber) ? Math.max(1, Math.floor(fallbackNumber)) : 1;
+}
+
+function getAlreadyResolvedDomeResult(damage, damageType) {
+  return {
+    handled: true,
+    applied: false,
+    reason: "alreadyResolved",
+    absorbed: 0,
+    penetration: Math.max(0, Math.floor(Number(damage) || 0)),
+    remainingHp: 0,
+    depleted: false,
+    damageType: String(damageType || "")
+  };
 }
 
 function getPeasantHpDimensions(hp, fallbackHp = null) {
@@ -116,6 +160,74 @@ function deletePathValue(root, path) {
   if (parent && key) delete parent[key];
 }
 
+function setPathValue(root, path, value) {
+  if (!root || typeof root !== "object") return;
+  if (Object.prototype.hasOwnProperty.call(root, path)) {
+    root[path] = value;
+    return;
+  }
+
+  const setProperty = globalThis.foundry?.utils?.setProperty;
+  if (typeof setProperty === "function") {
+    setProperty(root, path, value);
+    return;
+  }
+
+  const parts = String(path).split(".").filter(Boolean);
+  const key = parts.pop();
+  let parent = root;
+  for (const part of parts) parent = parent[part] ??= {};
+  if (key) parent[key] = value;
+}
+
+function setFallBlessingUpdatePath(changed, path, value, flatUpdate) {
+  if (flatUpdate) changed[path] = value;
+  else setPathValue(changed, path, value);
+}
+
+function adjustFallBlessingUsesForEdgeMaxChange(actor, changed) {
+  const paths = collectUpdateLeafPaths(changed);
+  const edgeMaxChanged = paths.includes("system.edge.max");
+  const fallValueChanged = paths.includes("system.fallBlessingUses.value");
+  const fallMaxChanged = paths.includes("system.fallBlessingUses.max");
+  if (!edgeMaxChanged && !fallValueChanged && !fallMaxChanged) return;
+
+  const sourceUses = getActorSourceValue(actor, "system.fallBlessingUses") || {};
+  const sourceMax = clampPeasantInteger(sourceUses.max ?? 1, { min: 0 });
+  const sourceValue = clampPeasantInteger(sourceUses.value ?? 0, { min: 0 });
+  const flatUpdate = Object.prototype.hasOwnProperty.call(changed, "system.edge.max")
+    || Object.prototype.hasOwnProperty.call(changed, "system.fallBlessingUses.value")
+    || Object.prototype.hasOwnProperty.call(changed, "system.fallBlessingUses.max");
+
+  if (fallMaxChanged || (fallValueChanged && !edgeMaxChanged)) {
+    const max = clampPeasantInteger(
+      fallMaxChanged ? getPathValue(changed, "system.fallBlessingUses.max") : sourceMax,
+      { min: 0 }
+    );
+    const value = Math.min(clampPeasantInteger(
+      fallValueChanged ? getPathValue(changed, "system.fallBlessingUses.value") : sourceValue,
+      { min: 0 }
+    ), max);
+    if (fallMaxChanged) setFallBlessingUpdatePath(changed, "system.fallBlessingUses.max", max, flatUpdate);
+    if (fallValueChanged || value !== sourceValue) setFallBlessingUpdatePath(changed, "system.fallBlessingUses.value", value, flatUpdate);
+    return;
+  }
+
+  const oldEdgeMax = clampPeasantInteger(getActorSourceValue(actor, "system.edge.max"), { min: 0 });
+  const newEdgeMax = clampPeasantInteger(getPathValue(changed, "system.edge.max"), { min: 0 });
+  if (oldEdgeMax === newEdgeMax) return;
+
+  const oldCapacity = Math.max(1, Math.floor(oldEdgeMax / 2));
+  const newCapacity = Math.max(1, Math.floor(newEdgeMax / 2));
+  const max = Math.max(0, sourceMax + newCapacity - oldCapacity);
+  const requestedValue = fallValueChanged
+    ? clampPeasantInteger(getPathValue(changed, "system.fallBlessingUses.value"), { min: 0 })
+    : sourceValue;
+  const value = Math.min(requestedValue, max);
+  setFallBlessingUpdatePath(changed, "system.fallBlessingUses.max", max, flatUpdate);
+  setFallBlessingUpdatePath(changed, "system.fallBlessingUses.value", value, flatUpdate);
+}
+
 function pruneEmptyUpdateObjects(value) {
   if (!isPlainObject(value)) return false;
   for (const [key, child] of Object.entries(value)) {
@@ -131,6 +243,34 @@ function valuesEqual(left, right) {
   } catch (error) {
     return false;
   }
+}
+
+const PEASANT_ENTRY_COLLECTIONS = new Set(["skills", "notableCombats"]);
+const PEASANT_USAGE_UNSET_PATHS = new Set([
+  "rollOverrides.characteristics",
+  "rollOverrides.characteristicMode",
+  "rollOverrides.tohit",
+  "rollOverrides.accuracy"
+]);
+
+function mergePeasantEntryPatch(target, patch) {
+  const result = target && typeof target === "object" && !Array.isArray(target) ? target : {};
+  for (const [key, value] of Object.entries(patch ?? {})) {
+    if (isPlainObject(value) && isPlainObject(result[key])) mergePeasantEntryPatch(result[key], value);
+    else result[key] = value == null || typeof value !== "object" ? value : JSON.parse(JSON.stringify(value));
+  }
+  return result;
+}
+
+function normalizePeasantEntryRef(ref) {
+  const collection = String(ref?.collection ?? "");
+  const entryId = String(ref?.entryId ?? "").trim();
+  return PEASANT_ENTRY_COLLECTIONS.has(collection) && entryId ? { collection, entryId } : null;
+}
+
+function normalizePeasantCounter(value, fallback = 0) {
+  if (value === undefined) return Math.max(0, Math.trunc(Number(fallback) || 0));
+  return Math.max(0, Math.trunc(Number(value) || 0));
 }
 
 function isPathManagedByEffect(path, effectKeys) {
@@ -177,11 +317,14 @@ function collectPeasantActiveEffectDocuments(actor) {
 
 function filterPeasantFoundryActiveEffectChanges(actor) {
   const restorations = [];
+  const gridHealth = isPeasantCharacterType(actor?.type) && !isSimplifiedHpActor(actor);
   for (const effect of collectPeasantActiveEffectDocuments(actor)) {
     const changes = effect?.changes;
     if (!Array.isArray(changes)) continue;
 
-    const filtered = changes.filter(change => isPeasantActiveEffectFoundryDynamicKey(change?.key));
+    const filtered = isSkillEditorDefinition(effect) && !isPassiveSkillEffectDefinition(effect, actor)
+      ? []
+      : changes.filter(change => isPeasantActiveEffectFoundryDynamicKey(change?.key, { gridHealth }));
     if (filtered.length === changes.length) continue;
 
     const original = [...changes];
@@ -203,6 +346,35 @@ function restorePeasantActiveEffectChanges(restorations) {
       /* The effect document will retain its source changes even if local restoration fails. */
     }
   }
+}
+
+function preservePeasantGridHealthEffectUpdate(actor, changed) {
+  if (!isPeasantCharacterType(actor?.type) || isSimplifiedHpActor(actor)) return;
+  const changedGrid = getPathValue(changed, "system.hp.grid");
+  if (!Array.isArray(changedGrid)) return;
+
+  const hasHealthMaxEffect = collectPeasantActiveEffectDocuments(actor).some(effect =>
+    !effect.disabled
+    && !effect.isSuppressed
+    && (!isSkillEditorDefinition(effect) || isPassiveSkillEffectDefinition(effect, actor))
+    && (effect.changes ?? effect._source?.changes ?? []).some(change => change?.key === "system.health.max")
+  );
+  if (!hasHealthMaxEffect) return;
+
+  const sourceHp = getPeasantActorSourceHp(actor);
+  const sourceDimensions = getPeasantHpDimensions(sourceHp);
+  const effectDimensions = getPeasantHpDimensions(actor.system?.hp, sourceHp);
+  if (sourceDimensions.cols === effectDimensions.cols) return;
+
+  setPathValue(changed, "system.hp.grid", mergePeasantGridHealthEffectUpdate(
+    sourceHp.grid,
+    changedGrid,
+    {
+      rows: sourceDimensions.rows,
+      sourceColumns: sourceDimensions.cols,
+      effectColumns: effectDimensions.cols
+    }
+  ));
 }
 
 const VIRTUAL_HALT_LOCATION_INDEXES = Object.freeze({
@@ -261,7 +433,6 @@ export class PeasantActor extends Actor {
   static CONDITION_KEYS = Object.freeze(["wounded", "head", "rightArm", "leftArm", "rightLeg", "leftLeg", "torso", "arms", "legs"]);
   static WOUND_STATUSES = Object.freeze(["disabled", "crippled"]);
   static BLESSING_TYPES = Object.freeze(["spring", "summer", "fall", "winter"]);
-  static BLESSING_TARGETS = Object.freeze(["build", "reflex", "intuition", "learn", "charisma"]);
   static TO_HIT_PENALTY_TARGETS = Object.freeze(["Strength", "Dexterity", "Mental", "Social"]);
   static HARD_LOCATION_NAMES = Object.freeze(["Head", "Arms", "Legs", "Torso"]);
 
@@ -291,6 +462,341 @@ export class PeasantActor extends Actor {
     return combats;
   }
 
+  _queuePeasantEntryWrite(callback) {
+    const previous = this._peasantEntryWriteQueue ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(callback);
+    this._peasantEntryWriteQueue = current.catch(() => undefined);
+    return current;
+  }
+
+  async ensurePeasantEntryIds(collection) {
+    if (!PEASANT_ENTRY_COLLECTIONS.has(collection)) return { ok: false, changed: false };
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const list = cloneActorList(source?.[collection]);
+      const seen = new Set();
+      let changed = false;
+      for (const entry of list) {
+        if (!entry || typeof entry !== "object") continue;
+        let id = String(entry.id ?? "").trim();
+        if (!id || seen.has(id)) {
+          do id = PeasantActor.createPeasantNotableCombatId(); while (seen.has(id));
+          changed = true;
+        } else if (entry.id !== id) {
+          changed = true;
+        }
+        entry.id = id;
+        seen.add(id);
+      }
+      if (!changed) return { ok: true, changed: false };
+      await this.updatePeasantSourceData({ [`system.${collection}`]: list });
+      return { ok: true, changed: true };
+    });
+  }
+
+  async updatePeasantEntry(ref, patch = {}, { usageId = null, unset = [], state = false, render = true } = {}) {
+    const normalizedRef = normalizePeasantEntryRef(ref);
+    if (!normalizedRef || Object.prototype.hasOwnProperty.call(patch ?? {}, "id")) return { ok: false, changed: false };
+    if (!Array.isArray(unset) || unset.some((path) => !PEASANT_USAGE_UNSET_PATHS.has(path))) {
+      return { ok: false, changed: false };
+    }
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const list = cloneActorList(source?.[normalizedRef.collection]);
+      const index = list.findIndex((entry) => String(entry?.id ?? "").trim() === normalizedRef.entryId);
+      if (index < 0) return { ok: false, changed: false };
+
+      const entry = normalizeSkillEntry(list[index], {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+      if (usageId === null) {
+        mergePeasantEntryPatch(entry, patch);
+      } else if (usageId === "base") {
+        const mechanics = patch.mechanics ?? Object.fromEntries(
+          Object.entries(patch).filter(([key]) => Object.prototype.hasOwnProperty.call(SKILL_MECHANIC_DEFAULTS, key))
+        );
+        mergePeasantEntryPatch(entry, mechanics);
+        const metadata = Object.fromEntries(
+          Object.entries(patch).filter(([key]) => !Object.prototype.hasOwnProperty.call(SKILL_MECHANIC_DEFAULTS, key) && key !== "mechanics")
+        );
+        mergePeasantEntryPatch(entry.baseUsage, metadata);
+      } else {
+        const usage = entry.usages.find((candidate) => candidate.id === usageId);
+        if (!usage) return { ok: false, changed: false };
+        mergePeasantEntryPatch(usage, patch);
+        for (const path of unset) delete usage.rollOverrides[path.slice("rollOverrides.".length)];
+      }
+
+      const normalized = normalizeSkillEntry(entry, {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+      if (valuesEqual(list[index], normalized)) return { ok: true, changed: false, entry: normalized };
+      list[index] = normalized;
+      const update = { [`system.${normalizedRef.collection}`]: list };
+      if (state) await this.updatePeasantStateData(update, { render });
+      else await this.updatePeasantSourceData(update, { render });
+      return { ok: true, changed: true, entry: normalized };
+    });
+  }
+
+  async managePeasantEntryUsage(ref, action, options = {}) {
+    const normalizedRef = normalizePeasantEntryRef(ref);
+    const operation = String(action ?? "").trim().toLowerCase();
+    if (!normalizedRef || !["add", "clear", "condition", "counter-scope", "default", "delete", "duplicate", "rename"].includes(operation)) {
+      return { ok: false, changed: false };
+    }
+
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const list = cloneActorList(source?.[normalizedRef.collection]);
+      const index = list.findIndex((entry) => String(entry?.id ?? "").trim() === normalizedRef.entryId);
+      if (index < 0) return { ok: false, changed: false };
+      const entry = normalizeSkillEntry(list[index], {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+
+      let result;
+      switch (operation) {
+        case "add":
+          result = addSkillUsage(entry, { name: options.name, createId: PeasantActor.createPeasantNotableCombatId });
+          break;
+        case "clear":
+          result = clearSkillUsage(entry, options.usageId);
+          break;
+        case "condition":
+          result = setSkillTagCondition(entry, options.usageId, options.tagKey, {
+            when: options.when, limitNote: options.limitNote
+          }, { createId: PeasantActor.createPeasantNotableCombatId });
+          break;
+        case "counter-scope":
+          result = setSkillUsageCounterScope(entry, options.usageId, options.pool, options.scope);
+          break;
+        case "default":
+          result = setDefaultSkillUsage(entry, options.usageId);
+          break;
+        case "delete":
+          result = deleteSkillUsage(entry, options.usageId, { replacementDefaultId: options.replacementDefaultId });
+          break;
+        case "duplicate":
+          result = duplicateSkillUsage(entry, options.usageId, { createId: PeasantActor.createPeasantNotableCombatId });
+          break;
+        case "rename":
+          result = renameSkillUsage(entry, options.usageId, options.name);
+          break;
+      }
+      if (!result?.ok) return { ...result, changed: false };
+
+      const normalized = normalizeSkillEntry(result.entry, {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+      if (valuesEqual(list[index], normalized)) return { ...result, changed: false, entry: normalized };
+      list[index] = normalized;
+      await this.updatePeasantSourceData({ [`system.${normalizedRef.collection}`]: list }, { render: options.render ?? true });
+      return { ...result, changed: true, entry: normalized };
+    });
+  }
+
+  async managePeasantEntryEffectLink(ref, action, options = {}) {
+    const normalizedRef = normalizePeasantEntryRef(ref);
+    const operation = String(action ?? "").trim().toLowerCase();
+    if (!normalizedRef || !["link", "unlink"].includes(operation)) {
+      return { ok: false, changed: false };
+    }
+
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const list = cloneActorList(source?.[normalizedRef.collection]);
+      const index = list.findIndex((entry) => String(entry?.id ?? "").trim() === normalizedRef.entryId);
+      if (index < 0) return { ok: false, changed: false };
+      const entry = normalizeSkillEntry(list[index], {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+
+      let result;
+      if (operation === "link") {
+        const effectId = String(options.effectLink?.effectId ?? "").trim();
+        const effect = this.effects?.get?.(effectId);
+        if (!effectId || !effect) {
+          return { ok: false, changed: false, error: "The Actor effect definition is unavailable." };
+        }
+        if (!isSkillEditorDefinition(effect)) {
+          return { ok: false, changed: false, error: "Only a disabled Skill effect definition can be linked to a usage." };
+        }
+        if (options.effectLink?.when === "passive"
+          && hasExpiringSkillEffectDuration(effect._source?.duration ?? effect.duration)) {
+          return { ok: false, changed: false, error: "Passive effects cannot have a duration. Clear the effect duration first." };
+        }
+        if (Array.from(effect.changes || []).some(change => isPeasantActiveEffectStateKey(change?.key))) {
+          return { ok: false, changed: false, error: "This effect uses an immediate state-operation key, which cannot be offered safely." };
+        }
+        result = upsertSkillEffectLink(entry, options.usageId ?? "base", options.effectLink, {
+          createId: PeasantActor.createPeasantNotableCombatId
+        });
+      } else {
+        result = removeSkillEffectLink(entry, options.usageId ?? "base", options.linkId);
+      }
+      if (!result?.ok) return { ...result, changed: false };
+
+      const normalized = normalizeSkillEntry(result.entry, {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+      if (valuesEqual(list[index], normalized)) return { ...result, changed: false, entry: normalized };
+      list[index] = normalized;
+      await this.updatePeasantSourceData({ [`system.${normalizedRef.collection}`]: list }, { render: options.render ?? true });
+      return { ...result, changed: true, entry: normalized };
+    });
+  }
+
+  async removePeasantEffectReferences(effectId, { render = true } = {}) {
+    const removeId = String(effectId ?? "").trim();
+    if (!removeId) return { ok: false, changed: false };
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const update = {};
+      for (const collection of ["skills", "notableCombats"]) {
+        const list = cloneActorList(source?.[collection]);
+        let changed = false;
+        for (let index = 0; index < list.length; index += 1) {
+          const result = removeSkillEffectReferences(list[index], removeId);
+          if (!result.changed) continue;
+          list[index] = result.entry;
+          changed = true;
+        }
+        if (changed) update[`system.${collection}`] = list;
+      }
+      if (Object.keys(update).length === 0) return { ok: true, changed: false };
+      await this.updatePeasantSourceData(update, { render });
+      return { ok: true, changed: true };
+    });
+  }
+
+  async setPeasantEntryTag(ref, rawTagType, tagData = {}, {
+    usageId = "base",
+    mode = "add",
+    customId = null,
+    render = true
+  } = {}) {
+    const normalizedRef = normalizePeasantEntryRef(ref);
+    if (!normalizedRef) return { ok: false, changed: false };
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const list = cloneActorList(source?.[normalizedRef.collection]);
+      const index = list.findIndex(entry => String(entry?.id ?? "").trim() === normalizedRef.entryId);
+      if (index < 0) return { ok: false, changed: false };
+
+      const entry = normalizeSkillEntry(list[index], {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+      let result;
+      if (usageId === "base") {
+        result = setSkillTagData(entry, rawTagType, tagData, { mode, customId });
+        if (result.ok) list[index] = normalizeSkillEntry(result.data, {
+          collection: normalizedRef.collection,
+          createId: PeasantActor.createPeasantNotableCombatId
+        });
+      } else {
+        const usage = entry.usages.find(candidate => candidate.id === usageId);
+        if (!usage) return { ok: false, changed: false };
+        const working = {
+          ...usage.mechanics,
+          layout: usage.layout,
+          rules: usage.rules,
+          effectLinks: usage.effectLinks
+        };
+        result = setSkillTagData(working, rawTagType, tagData, { mode, customId });
+        if (result.ok) {
+          usage.mechanics = Object.fromEntries(Object.keys(SKILL_MECHANIC_DEFAULTS).map(key => [key, result.data[key]]));
+          usage.layout = result.data.layout;
+          usage.rules = result.data.rules ?? usage.rules;
+          usage.effectLinks = result.data.effectLinks ?? usage.effectLinks;
+          list[index] = normalizeSkillEntry(entry, {
+            collection: normalizedRef.collection,
+            createId: PeasantActor.createPeasantNotableCombatId
+          });
+        }
+      }
+
+      if (!result?.ok || !result.changed) return { ...result, entry: list[index] };
+      await this.updatePeasantSourceData({ [`system.${normalizedRef.collection}`]: list }, { render });
+      return { ok: true, changed: true, entry: list[index] };
+    });
+  }
+
+  async setPeasantEntryUses(ref, { pool = "primary", current, max } = {}) {
+    const normalizedRef = normalizePeasantEntryRef(ref);
+    if (!normalizedRef || !["primary", "duress"].includes(pool)) return { ok: false, changed: false };
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const list = cloneActorList(source?.[normalizedRef.collection]);
+      const index = list.findIndex((entry) => String(entry?.id ?? "").trim() === normalizedRef.entryId);
+      if (index < 0) return { ok: false, changed: false };
+      const entry = normalizeSkillEntry(list[index], {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+      if (pool === "primary") {
+        const nextMax = normalizePeasantCounter(max, entry.usesMax);
+        const requestedCurrent = normalizePeasantCounter(current, entry.usesCurrent);
+        entry.usesMax = nextMax;
+        entry.usesCurrent = Math.min(nextMax, requestedCurrent);
+      } else {
+        const nextMax = normalizePeasantCounter(max, entry.signatureUsage.duressMax);
+        const requestedCurrent = normalizePeasantCounter(current, entry.signatureUsage.duressCurrent);
+        entry.signatureUsage.duressMax = nextMax;
+        entry.signatureUsage.duressCurrent = Math.min(nextMax, requestedCurrent);
+      }
+      if (valuesEqual(list[index], entry)) return { ok: true, changed: false, entry };
+      list[index] = entry;
+      await this.updatePeasantSourceData({ [`system.${normalizedRef.collection}`]: list });
+      return { ok: true, changed: true, entry };
+    });
+  }
+
+  async consumePeasantEntryUses(ref, { usageId = "base", pool = "primary", spendSignature = null } = {}) {
+    const normalizedRef = normalizePeasantEntryRef(ref);
+    if (!normalizedRef || !["primary", "duress"].includes(pool)) return { ok: false, changed: false, spent: [] };
+    return this._queuePeasantEntryWrite(async () => {
+      const source = getActorSourceSystem(this);
+      const list = cloneActorList(source?.[normalizedRef.collection]);
+      const index = list.findIndex((entry) => String(entry?.id ?? "").trim() === normalizedRef.entryId);
+      if (index < 0) return { ok: false, changed: false, spent: [] };
+      const entry = normalizeSkillEntry(list[index], {
+        collection: normalizedRef.collection,
+        createId: PeasantActor.createPeasantNotableCombatId
+      });
+      const usage = usageId === "base" ? null : entry.usages.find((candidate) => candidate.id === usageId);
+      if (usageId !== "base" && !usage) return { ok: false, changed: false, spent: [] };
+
+      const spent = [];
+      const shouldSpendSignature = spendSignature ?? isSignatureSkillType(entry.type);
+      if (shouldSpendSignature && pool === "primary" && entry.usesCurrent > 0) {
+        entry.usesCurrent -= 1;
+        spent.push("primary");
+      }
+      if (shouldSpendSignature && pool === "duress" && entry.signatureUsage.duressUses && entry.signatureUsage.duressCurrent > 0) {
+        entry.signatureUsage.duressCurrent -= 1;
+        spent.push("duress");
+      }
+
+      const tagUses = usage?.counterScopes?.tagUses === "local" ? usage.mechanics.tagUses : entry.tagUses;
+      if (Number(tagUses?.max) > 0 && Number(tagUses?.current) > 0) {
+        tagUses.current = Math.max(0, Math.trunc(Number(tagUses.current)) - 1);
+        spent.push("tagUses");
+      }
+      if (!spent.length) return { ok: true, changed: false, spent, entry };
+      list[index] = entry;
+      await this.updatePeasantStateData({ [`system.${normalizedRef.collection}`]: list });
+      return { ok: true, changed: true, spent, entry };
+    });
+  }
+
   applyActiveEffects(...args) {
     const restorations = filterPeasantFoundryActiveEffectChanges(this);
     try {
@@ -307,7 +813,7 @@ export class PeasantActor extends Actor {
     let changed = false;
 
     for (const effect of collectPeasantActiveEffectDocuments(this)) {
-      if (effect.disabled) continue;
+      if (effect.disabled || (isSkillEditorDefinition(effect) && !isPassiveSkillEffectDefinition(effect, this))) continue;
       for (const change of effect.changes ?? effect._source?.changes ?? []) {
         const target = getPeasantVirtualHaltTarget(change?.key);
         if (!target) continue;
@@ -325,9 +831,29 @@ export class PeasantActor extends Actor {
     this.system.naturalHaltValues = naturalHaltValues;
   }
 
+  _applyPeasantGridHealthMaxActiveEffectChanges() {
+    if (!isPeasantCharacterType(this.type) || isSimplifiedHpActor(this)) return;
+    const hp = this.system?.hp;
+    if (!hp) return;
+
+    const changes = [];
+    for (const effect of collectPeasantActiveEffectDocuments(this)) {
+      if (effect.disabled || effect.isSuppressed
+        || (isSkillEditorDefinition(effect) && !isPassiveSkillEffectDefinition(effect, this))) continue;
+      changes.push(...(effect.changes ?? effect._source?.changes ?? []));
+    }
+
+    const { rows, cols } = getPeasantHpDimensions(hp);
+    const effectCols = applyPeasantGridHealthMaxChanges(cols, changes);
+    if (effectCols === cols) return;
+    hp.cols = effectCols;
+    hp.grid = normalizePeasantHpGrid(hp.grid, rows, effectCols);
+  }
+
   prepareDerivedData() {
     super.prepareDerivedData();
     this._applyPeasantVirtualActiveEffectChanges();
+    this._applyPeasantGridHealthMaxActiveEffectChanges();
 
     pcLog.debug("prepareDerivedData called for actor:", this.name, "type:", this.type);
 
@@ -370,16 +896,78 @@ export class PeasantActor extends Actor {
     } else {
       pcLog.debug("Health NOT calculated - type:", this.type, "has hp:", !!this.system.hp, "has grid:", !!this.system.hp?.grid);
     }
+
+    if (isPeasantCharacterType(this.type)) {
+      const capacity = getActiveArmorChargeCapacity(this);
+      const current = Math.max(0, Number(this.system?.armorCharge?.value) || 0);
+      this.system.armorCharge ??= {};
+      this.system.armorCharge.max = capacity;
+      this.system.armorCharge.value = Math.min(current, capacity);
+    }
   }
 
   async _preUpdate(changed, options, user) {
     const result = await super._preUpdate(changed, options, user);
     if (result === false) return false;
-    return guardPeasantStateUpdateFromPreparedEffectWrites(this, changed, options);
+    adjustFallBlessingUsesForEdgeMaxChange(this, changed);
+    preservePeasantGridHealthEffectUpdate(this, changed);
+    const guarded = guardPeasantStateUpdateFromPreparedEffectWrites(this, changed, options);
+    if (guarded === false) return false;
+    if (!options?.peasantCore?.sourceWrite && (Object.hasOwn(changed, "system.skills")
+      || Object.hasOwn(changed, "system.notableCombats")
+      || Object.hasOwn(changed.system ?? {}, "skills")
+      || Object.hasOwn(changed.system ?? {}, "notableCombats"))) {
+      options.peasantCore ??= {};
+      options.peasantCore.passiveBefore = [...this._getPeasantPassiveSkillEffectIds()];
+    }
+    return guarded;
+  }
+
+  _onUpdate(changed, options, userId) {
+    super._onUpdate?.(changed, options, userId);
+    if (userId !== globalThis.game?.user?.id || options?.peasantCore?.sourceWrite) return;
+    if (!Object.hasOwn(changed, "system.skills") && !Object.hasOwn(changed, "system.notableCombats")
+      && !Object.hasOwn(changed.system ?? {}, "skills")
+      && !Object.hasOwn(changed.system ?? {}, "notableCombats")) return;
+    const previousPassiveIds = options?.peasantCore?.passiveBefore;
+    return this._syncPeasantPassiveSkillEffects(Array.isArray(previousPassiveIds)
+      ? new Set(previousPassiveIds) : this._getPeasantPassiveSkillEffectIds())
+      .catch(error => console.error("Peasant Core: could not synchronize Passive effects", error));
+  }
+
+  _onCreate(data, options, userId) {
+    super._onCreate?.(data, options, userId);
+    if (userId !== globalThis.game?.user?.id) return;
+    return this._syncPeasantPassiveSkillEffects(this._getPeasantPassiveSkillEffectIds())
+      .catch(error => console.error("Peasant Core: could not synchronize Passive effects", error));
+  }
+
+  _getPeasantPassiveSkillEffectIds() {
+    return new Set(Array.from(this.effects ?? [])
+      .filter(effect => findPassiveSkillEffectSource(this, effect.id)).map(effect => effect.id));
+  }
+
+  async _syncPeasantPassiveSkillEffects(previousPassiveIds) {
+    for (const effect of this.effects ?? []) {
+      if (!isSkillEditorDefinition(effect)) continue;
+      const passive = !!findPassiveSkillEffectSource(this, effect.id);
+      const patch = {};
+      if (effect.disabled === passive && (!passive || !previousPassiveIds.has(effect.id))) {
+        patch.disabled = !passive;
+      }
+      if (passive && hasExpiringSkillEffectDuration(effect._source?.duration ?? effect.duration)) {
+        patch.duration = { value: null, expiry: null, expired: false };
+      }
+      if (Object.keys(patch).length) await effect.update(patch);
+    }
   }
 
   async updatePeasantSourceData(updateData, options = {}) {
-    return this.update(updateData, withPeasantActorSourceWriteContext(options));
+    const updatesEntries = Object.hasOwn(updateData, "system.skills") || Object.hasOwn(updateData, "system.notableCombats");
+    const previousPassiveIds = updatesEntries ? this._getPeasantPassiveSkillEffectIds() : null;
+    const result = await this.update(updateData, withPeasantActorSourceWriteContext(options));
+    if (updatesEntries) await this._syncPeasantPassiveSkillEffects(previousPassiveIds);
+    return result;
   }
 
   async updatePeasantStateData(updateData, options = {}) {
@@ -426,12 +1014,23 @@ export class PeasantActor extends Actor {
     return { ok: true, value: newHealth, scaledDamage: damageValue, tempUsed, bolsteredUsed };
   }
 
-  async applyPeasantDamage(amount, dmgType, hardLocation = false) {
+  async applyPeasantDamage(amount, dmgType, hardLocation = false, { domeAlreadyResolved = false } = {}) {
     if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Damage amount must be positive." };
 
+    const dome = domeAlreadyResolved
+      ? getAlreadyResolvedDomeResult(amount, dmgType)
+      : await absorbActorSpellEffect(this, { manifestType: "dome", damage: amount, damageType: dmgType });
+    const resistance = await absorbActorSpellEffect(this, {
+      manifestType: "resistance",
+      damage: dome.penetration,
+      damageType: dmgType
+    });
+    const postResistanceDamage = resistance.penetration;
+
     if (isSimplifiedHpActor(this)) {
-      const scaledDamage = toSimplifiedHpDamageWithResistance(amount, dmgType, this, hardLocation);
-      return this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
+      const scaledDamage = toSimplifiedHpDamageWithResistance(postResistanceDamage, dmgType, this, hardLocation);
+      const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
+      return { ...result, dome, resistance };
     }
 
     const hp = this?.system?.hp;
@@ -442,23 +1041,18 @@ export class PeasantActor extends Actor {
       return { ok: false, message: "HP grid is not available for this actor." };
     }
 
-    let remaining = amount;
     let tempHp = Number(this.system.temporaryHp?.value) || 0;
     let bolsteredHp = Number(this.system.bolsteredHp) || 0;
+    const damageCounts = splitDamageCounts(postResistanceDamage, String(dmgType || "").toLowerCase());
+    const tempResult = absorbTempHpFromCounts(damageCounts, tempHp);
+    const bolsteredResult = absorbBolsteredFromCounts(tempResult.remaining, bolsteredHp);
+    const remainingCounts = bolsteredResult.remaining;
+    tempHp = tempResult.tempRemaining;
+    bolsteredHp = bolsteredResult.bolsteredRemaining;
 
-    if (tempHp > 0 && remaining > 0) {
-      const used = Math.min(tempHp, remaining);
-      tempHp -= used;
-      remaining -= used;
-    }
-
-    if (bolsteredHp > 0 && remaining > 0) {
-      const used = Math.min(bolsteredHp, remaining);
-      bolsteredHp -= used;
-      remaining -= used;
-    }
-
-    if (remaining > 0) hp.applyDamage(dmgType, remaining, hardLocation);
+    if (remainingCounts.critical > 0) hp.applyDamage("critical", remainingCounts.critical, false);
+    if (remainingCounts.lethal > 0) hp.applyDamage("lethal", remainingCounts.lethal, hardLocation);
+    if (remainingCounts.blunt > 0) hp.applyDamage("blunt", remainingCounts.blunt, false);
 
     const { rows, cols } = getPeasantHpDimensions(hp);
     const totalCells = rows * cols;
@@ -475,7 +1069,7 @@ export class PeasantActor extends Actor {
       "system.bolsteredHp": bolsteredHp
     });
 
-    return { ok: true, value: regularCells };
+    return { ok: true, value: regularCells, dome, resistance };
   }
 
   async applyPeasantTargetedDamage({
@@ -484,9 +1078,11 @@ export class PeasantActor extends Actor {
     location = "Torso",
     isAP = false,
     useArmorCharge = false,
+    armorGrade = "",
     ignoreHaltReduction = false,
     woundLocation = null,
-    suppressLocationBreaks = false
+    suppressLocationBreaks = false,
+    domeAlreadyResolved = false
   } = {}) {
     const normalizedType = normalizeAppliedDamageType(type);
     if (normalizedType === "flexible") {
@@ -500,18 +1096,25 @@ export class PeasantActor extends Actor {
 
     const locKey = getTargetedDamageConditionKey(location);
     const woundLoc = woundLocation || location;
-    const woundLocKey = getTargetedDamageConditionKey(woundLoc);
     const locationDisplay = getTargetedDamageLocationDisplay(location);
     const haltIndex = TARGETED_DAMAGE_HALT_INDEX_MAP[location] ?? 0;
     const isHybrid = normalizedType === "hybrid";
 
+    const armorTraining = getActiveArmorTraining(this);
+    const requestedArmorGrade = String(armorGrade ?? "").trim().toLowerCase();
     const armorChargeValue = getArmorChargeValue(this);
-    useArmorCharge = !!useArmorCharge && armorChargeValue > 0;
+    useArmorCharge = !!useArmorCharge
+      && canSpendActiveArmorCharge(this)
+      && (!requestedArmorGrade || requestedArmorGrade === armorTraining.grade);
 
-    let netDamage = damageAmount;
+    const dome = domeAlreadyResolved
+      ? getAlreadyResolvedDomeResult(damageAmount, normalizedType)
+      : await absorbActorSpellEffect(this, { manifestType: "dome", damage: damageAmount, damageType: normalizedType });
+    let netDamage = dome.penetration;
     let haltUsed = 0;
 
-    const haltParts = parseHaltSlashValues(this.system?.haltValues || "0/0/0/0");
+    const equippedArmor = getEquippedArmorEffects(this);
+    const haltParts = addEquippedArmorHalt(this.system?.haltValues, equippedArmor);
     const naturalHaltParts = parseHaltSlashValues(this.system?.naturalHaltValues || "0/0/0/0");
     const combatHaltTotals = getCombatHaltBuffTotals(this.system?.combatMods?.haltBuffs);
     const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];
@@ -524,15 +1127,22 @@ export class PeasantActor extends Actor {
 
       haltUsed += naturalHalt;
       if (!isAP) haltUsed += armorHalt;
-      netDamage = Math.max(0, damageAmount - haltUsed);
+      netDamage = Math.max(0, netDamage - haltUsed);
     }
+
+    const resistance = await absorbActorSpellEffect(this, {
+      manifestType: "resistance",
+      damage: netDamage,
+      damageType: normalizedType
+    });
+    netDamage = resistance.penetration;
 
     let isHard = false;
     if (isHybrid) {
       isHard = true;
     } else {
       const flags = TARGETED_DAMAGE_HARD_FLAG_MAP[location] || { hard: "", naturalHard: "" };
-      const armorHard = !!this.system?.[flags.hard];
+      const armorHard = !!this.system?.[flags.hard] || !!equippedArmor[flags.hard];
       const naturalHard = !!this.system?.[flags.naturalHard];
       isHard = naturalHard || (!isAP && armorHard);
     }
@@ -540,9 +1150,15 @@ export class PeasantActor extends Actor {
     const rawCounts = splitDamageCounts(netDamage, normalizedType);
 
     if (isSimplifiedHpActor(this)) {
+      const healthBefore = Math.max(0, Number(this.system?.health?.value) || 0);
       const scaledDamage = toSimplifiedHpDamageFromCountsWithResistance(rawCounts, this, isHard);
       const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
-      if (useArmorCharge) await this.setPeasantResourceValue("armorCharge", armorChargeValue - 1);
+      const damageToGrid = Math.max(0, healthBefore - (Number(result?.value) || 0));
+      const armorChargeRefunded = !!(result?.ok && useArmorCharge && armorTraining.grade === "heavy" && damageToGrid === 0);
+      const armorChargeSpent = !!(result?.ok && useArmorCharge && !armorChargeRefunded);
+      if (armorChargeSpent) {
+        await this.updatePeasantStateData({ "system.armorCharge.value": Math.max(0, armorChargeValue - 1) });
+      }
       return {
         ...result,
         location,
@@ -551,11 +1167,15 @@ export class PeasantActor extends Actor {
         netDamage,
         normalizedType,
         isHybrid,
-        damageToGrid: result?.scaledDamage ?? scaledDamage,
+        damageToGrid,
         isHard,
         useArmorCharge,
+        armorChargeSpent,
+        armorChargeRefunded,
         isAP,
-        ignoreHaltReduction
+        ignoreHaltReduction,
+        dome,
+        resistance
       };
     }
 
@@ -586,71 +1206,69 @@ export class PeasantActor extends Actor {
       return { ok: false, message: "HP grid is not available for this actor." };
     }
 
-    const hpCols = hp.cols || 7;
-    const woundMult = getWoundThresholdMultipliers(this);
-    let woundMultiplier = woundMult.head;
-    if (woundLoc === "Torso") woundMultiplier = woundMult.torso;
-    else if (woundLoc === "RightArm" || woundLoc === "LeftArm") woundMultiplier = woundMult.arms;
-    else if (woundLoc === "RightLeg" || woundLoc === "LeftLeg") woundMultiplier = woundMult.legs;
-    const woundThreshold = hpCols * woundMultiplier;
+    const woundThresholds = getEffectiveWoundThresholds(this);
+    const woundThresholdKey = woundLoc === "Torso"
+      ? "torso"
+      : (woundLoc === "RightArm" || woundLoc === "LeftArm")
+        ? "arms"
+        : (woundLoc === "RightLeg" || woundLoc === "LeftLeg")
+          ? "legs"
+          : "head";
+    const { base: woundThresholdBase, effective: woundThreshold } = woundThresholds[woundThresholdKey];
+    const devastatingWoundsBefore = getDevastatingWoundCount(this);
+    const wasWounded = !!this.system?.conditions?.wounded;
+    const currentLocStatus = this.system?.conditions?.[locKey];
 
-    const isAlreadyWounded = this.system?.conditions?.wounded;
-    const currentLocStatus = this.system?.conditions?.[suppressLocationBreaks ? woundLocKey : locKey];
-
-    const disabledMult = isAlreadyWounded ? 1 : 2;
-    const crippledMult = isAlreadyWounded ? 2 : 3;
-    const disabledThreshold = woundThreshold * disabledMult;
-    const crippledThreshold = woundThreshold * crippledMult;
-
-    let newWoundedState = isAlreadyWounded;
+    let newWoundedState = wasWounded;
     let newLocStatus = currentLocStatus;
     let breakOccurred = false;
     let breakType = "";
+    let devastatingWoundsGained = 0;
     const events = [];
 
-    if (damageToGrid > 0) {
-      if (damageToGrid >= woundThreshold && !isAlreadyWounded) {
+    if (damageToGrid > woundThreshold) {
+      if (!wasWounded) {
         newWoundedState = true;
         events.push("Became Wounded!");
-      }
-
-      if (!suppressLocationBreaks && (damageToGrid >= crippledThreshold || (damageToGrid >= disabledThreshold && currentLocStatus === "disabled"))) {
-        if (newLocStatus !== "crippled") {
-          newLocStatus = "crippled";
-          breakOccurred = true;
-          breakType = "Crippled";
-          events.push(`${breakType} ${locationDisplay}!`);
-        }
-      } else if (!suppressLocationBreaks && damageToGrid >= disabledThreshold) {
-        if (newLocStatus !== "disabled" && newLocStatus !== "crippled") {
-          newLocStatus = "disabled";
-          breakOccurred = true;
-          breakType = "Disabled";
-          events.push(`${breakType} ${locationDisplay}!`);
-        }
+      } else {
+        devastatingWoundsGained++;
       }
     }
 
-    const conditionUpdates = {};
-    if (newWoundedState !== isAlreadyWounded) conditionUpdates["system.conditions.wounded"] = newWoundedState;
-    if (!suppressLocationBreaks && newLocStatus !== currentLocStatus) conditionUpdates[`system.conditions.${locKey}`] = newLocStatus;
-    if (Object.keys(conditionUpdates).length > 0) await this.updatePeasantStateData(conditionUpdates);
-
-    const gridDamageType = isHybrid ? "lethal" : normalizedType;
-    if (damageToGrid > 0) {
-      if (breakOccurred) {
-        const halfDamage = Math.floor(damageToGrid / 2);
-        const otherHalf = damageToGrid - halfDamage;
-        hp.applyDamage(gridDamageType, otherHalf, isHard);
-        hp.applyDamage("critical", halfDamage, isHard);
+    if (!suppressLocationBreaks && damageToGrid >= woundThreshold * 3) {
+      breakOccurred = true;
+      breakType = "Crippled";
+      newLocStatus = "crippled";
+    } else if (!suppressLocationBreaks && damageToGrid >= woundThreshold * 2) {
+      if (currentLocStatus === "disabled") {
+        breakOccurred = true;
+        breakType = "Crippled";
+        newLocStatus = "crippled";
+      } else if (currentLocStatus === "crippled") {
+        breakOccurred = true;
+        breakType = "Crippled";
       } else {
-        if (remainingCounts.critical > 0) hp.applyDamage("critical", remainingCounts.critical, false);
-        if (remainingCounts.lethal > 0) {
-          const hardForLethal = isHybrid ? false : isHard;
-          hp.applyDamage("lethal", remainingCounts.lethal, hardForLethal);
-        }
-        if (remainingCounts.blunt > 0) hp.applyDamage("blunt", remainingCounts.blunt, false);
+        breakOccurred = true;
+        breakType = "Disabled";
+        newLocStatus = "disabled";
       }
+    }
+
+    if (breakType === "Disabled") devastatingWoundsGained++;
+    if (breakType === "Crippled") devastatingWoundsGained += 2;
+    const devastatingWoundsAfter = devastatingWoundsBefore + devastatingWoundsGained;
+    const breakCriticalDamage = breakOccurred ? woundThresholdBase : 0;
+    if (devastatingWoundsGained > 0) events.push(`Gained ${devastatingWoundsGained} Devastating Wound${devastatingWoundsGained === 1 ? "" : "s"}!`);
+    if (breakOccurred) events.push(`${breakType} ${locationDisplay}!`);
+
+    if (damageToGrid > 0) {
+      if (remainingCounts.critical > 0) hp.applyDamage("critical", remainingCounts.critical, false);
+      if (remainingCounts.lethal > 0) {
+        const hardForLethal = isHybrid ? false : isHard;
+        hp.applyDamage("lethal", remainingCounts.lethal, hardForLethal);
+      }
+      if (remainingCounts.blunt > 0) hp.applyDamage("blunt", remainingCounts.blunt, false);
+      if (breakOccurred) hp.applyDamage("critical", breakCriticalDamage, false);
     }
 
     const { rows, cols } = getPeasantHpDimensions(hp);
@@ -660,6 +1278,8 @@ export class PeasantActor extends Actor {
     const newTempHpMax = totalCells - regularCells;
     const newTempHpValue = Math.min(tempHp, newTempHpMax);
 
+    const armorChargeRefunded = !!(useArmorCharge && armorTraining.grade === "heavy" && damageToGrid === 0);
+    const armorChargeSpent = !!(useArmorCharge && !armorChargeRefunded);
     await this.updatePeasantStateData({
       "system.hp.grid": hp.grid.map(row => [...row]),
       "system.health.value": regularCells,
@@ -667,7 +1287,10 @@ export class PeasantActor extends Actor {
       "system.temporaryHp.value": newTempHpValue,
       "system.temporaryHp.max": newTempHpMax,
       "system.bolsteredHp": bolsteredHp,
-      ...(useArmorCharge ? { "system.armorCharge.value": Math.max(0, armorChargeValue - 1) } : {})
+      ...(newWoundedState !== wasWounded ? { "system.conditions.wounded": newWoundedState } : {}),
+      ...(!suppressLocationBreaks && newLocStatus !== currentLocStatus ? { [`system.conditions.${locKey}`]: newLocStatus } : {}),
+      ...(devastatingWoundsGained > 0 ? { "system.devastatingWounds": devastatingWoundsAfter } : {}),
+      ...(armorChargeSpent ? { "system.armorCharge.value": Math.max(0, armorChargeValue - 1) } : {})
     });
 
     return {
@@ -682,18 +1305,30 @@ export class PeasantActor extends Actor {
       damageToGrid,
       isHard,
       useArmorCharge,
+      armorChargeSpent,
+      armorChargeRefunded,
       isAP,
       ignoreHaltReduction,
       tempHpUsed,
       bolsteredHpUsed,
       breakOccurred,
-      events
+      woundThresholds,
+      devastatingWoundsBefore,
+      devastatingWoundsGained,
+      devastatingWoundsAfter,
+      breakType,
+      breakCriticalDamage,
+      events,
+      dome,
+      resistance
     };
   }
 
   async applyPeasantLocationlessDamage({
     amount,
-    type
+    type,
+    domeAlreadyResolved = false,
+    ignoreResistance = false
   } = {}) {
     const normalizedType = normalizeAppliedDamageType(type);
     if (normalizedType === "flexible") {
@@ -705,27 +1340,51 @@ export class PeasantActor extends Actor {
       return { ok: false, message: "Damage amount must be positive." };
     }
 
-    const rawCounts = splitDamageCounts(damageAmount, normalizedType);
+    const dome = domeAlreadyResolved
+      ? getAlreadyResolvedDomeResult(damageAmount, normalizedType)
+      : await absorbActorSpellEffect(this, { manifestType: "dome", damage: damageAmount, damageType: normalizedType });
+    const resistance = ignoreResistance
+      ? {
+        handled: true,
+        applied: false,
+        reason: "ignored",
+        absorbed: 0,
+        penetration: dome.penetration,
+        remainingHp: 0,
+        depleted: false,
+        damageType: normalizedType
+      }
+      : await absorbActorSpellEffect(this, {
+        manifestType: "resistance",
+        damage: dome.penetration,
+        damageType: normalizedType
+      });
+    const netDamage = resistance.penetration;
+    const rawCounts = splitDamageCounts(netDamage, normalizedType);
 
     if (isSimplifiedHpActor(this)) {
-      const scaledDamage = toSimplifiedHpDamageFromCountsWithResistance(rawCounts, this, false);
+      const scaledDamage = ignoreResistance
+        ? toSimplifiedHpDamageFromCounts(rawCounts)
+        : toSimplifiedHpDamageFromCountsWithResistance(rawCounts, this, false);
       const result = await this._applyPeasantSimplifiedHpDamageValue(scaledDamage);
       return {
         ...result,
         locationless: true,
         haltUsed: 0,
-        netDamage: damageAmount,
+        netDamage,
         normalizedType,
         isHybrid: normalizedType === "hybrid",
         damageToGrid: result?.scaledDamage ?? scaledDamage,
         isHard: false,
         useArmorCharge: false,
         isAP: false,
-        ignoreHaltReduction: true
+        ignoreHaltReduction: true,
+        dome,
+        resistance
       };
     }
 
-    const resistedCounts = applyDamageResistanceToCounts(rawCounts, this);
+    const resistedCounts = ignoreResistance ? rawCounts : applyDamageResistanceToCounts(rawCounts, this);
     const resistedDamage = sumDamageCounts(resistedCounts);
 
     let tempHp = this.system?.temporaryHp?.value || 0;
@@ -777,7 +1436,7 @@ export class PeasantActor extends Actor {
       value: regularCells,
       locationless: true,
       haltUsed: 0,
-      netDamage: damageAmount,
+      netDamage,
       normalizedType,
       isHybrid: normalizedType === "hybrid",
       damageToGrid,
@@ -788,17 +1447,27 @@ export class PeasantActor extends Actor {
       tempHpUsed,
       bolsteredHpUsed,
       breakOccurred: false,
-      events: []
+      events: [],
+      dome,
+      resistance
     };
   }
 
   async applyPeasantHeal(amount, healType) {
     if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Heal amount must be positive." };
-    if (healType !== "temporary" && healType !== "greater") {
-      return { ok: false, message: "Heal type must be temporary or greater." };
+    if (healType !== "temporary" && healType !== "greater" && healType !== "special") {
+      return { ok: false, message: "Heal type must be temporary, greater, or special." };
     }
 
     const emptyHealedDamageCounts = () => ({ blunt: 0, lethal: 0, critical: 0 });
+    const noSpecialResult = {
+      specialEligible: false,
+      criticalOnlyBefore: false,
+      criticalDamageBefore: 0,
+      criticalDamageAfter: 0,
+      criticalFullyHealed: false,
+      thresholdBreakLocationsMended: []
+    };
 
     if (isSimplifiedHpActor(this)) {
       const maxHealth = getActorHealthMax(this);
@@ -812,7 +1481,7 @@ export class PeasantActor extends Actor {
       const bolsteredCap = getActorBolsteredMax(this);
       let updates = {};
 
-      if (healType === "temporary") {
+      if (healType !== "greater") {
         const canGrantTempHp = Math.max(0, tempHpMax - currentTempHp);
         const tempHpGranted = Math.min(amount, canGrantTempHp);
         updates["system.temporaryHp.value"] = currentTempHp + tempHpGranted;
@@ -824,8 +1493,12 @@ export class PeasantActor extends Actor {
           ok: true,
           value: currentHealth,
           healedDamageCounts: emptyHealedDamageCounts(),
+          tempHpGranted,
+          bolsteredHpBefore: Math.max(0, Number(this.system?.bolsteredHp) || 0),
+          bolsteredHpAfter: Math.max(0, Number(this.system?.bolsteredHp) || 0),
           bolsteredHpGained: 0,
-          effectiveHealingPower: 0
+          effectiveHealingPower: 0,
+          ...noSpecialResult
         };
       }
 
@@ -843,11 +1516,11 @@ export class PeasantActor extends Actor {
       let newBolsteredHp = previousBolsteredHp;
       if (remaining > 0) {
         const bolsteredGain = Math.floor(remaining / 2);
-        newBolsteredHp = Math.min(bolsteredCap, newBolsteredHp + bolsteredGain);
+        newBolsteredHp = Math.min(bolsteredCap, bolsteredGain);
       }
       const bolsteredHpGained = Math.max(0, newBolsteredHp - previousBolsteredHp);
       const healedDamageCounts = { blunt: hpHealed, lethal: 0, critical: 0 };
-      const effectiveHealingPower = toSimplifiedHpDamageFromCounts(healedDamageCounts) + bolsteredHpGained;
+      const effectiveHealingPower = toSimplifiedHpDamageFromCounts(healedDamageCounts);
 
       const newTempHpMax = Math.max(0, maxHealth - newHealth);
       const newTempHpValue = Math.min(currentTempHp + tempHpGranted, newTempHpMax);
@@ -857,13 +1530,18 @@ export class PeasantActor extends Actor {
       updates["system.temporaryHp.value"] = newTempHpValue;
       updates["system.temporaryHp.max"] = newTempHpMax;
       updates["system.bolsteredHp"] = newBolsteredHp;
+      if (hpHealed > 0) updates["system.conditions.overcharged"] = true;
       await this.updatePeasantStateData(updates);
       return {
         ok: true,
         value: newHealth,
         healedDamageCounts,
+        tempHpGranted,
+        bolsteredHpBefore: previousBolsteredHp,
+        bolsteredHpAfter: newBolsteredHp,
         bolsteredHpGained,
-        effectiveHealingPower
+        effectiveHealingPower,
+        ...noSpecialResult
       };
     }
 
@@ -878,42 +1556,54 @@ export class PeasantActor extends Actor {
     let regularCells = countPeasantRegularHpCellsInDimensions(hp.grid, rows, cols);
 
     const tempHpMax = totalCells - regularCells;
-    const currentTempHp = this.system.temporaryHp?.value || 0;
+    const currentTempHp = Math.max(0, Number(this.system.temporaryHp?.value) || 0);
+    let criticalDamageBefore = 0;
+    let damagedCellsBefore = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = Number(hp.grid?.[r]?.[c]) || 0;
+        if (cell > 0) damagedCellsBefore++;
+        if (cell === 3) criticalDamageBefore++;
+      }
+    }
+    const criticalOnlyBefore = criticalDamageBefore > 0 && criticalDamageBefore === damagedCellsBefore;
+    const specialEligible = healType === "special" && currentTempHp >= tempHpMax && criticalOnlyBefore;
     let updates = {};
     let remaining = amount;
     let tempHpGranted = 0;
     let bolsteredHpGained = 0;
     const healedDamageCounts = emptyHealedDamageCounts();
+    const previousBolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
+    let newBolsteredHp = previousBolsteredHp;
 
-    if (healType === "temporary") {
+    if (healType === "temporary" || (healType === "special" && !specialEligible)) {
       const canGrantTempHp = Math.max(0, tempHpMax - currentTempHp);
       tempHpGranted = Math.min(remaining, canGrantTempHp);
       const newTempHpValue = currentTempHp + tempHpGranted;
       updates["system.temporaryHp.value"] = newTempHpValue;
       updates["system.temporaryHp.max"] = tempHpMax;
-    } else if (healType === "greater") {
-      const canGrantTempHp = Math.max(0, tempHpMax - currentTempHp);
-      tempHpGranted = Math.min(remaining, canGrantTempHp);
-      remaining -= tempHpGranted;
+    } else if (healType === "greater" || specialEligible) {
+      if (healType === "greater") {
+        const canGrantTempHp = Math.max(0, tempHpMax - currentTempHp);
+        tempHpGranted = Math.min(remaining, canGrantTempHp);
+        remaining -= tempHpGranted;
+      }
 
       for (let r = rows - 1; r >= 0 && remaining > 0; r--) {
         for (let c = cols - 1; c >= 0 && remaining > 0; c--) {
-          if (hp.grid[r][c] > 0) {
-            const healedCell = Number(hp.grid[r][c]) || 0;
-            if (healedCell === 1) healedDamageCounts.blunt += 1;
-            else if (healedCell === 2) healedDamageCounts.lethal += 1;
-            else if (healedCell === 3) healedDamageCounts.critical += 1;
-            hp.grid[r][c] = 0;
-            remaining--;
-          }
+          const healedCell = Number(hp.grid?.[r]?.[c]) || 0;
+          if (specialEligible ? healedCell !== 3 : (healedCell !== 1 && healedCell !== 2)) continue;
+          if (healedCell === 1) healedDamageCounts.blunt += 1;
+          else if (healedCell === 2) healedDamageCounts.lethal += 1;
+          else if (healedCell === 3) healedDamageCounts.critical += 1;
+          hp.grid[r][c] = 0;
+          remaining--;
         }
       }
 
-      const previousBolsteredHp = Math.max(0, Number(this.system?.bolsteredHp) || 0);
-      let newBolsteredHp = previousBolsteredHp;
-      if (remaining > 0) {
+      if (healType === "greater" && remaining > 0) {
         const bolsteredHpGenerated = Math.min(Math.floor(remaining / 2), cols);
-        newBolsteredHp = Math.min(getActorBolsteredMax(this), previousBolsteredHp + bolsteredHpGenerated);
+        newBolsteredHp = Math.min(getActorBolsteredMax(this), bolsteredHpGenerated);
       }
       bolsteredHpGained = Math.max(0, newBolsteredHp - previousBolsteredHp);
 
@@ -929,20 +1619,47 @@ export class PeasantActor extends Actor {
       if (newBolsteredHp !== previousBolsteredHp) updates["system.bolsteredHp"] = newBolsteredHp;
     }
 
+    const criticalDamageAfter = hp.grid.slice(0, rows).reduce((sum, row) => (
+      sum + row.slice(0, cols).filter((cell) => Number(cell) === 3).length
+    ), 0);
+    const criticalFullyHealed = specialEligible && criticalDamageBefore > 0 && criticalDamageAfter === 0;
+    const thresholdBreakLocationsMended = [];
+    if (criticalFullyHealed) {
+      for (const key of PeasantActor.CONDITION_KEYS) {
+        if (key === "wounded" || !PeasantActor.WOUND_STATUSES.includes(this.system?.conditions?.[key])) continue;
+        thresholdBreakLocationsMended.push(key);
+        updates[`system.conditions.${key}`] = "";
+      }
+    }
+    if (specialEligible && healedDamageCounts.critical > 0) {
+      updates["system.conditions.overcharged"] = true;
+    } else if (healType === "greater" && (healedDamageCounts.blunt > 0 || healedDamageCounts.lethal > 0)) {
+      updates["system.conditions.overcharged"] = true;
+    }
+
     await this.updatePeasantStateData(updates);
     return {
       ok: true,
       value: regularCells,
       healedDamageCounts,
+      tempHpGranted,
+      bolsteredHpBefore: previousBolsteredHp,
+      bolsteredHpAfter: newBolsteredHp,
       bolsteredHpGained,
-      effectiveHealingPower: toSimplifiedHpDamageFromCounts(healedDamageCounts) + bolsteredHpGained
+      effectiveHealingPower: toSimplifiedHpDamageFromCounts(healedDamageCounts),
+      specialEligible,
+      criticalOnlyBefore,
+      criticalDamageBefore,
+      criticalDamageAfter,
+      criticalFullyHealed,
+      thresholdBreakLocationsMended
     };
   }
 
   async applyPeasantHpValueCommand(raw) {
     const cmd = parseHpValueCommand(raw);
     if (!cmd) {
-      return { ok: false, message: "Use +# or -# (optional: L, B, C, H for damage; G for greater heal)." };
+      return { ok: false, message: "Use +# or -# (optional: L, B, C, H for damage; G for greater heal; S for special heal)." };
     }
 
     if (cmd.sign === "-") {
@@ -958,10 +1675,10 @@ export class PeasantActor extends Actor {
       return this.applyPeasantDamage(cmd.amount, dmgType, hard);
     }
 
-    if (cmd.suffix && cmd.suffix !== "G") {
-      return { ok: false, message: "Heal modifier must be G for Greater Heal." };
+    if (cmd.suffix && cmd.suffix !== "G" && cmd.suffix !== "S") {
+      return { ok: false, message: "Heal modifier must be G for Greater Heal or S for Special Heal." };
     }
-    const healType = cmd.suffix === "G" ? "greater" : "temporary";
+    const healType = cmd.suffix === "G" ? "greater" : cmd.suffix === "S" ? "special" : "temporary";
     return this.applyPeasantHeal(cmd.amount, healType);
   }
 
@@ -1056,6 +1773,59 @@ export class PeasantActor extends Actor {
     return { ok: true };
   }
 
+  async applyPeasantMageBlockBarrierAction({
+    action,
+    selectedCombatId = null,
+    selectedCombatIndex = null
+  } = {}) {
+    const combats = this.getPeasantNotableCombatsForUpdate();
+    const id = String(selectedCombatId || "").trim();
+    const combatIndex = id
+      ? combats.findIndex((combat) => String(combat?.id || "") === id)
+      : Number.parseInt(selectedCombatIndex, 10);
+    const combat = combats[combatIndex] || null;
+    const defense = normalizeCombatDefense(combat?.defense);
+    if (!combat || !defense.block || defense.blockType !== "Mage") {
+      return { ok: false, changed: false, reason: "invalidMageBlockDefense" };
+    }
+
+    const identity = getMageBlockDefenseIdentity("notableCombats", combat.id, "base");
+    const duress = getMageBlockDuressEffect(this, identity);
+    let barrier = getMageBlockBarrierEffect(this, identity);
+    const initialized = !!(barrier && duress);
+    const resolvedAction = String(action || "").trim().toLowerCase();
+    if (resolvedAction === "use") {
+      return initialized
+        ? { ok: true, changed: false, action: resolvedAction, hp: getMageBlockBarrierHp(barrier).value }
+        : { ok: false, changed: false, reason: "mageBlockDuressNotStarted" };
+    }
+    if ((resolvedAction === "create" && initialized) || (resolvedAction === "refresh" && !initialized)) {
+      return { ok: false, changed: false, reason: "invalidMageBarrierAction" };
+    }
+    if (resolvedAction !== "create" && resolvedAction !== "refresh") {
+      return { ok: false, changed: false, reason: "invalidMageBarrierAction" };
+    }
+
+    const maxHp = Math.max(1, defense.maxHp);
+    const name = String(combat.name || "Mage Block");
+    const effects = await createMageBlockEffects(this, {
+      identity,
+      name,
+      img: getNotableCombatEffectImage(this, combat),
+      hp: maxHp,
+      maxHp,
+      createBarrier: true,
+      createDuress: true,
+      refreshBarrier: true
+    });
+    barrier = effects.barrier || getMageBlockBarrierEffect(this, identity);
+    const currentDuress = effects.duress || getMageBlockDuressEffect(this, identity);
+    if (!barrier || !currentDuress) {
+      return { ok: false, changed: false, reason: "mageBlockEffectCreationFailed" };
+    }
+    return { ok: true, changed: true, action: resolvedAction, hp: maxHp };
+  }
+
   async applyPeasantResourceHpDamage(amount, dmgType) {
     if (isSimplifiedHpActor(this)) {
       return this.applyPeasantDamage(amount, dmgType, false);
@@ -1077,44 +1847,25 @@ export class PeasantActor extends Actor {
     return { ok: true };
   }
 
-  async consumePeasantCombatUse(combatIndex) {
-    const system = getActorSourceSystem(this);
-    const combats = JSON.parse(JSON.stringify(system?.notableCombats || []));
-    if (!combats[combatIndex]) return { ok: false, changed: false };
-
-    let changed = false;
-
-    if (combats[combatIndex].sig) {
-      const currentUses = Number.parseInt(combats[combatIndex].usesCurrent, 10) || 0;
-      if (currentUses > 0) {
-        combats[combatIndex].usesCurrent = Math.max(0, currentUses - 1);
-        changed = true;
-      }
-    }
-
-    const tagUsesMax = Number.parseInt(combats[combatIndex]?.tagUses?.max, 10) || 0;
-    const tagUsesCurrent = Number.parseInt(combats[combatIndex]?.tagUses?.current, 10) || 0;
-    if (tagUsesMax > 0 && tagUsesCurrent > 0) {
-      combats[combatIndex].tagUses = combats[combatIndex].tagUses || { current: 0, max: tagUsesMax };
-      combats[combatIndex].tagUses.current = Math.max(0, tagUsesCurrent - 1);
-      changed = true;
-    }
-
-    if (!changed) return { ok: true, changed: false };
-
-    await this.updatePeasantStateData({ "system.notableCombats": combats });
-    return { ok: true, changed: true };
+  async consumePeasantCombatUse(combatIndex, options = {}) {
+    await this.ensurePeasantEntryIds("notableCombats");
+    const combat = getActorSourceSystem(this)?.notableCombats?.[Number.parseInt(combatIndex, 10)];
+    if (!combat?.id) return { ok: false, changed: false };
+    const result = await this.consumePeasantEntryUses(
+      { collection: "notableCombats", entryId: combat.id },
+      { usageId: options.usageId ?? "base", pool: options.pool ?? "primary" }
+    );
+    return { ...result, combats: getActorSourceSystem(this)?.notableCombats ?? [] };
   }
 
   static createDefaultPeasantCombatEntry(entry = {}) {
     const existing = (entry && typeof entry === "object") ? entry : {};
     const defaults = {
       id: PeasantActor.createPeasantNotableCombatId(),
-      type: "standard",
+      type: "skill",
       specialGrade: 0,
       class: 1,
       rank: "0",
-      sig: false,
       name: "",
       img: "",
       effectIds: [],
@@ -1136,6 +1887,8 @@ export class PeasantActor extends Actor {
       magnetism: { grade: 0 },
       heal: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
       manifest: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0 },
+      manifestDome: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, duration: 3 },
+      manifestResistance: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, haltValues: [1, 1, 1, 1] },
       tagUses: { current: 0, max: 0 },
       sections: { current: 0, max: 0 },
       aoe: { value: 0, type: "" },
@@ -1162,6 +1915,9 @@ export class PeasantActor extends Actor {
     merged.magnetism = normalizeCombatMagnetism(existing.magnetism);
     merged.heal = { ...defaults.heal, ...(existing.heal || {}) };
     merged.manifest = { ...defaults.manifest, ...(existing.manifest || {}) };
+    merged.manifestDome = { ...defaults.manifestDome, ...(existing.manifestDome || {}) };
+    merged.manifestResistance = { ...defaults.manifestResistance, ...(existing.manifestResistance || {}) };
+    merged.manifestResistance.haltValues = normalizeHaltValues(merged.manifestResistance.haltValues);
     merged.tagUses = { ...defaults.tagUses, ...(existing.tagUses || {}) };
     merged.sections = { ...defaults.sections, ...(existing.sections || {}) };
     merged.aoe = { ...defaults.aoe, ...(existing.aoe || {}) };
@@ -1175,7 +1931,10 @@ export class PeasantActor extends Actor {
     merged.rangeRate = normalizeRangeRateValue(merged.rangeRate);
     syncCombatCustomTags(merged);
     if (!merged.stability) merged.strengthen = false;
-    return merged;
+    return normalizeSkillEntry(merged, {
+      collection: "notableCombats",
+      createId: PeasantActor.createPeasantNotableCombatId
+    });
   }
 
   getPeasantNotableCombatsForUpdate() {
@@ -1188,6 +1947,10 @@ export class PeasantActor extends Actor {
 
   async setPeasantNotableCombats(combats, options = {}) {
     const list = cloneActorList(combats);
+    for (const combat of list) {
+      if (!combat || typeof combat !== "object") continue;
+      combat.type = normalizeSkillTypeForCategory(combat.type, combat.category);
+    }
     PeasantActor.ensurePeasantNotableCombatIds(list);
     await this.updatePeasantSourceData({ "system.notableCombats": list }, options);
     return { ok: true, changed: true, combats: list };
@@ -1196,6 +1959,30 @@ export class PeasantActor extends Actor {
   async addPeasantNotableCombat(options = {}) {
     const combats = this.getPeasantNotableCombatsForUpdate();
     combats.push(PeasantActor.createDefaultPeasantCombatEntry());
+    return this.setPeasantNotableCombats(combats, options);
+  }
+
+  async duplicatePeasantNotableCombat(index, options = {}) {
+    const combats = this.getPeasantNotableCombatsForUpdate();
+    const sourceIndex = Number.parseInt(index, 10);
+    const source = combats[sourceIndex];
+    if (!Number.isFinite(sourceIndex) || sourceIndex < 0 || !source || typeof source !== "object") {
+      return { ok: false, changed: false };
+    }
+
+    const sourceIndent = Math.max(0, Number.parseInt(source.indent, 10) || 0);
+    let insertIndex = sourceIndex + 1;
+    while (insertIndex < combats.length) {
+      const indent = Math.max(0, Number.parseInt(combats[insertIndex]?.indent, 10) || 0);
+      if (indent <= sourceIndent) break;
+      insertIndex++;
+    }
+
+    const duplicate = cloneActorList([source])[0];
+    duplicate.id = PeasantActor.createPeasantNotableCombatId();
+    duplicate.name = `${String(source.name ?? "")} (Copy)`;
+    duplicate.indent = sourceIndent;
+    combats.splice(insertIndex, 0, duplicate);
     return this.setPeasantNotableCombats(combats, options);
   }
 
@@ -1220,28 +2007,20 @@ export class PeasantActor extends Actor {
     return this.setPeasantNotableCombats(combats, options);
   }
 
-  async setPeasantNotableCombatType(index, rawType, { clearStandardFields = false, render } = {}) {
-    const type = String(rawType ?? "standard").trim() || "standard";
+  async setPeasantNotableCombatType(index, rawType, { render } = {}) {
+    const type = String(rawType ?? "skill").trim() || "skill";
     const combats = this.getPeasantNotableCombatsForUpdate();
     const combat = this.ensurePeasantNotableCombatAt(combats, index);
     if (!combat) return { ok: false, changed: false };
 
-    if (type === "standard") {
-      combat.type = "standard";
+    if (isSkillProgressionType(type)) {
+      combat.type = type;
       combat.class = combat.class || 1;
       combat.rank = combat.rank !== undefined ? String(combat.rank) : "0";
-      combat.sig = combat.sig || false;
       combat.usesMax = combat.usesMax || 0;
       combat.usesCurrent = combat.usesCurrent || 0;
     } else {
       combat.type = type;
-      if (clearStandardFields) {
-        delete combat.class;
-        delete combat.rank;
-        delete combat.sig;
-        delete combat.usesMax;
-        delete combat.usesCurrent;
-      }
     }
 
     return this.setPeasantNotableCombats(combats, { render });
@@ -1253,10 +2032,6 @@ export class PeasantActor extends Actor {
     if (!combat) return { ok: false, changed: false };
     combat.indent = Math.max(0, (Number.parseInt(combat.indent, 10) || 0) + (Number.parseInt(delta, 10) || 0));
     return this.setPeasantNotableCombats(combats, options);
-  }
-
-  async setPeasantNotableCombatSig(index, enabled, options = {}) {
-    return this.updatePeasantNotableCombat(index, { sig: !!enabled }, options);
   }
 
   async setPeasantNotableCombatMainFields(index, fields = {}, options = {}) {
@@ -1274,14 +2049,19 @@ export class PeasantActor extends Actor {
   }
 
   async setPeasantNotableCombatUsesMax(index, rawValue, options = {}) {
-    return this.updatePeasantNotableCombat(index, { usesMax: Number.parseInt(rawValue, 10) || 0 }, options);
+    await this.ensurePeasantEntryIds("notableCombats");
+    const combat = getActorSourceSystem(this)?.notableCombats?.[Number.parseInt(index, 10)];
+    if (!combat?.id) return { ok: false, changed: false };
+    const result = await this.setPeasantEntryUses({ collection: "notableCombats", entryId: combat.id }, { max: rawValue });
+    return { ...result, combats: getActorSourceSystem(this)?.notableCombats ?? [] };
   }
 
   async setPeasantNotableCombatUsesCurrent(index, rawValue, options = {}) {
-    const combat = this.getPeasantNotableCombatsForUpdate()[Number.parseInt(index, 10)];
-    const max = Number.parseInt(combat?.usesMax, 10) || 0;
-    const value = Math.min(Number.parseInt(rawValue, 10) || 0, Math.max(0, max));
-    return this.updatePeasantNotableCombat(index, { usesCurrent: value }, options);
+    await this.ensurePeasantEntryIds("notableCombats");
+    const combat = getActorSourceSystem(this)?.notableCombats?.[Number.parseInt(index, 10)];
+    if (!combat?.id) return { ok: false, changed: false };
+    const result = await this.setPeasantEntryUses({ collection: "notableCombats", entryId: combat.id }, { current: rawValue });
+    return { ...result, combats: getActorSourceSystem(this)?.notableCombats ?? [] };
   }
 
   async setPeasantNotableCombatSectionsCurrent(index, rawValue, options = {}) {
@@ -1372,232 +2152,35 @@ export class PeasantActor extends Actor {
   }
 
   async removePeasantNotableCombatTag(index, rawTagType, { customIndex = null, render } = {}) {
-    const combats = this.getPeasantNotableCombatsForUpdate();
-    const numericIndex = Number.parseInt(index, 10);
-    if (!Number.isFinite(numericIndex) || numericIndex < 0 || numericIndex >= combats.length) return { ok: false, changed: false };
-
-    const combat = combats[numericIndex] || {};
-    const tagType = String(rawTagType ?? "").trim();
-    switch (tagType) {
-      case "description":
-        combat.description = "";
-        break;
-      case "resourceCosts":
-        combat.resourceCosts = [];
-        break;
-      case "speed":
-        combat.speed = { type: "", splitSecondCurrent: 0, splitSecondMax: 0 };
-        break;
-      case "staminaCost":
-        combat.staminaCost = 0;
-        break;
-      case "attunementCost":
-        combat.attunementCost = 0;
-        break;
-      case "range":
-        combat.range = 0;
-        break;
-      case "rangeRate":
-        combat.rangeRate = [null, null, null, null];
-        break;
-      case "damage":
-        combat.damage = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
-        break;
-      case "desperate":
-        combat.desperate = 0;
-        break;
-      case "overkill":
-        combat.overkill = false;
-        break;
-      case "magnetism":
-        combat.magnetism = { grade: 0 };
-        break;
-      case "heal":
-        combat.heal = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" };
-        break;
-      case "manifest":
-        combat.manifest = { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0 };
-        break;
-      case "tagUses":
-        combat.tagUses = { current: 0, max: 0 };
-        break;
-      case "sections":
-        combat.sections = { current: 0, max: 0 };
-        break;
-      case "aoe":
-        combat.aoe = { value: 0, type: "" };
-        break;
-      case "targetingType":
-        combat.targetingType = "";
-        combat.aoe = { value: 0, type: "" };
-        break;
-      case "defense":
-        combat.defense = createDefaultCombatDefense();
-        break;
-      case "reach":
-        combat.reach = 0;
-        break;
-      case "stability":
-        combat.stability = false;
-        combat.strengthen = false;
-        break;
-      case "strengthen":
-        combat.strengthen = false;
-        break;
-      case "custom": {
-        const customTags = getCombatCustomTags(combat);
-        const numericCustomIndex = Number.parseInt(customIndex, 10);
-        if (Number.isFinite(numericCustomIndex) && numericCustomIndex >= 0 && numericCustomIndex < customTags.length) {
-          customTags.splice(numericCustomIndex, 1);
-        } else {
-          customTags.length = 0;
-        }
-        combat.customTags = customTags;
-        syncCombatCustomTags(combat);
-        break;
-      }
-      case "self":
-        combat.self = false;
-        break;
-      default:
-        return { ok: false, changed: false };
-    }
-
-    combats[numericIndex] = combat;
-    return this.setPeasantNotableCombats(combats, { render });
+    await this.ensurePeasantEntryIds("notableCombats");
+    const combat = getActorSourceSystem(this)?.notableCombats?.[Number.parseInt(index, 10)];
+    if (!combat?.id) return { ok: false, changed: false };
+    const customId = rawTagType === "custom"
+      ? getCombatCustomTags(combat)[Number.parseInt(customIndex, 10)]?.id ?? null
+      : null;
+    const result = await this.setPeasantEntryTag(
+      { collection: "notableCombats", entryId: combat.id },
+      rawTagType,
+      {},
+      { mode: "remove", customId, render }
+    );
+    return { ...result, combats: getActorSourceSystem(this)?.notableCombats ?? [] };
   }
-
   async setPeasantNotableCombatTag(index, rawTagType, data = {}, { mode = "add", customIndex = null, render } = {}) {
-    const combats = this.getPeasantNotableCombatsForUpdate();
-    const combat = this.ensurePeasantNotableCombatAt(combats, index);
-    if (!combat) return { ok: false, changed: false };
-
-    const tagType = String(rawTagType ?? "").trim();
-    switch (tagType) {
-      case "resourceCosts":
-        combat.resourceCosts = Array.isArray(data.resourceCosts) ? data.resourceCosts : [];
-        break;
-      case "speed":
-        combat.speed = {
-          type: String(data.speed?.type ?? ""),
-          splitSecondCurrent: Number.parseInt(data.speed?.splitSecondCurrent, 10) || 0,
-          splitSecondMax: Number.parseInt(data.speed?.splitSecondMax, 10) || 0
-        };
-        break;
-      case "staminaCost":
-        combat.staminaCost = Number.parseInt(data.staminaCost, 10) || 0;
-        break;
-      case "attunementCost":
-        combat.attunementCost = Number.parseInt(data.attunementCost, 10) || 0;
-        break;
-      case "range":
-        combat.range = Number.parseInt(data.range, 10) || 0;
-        break;
-      case "rangeRate":
-        combat.rangeRate = normalizeRangeRateValue(data.rangeRate);
-        break;
-      case "damage":
-        combat.damage = {
-          enabled: true,
-          diceCount: Number.parseInt(data.damage?.diceCount, 10) || 0,
-          diceValue: Number.parseInt(data.damage?.diceValue, 10) || 0,
-          diceBonus: Number.parseInt(data.damage?.diceBonus, 10) || 0,
-          flat: Number.parseInt(data.damage?.flat, 10) || 0,
-          type: String(data.damage?.type ?? "")
-        };
-        break;
-      case "desperate":
-        combat.desperate = Number.parseInt(data.desperate, 10) || 0;
-        break;
-      case "overkill":
-        combat.overkill = true;
-        break;
-      case "magnetism":
-        combat.magnetism = normalizeCombatMagnetism(data.magnetism);
-        break;
-      case "heal":
-        combat.heal = {
-          enabled: true,
-          diceCount: Number.parseInt(data.heal?.diceCount, 10) || 0,
-          diceValue: Number.parseInt(data.heal?.diceValue, 10) || 0,
-          diceBonus: Number.parseInt(data.heal?.diceBonus, 10) || 0,
-          flat: Number.parseInt(data.heal?.flat, 10) || 0,
-          type: String(data.heal?.type ?? "")
-        };
-        break;
-      case "manifest":
-        combat.manifest = {
-          enabled: true,
-          diceCount: Number.parseInt(data.manifest?.diceCount, 10) || 0,
-          diceValue: Number.parseInt(data.manifest?.diceValue, 10) || 0,
-          diceBonus: Number.parseInt(data.manifest?.diceBonus, 10) || 0,
-          flat: Number.parseInt(data.manifest?.flat, 10) || 0
-        };
-        break;
-      case "tagUses":
-        combat.tagUses = {
-          current: Number.parseInt(data.tagUses?.current, 10) || 0,
-          max: Number.parseInt(data.tagUses?.max, 10) || 0
-        };
-        break;
-      case "sections":
-        combat.sections = {
-          current: Number.parseInt(data.sections?.current, 10) || 0,
-          max: Number.parseInt(data.sections?.max, 10) || 0
-        };
-        break;
-      case "aoe":
-        combat.aoe = {
-          value: Number.parseInt(data.aoe?.value, 10) || 0,
-          type: String(data.aoe?.type ?? "")
-        };
-        break;
-      case "targetingType":
-        combat.targetingType = normalizeCombatTargetingType(data.targetingType) || String(data.targetingType ?? "");
-        combat.aoe = { value: 0, type: "" };
-        break;
-      case "defense":
-        combat.defense = normalizeCombatDefense(data.defense);
-        break;
-      case "reach":
-        combat.reach = Number.parseInt(data.reach, 10) || 0;
-        break;
-      case "stability":
-        combat.stability = true;
-        break;
-      case "strengthen":
-        if (!combat.stability) return { ok: false, changed: false };
-        combat.strengthen = true;
-        break;
-      case "custom": {
-        const name = String(data.name ?? "").trim();
-        if (!name) return { ok: false, changed: false };
-        const value = String(data.value ?? "").trim();
-        const customTags = getCombatCustomTags(combat);
-        const numericCustomIndex = Number.parseInt(customIndex, 10);
-        if (mode === "edit" && Number.isFinite(numericCustomIndex) && numericCustomIndex >= 0 && numericCustomIndex < customTags.length) {
-          customTags[numericCustomIndex] = { name, value };
-        } else {
-          customTags.push({ name, value });
-        }
-        combat.customTags = customTags;
-        syncCombatCustomTags(combat);
-        break;
-      }
-      case "self":
-        combat.self = true;
-        break;
-      default:
-        return { ok: false, changed: false };
-    }
-
-    if (Array.isArray(combat.tagOrder) && combat.tagOrder.length > 0 && !combat.tagOrder.includes(tagType)) {
-      combat.tagOrder.push(tagType);
-    }
-
-    return this.setPeasantNotableCombats(combats, { render });
+    await this.ensurePeasantEntryIds("notableCombats");
+    const combat = getActorSourceSystem(this)?.notableCombats?.[Number.parseInt(index, 10)];
+    if (!combat?.id) return { ok: false, changed: false };
+    const customId = rawTagType === "custom" && mode === "edit"
+      ? getCombatCustomTags(combat)[Number.parseInt(customIndex, 10)]?.id ?? null
+      : null;
+    const result = await this.setPeasantEntryTag(
+      { collection: "notableCombats", entryId: combat.id },
+      rawTagType,
+      data,
+      { mode, customId, render }
+    );
+    return { ...result, combats: getActorSourceSystem(this)?.notableCombats ?? [] };
   }
-
   async setPeasantNotableCombatDescription(index, description, options = {}) {
     return this.updatePeasantNotableCombat(index, { description: String(description ?? "") }, options);
   }
@@ -1609,6 +2192,35 @@ export class PeasantActor extends Actor {
   getPeasantResourceName(rawName) {
     const name = String(rawName ?? "").trim();
     return PeasantActor.RESOURCE_NAMES.includes(name) ? name : "";
+  }
+
+  getPeasantFallBlessingUseCapacity(edgeMax = this.system?.edge?.max) {
+    const maxEdge = clampPeasantInteger(edgeMax, { min: 0 });
+    return Math.max(1, Math.floor(maxEdge / 2));
+  }
+
+  async setPeasantFallBlessingUses(rawUses = {}, options = {}) {
+    const uses = this.system?.fallBlessingUses || { value: 0, max: 1 };
+    const max = clampPeasantInteger(rawUses.max ?? uses.max ?? 1, { min: 0 });
+    const value = Math.min(clampPeasantInteger(rawUses.value ?? uses.value ?? 0, { min: 0 }), max);
+    await this.updatePeasantStateData({
+      "system.fallBlessingUses.value": value,
+      "system.fallBlessingUses.max": max
+    }, options);
+    return { ok: true, changed: true, value, max };
+  }
+
+  async spendPeasantFallBlessingUses(rawCount) {
+    const count = Number(rawCount);
+    const current = clampPeasantInteger(this.system?.fallBlessingUses?.value, { min: 0 });
+    const max = clampPeasantInteger(this.system?.fallBlessingUses?.max ?? 1, { min: 0 });
+    if (this.system?.blessing?.type !== "fall" || !Number.isSafeInteger(count) || count < 1 || count > current) {
+      return { ok: false, changed: false, value: current, max };
+    }
+
+    const value = current - count;
+    await this.updatePeasantStateData({ "system.fallBlessingUses.value": value });
+    return { ok: true, changed: true, value, max, spent: count };
   }
 
   async setPeasantResourceMax(rawName, rawMax, { fillOnlyWhenEmpty = false } = {}) {
@@ -1644,6 +2256,35 @@ export class PeasantActor extends Actor {
     const max = Math.max(0, Number(this.system?.[resourceName]?.max) || 0);
     await this.updatePeasantStateData({ [`system.${resourceName}.value`]: max });
     return { ok: true, changed: true, value: max, max };
+  }
+
+  async rechargePeasantArmorCharges() {
+    const training = getActiveArmorTraining(this);
+    const capacity = training.capacity;
+    const value = Math.min(
+      capacity,
+      Math.max(0, Math.floor(Number(this.system?.armorCharge?.value) || 0))
+    );
+    const staminaBefore = Math.max(0, Number(this.system?.stamina?.value) || 0);
+
+    if (!training.grade || !training.trained || capacity <= 0) {
+      return { ok: false, changed: false, grade: training.grade, capacity, trained: training.trained };
+    }
+    if (value >= capacity) {
+      return { ok: false, changed: false, alreadyFull: true, grade: training.grade, capacity, value };
+    }
+
+    await this.applyPeasantCombatResourceCosts({ resourceCosts: [{ type: "Stamina", value: 2 }] });
+    await this.updatePeasantStateData({ "system.armorCharge.value": capacity });
+    return {
+      ok: true,
+      changed: true,
+      grade: training.grade,
+      capacity,
+      value: capacity,
+      staminaBefore,
+      armorChargeBefore: value
+    };
   }
 
   async setPeasantBolsteredHp(rawValue) {
@@ -1916,17 +2557,18 @@ export class PeasantActor extends Actor {
     return regularCells;
   }
 
-  addPeasantLongRestHpRecoveryUpdates(updateData) {
+  addPeasantLongRestHpRecoveryUpdates(updateData, { naturalHealing = true } = {}) {
+    const summer = this.system?.blessing?.type === "summer";
     if (isSimplifiedHpActor(this)) {
       const maxHealth = Math.max(0, Number(this.system?.health?.max) || getActorHealthMax(this) || 0);
       const currentHealth = Math.max(0, Math.min(Number(this.system?.health?.value) || 0, maxHealth));
       const missingHealth = Math.max(0, maxHealth - currentHealth);
-      const healed = Math.min(2, missingHealth);
+      const healed = naturalHealing ? Math.min(summer ? 4 : 2, missingHealth) : 0;
       const nextHealth = currentHealth + healed;
       const tempMax = Math.max(0, maxHealth - nextHealth);
 
       updateData["system.health.max"] = maxHealth;
-      updateData["system.health.value"] = nextHealth;
+      if (naturalHealing) updateData["system.health.value"] = nextHealth;
       updateData["system.temporaryHp.max"] = tempMax;
       updateData["system.temporaryHp.value"] = tempMax;
       return updateData;
@@ -1955,16 +2597,21 @@ export class PeasantActor extends Actor {
 
     const hasBlunt = grid.some(row => row.some(cell => cell === 1));
     const hasLethal = grid.some(row => row.some(cell => cell === 2));
-    if (hasBlunt) healCells(1, 2);
-    else if (hasLethal) healCells(2, 1);
+    if (naturalHealing) {
+      if (hasBlunt) healCells(1, summer ? 4 : 2);
+      else if (hasLethal) healCells(2, summer ? 2 : 1);
+      else if (summer) healCells(3, 1);
+    }
 
     const totalCells = rows * cols;
     const regularCells = this.countPeasantRegularHpCells(grid, rows, cols);
     const tempMax = Math.max(0, totalCells - regularCells);
 
-    updateData["system.hp.grid"] = grid.map(row => [...row]);
-    updateData["system.health.value"] = regularCells;
     updateData["system.health.max"] = totalCells;
+    if (naturalHealing) {
+      updateData["system.hp.grid"] = grid.map(row => [...row]);
+      updateData["system.health.value"] = regularCells;
+    }
     updateData["system.temporaryHp.max"] = tempMax;
     updateData["system.temporaryHp.value"] = tempMax;
     return updateData;
@@ -1972,7 +2619,7 @@ export class PeasantActor extends Actor {
 
   async performPeasantShortRest() {
     const updateData = {};
-    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "armorCharge"]);
+    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement"]);
     this.addPeasantStressClearUpdates(updateData, ["physical", "mental"]);
 
     await this.updatePeasantStateData(updateData);
@@ -1980,11 +2627,31 @@ export class PeasantActor extends Actor {
   }
 
   async performPeasantLongRest() {
+    const overchargedBefore = this.system?.conditions?.overcharged === true;
     const updateData = {};
-    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity", "armorCharge"]);
+    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity"]);
     this.addPeasantStressClearUpdates(updateData, ["physical", "mental"]);
-    this.addPeasantLongRestHpRecoveryUpdates(updateData);
-    this.addPeasantStressRecoveryUpdates(updateData, "general", 3);
+    this.addPeasantLongRestHpRecoveryUpdates(updateData, { naturalHealing: !overchargedBefore });
+    if (overchargedBefore) updateData["system.conditions.overcharged"] = false;
+    else this.addPeasantStressRecoveryUpdates(updateData, "general", 3);
+    if (this.system?.blessing?.type === "fall") {
+      updateData["system.fallBlessingUses.value"] = clampPeasantInteger(this.system?.fallBlessingUses?.max ?? 1, { min: 0 });
+    }
+
+    const healthValue = Number(updateData["system.health.value"] ?? this.system?.health?.value) || 0;
+    const healthMax = Number(updateData["system.health.max"] ?? this.system?.health?.max) || 0;
+    const generalStressCount = Math.max(0, Math.floor(Number(this.system?.generalStressCount) || 0));
+    const generalStressRemaining = Array.from({ length: generalStressCount }, (_, index) => (
+      Number(updateData[`system.general${index}`] ?? this.system?.[`general${index}`]) || 0
+    )).some(value => value > 0);
+    const woundsRecovered = !isSimplifiedHpActor(this)
+      && healthMax > 0
+      && healthValue >= healthMax
+      && !generalStressRemaining;
+    if (woundsRecovered) {
+      updateData["system.conditions.wounded"] = false;
+      updateData["system.devastatingWounds"] = 0;
+    }
 
     await this.updatePeasantStateData(updateData);
     return { ok: true, changed: true };
@@ -1993,10 +2660,11 @@ export class PeasantActor extends Actor {
   async refreshPeasantResourcesAndResetTracks() {
     const updateData = {};
 
-    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity", "armorCharge"]);
+    this.addPeasantResourceRefreshUpdates(updateData, ["stamina", "attunement", "capacity"]);
     this.addPeasantStressClearUpdates(updateData, ["physical", "mental", "general"]);
 
     updateData["system.conditions.wounded"] = false;
+    updateData["system.devastatingWounds"] = 0;
     for (const key of ["head", "rightArm", "leftArm", "rightLeg", "leftLeg", "torso", "arms", "legs"]) {
       updateData[`system.conditions.${key}`] = "";
     }
@@ -2027,6 +2695,17 @@ export class PeasantActor extends Actor {
     return PeasantActor.CONDITION_KEYS.includes(key) ? key : "";
   }
 
+  async adjustPeasantDevastatingWounds(delta, options = {}) {
+    const amount = Number(delta);
+    const before = getDevastatingWoundCount(this);
+    if (!Number.isSafeInteger(amount)) return { ok: false, changed: false, value: before };
+
+    const value = Math.max(0, before + amount);
+    if (value === before) return { ok: true, changed: false, value };
+    await this.updatePeasantStateData({ "system.devastatingWounds": value }, options);
+    return { ok: true, changed: true, value };
+  }
+
   hasPeasantConditions() {
     const conditions = this.system?.conditions || {};
     return PeasantActor.CONDITION_KEYS.some((key) => {
@@ -2052,6 +2731,9 @@ export class PeasantActor extends Actor {
       await this.updatePeasantStateData({ "system.conditions.wounded": true });
       return { ok: true, changed: true, hasConditions: true };
     }
+    if (woundType === "devastatingly-wounded") {
+      return this.adjustPeasantDevastatingWounds(1);
+    }
 
     const [rawStatus, rawLocation] = woundType.split(":");
     const status = String(rawStatus ?? "").trim();
@@ -2073,19 +2755,17 @@ export class PeasantActor extends Actor {
     return { ok: true, changed: true };
   }
 
-  async setPeasantBlessing(rawType = "", rawTarget = "") {
+  async setPeasantBlessing(rawType) {
     const type = String(rawType ?? "").trim().toLowerCase();
-    const target = String(rawTarget ?? "").trim();
     const safeType = PeasantActor.BLESSING_TYPES.includes(type) ? type : "";
-    const safeTarget = safeType && PeasantActor.BLESSING_TARGETS.includes(target) ? target : "";
 
-    const blessing = safeType ? { type: safeType, target: safeTarget } : { type: "", target: "" };
+    const blessing = { type: safeType };
     await this.updatePeasantStateData({ "system.blessing": blessing });
     return { ok: true, changed: true, blessing };
   }
 
   async clearPeasantBlessing() {
-    return this.setPeasantBlessing("", "");
+    return this.setPeasantBlessing("");
   }
 
   getPeasantToHitPenaltyTarget(rawTarget) {
@@ -2112,7 +2792,10 @@ export class PeasantActor extends Actor {
 
   async setPeasantReflexAoeSave(enabled, rawTarget = "", options = {}) {
     const isEnabled = !!enabled;
-    const target = isEnabled ? parseOptionalInteger(rawTarget, { min: 1 }) : null;
+    const effectiveTarget = isEnabled ? parseOptionalInteger(rawTarget, { min: 1 }) : null;
+    const target = effectiveTarget === null
+      ? null
+      : removeEquippedArmorAoeSaveModifier(effectiveTarget, getEquippedArmorEffects(this));
     await this.updatePeasantSourceData({
       "system.reflexAoeSaveEnabled": isEnabled,
       "system.reflexAoeSaveTarget": target
@@ -2133,7 +2816,11 @@ export class PeasantActor extends Actor {
   }
 
   async setPeasantMovement(rawValue) {
-    const movement = Math.max(0, Number.parseInt(rawValue, 10) || 0);
+    const movement = removeEquippedArmorMovement(
+      rawValue,
+      getEquippedArmorEffects(this),
+      getUntrainedArmorMovementPenalty(this)
+    );
     await this.updatePeasantSourceData({ "system.movement": movement });
     return { ok: true, changed: true, movement };
   }
@@ -2146,7 +2833,9 @@ export class PeasantActor extends Actor {
 
   async setPeasantHaltValues(rawValues, { natural = false, render } = {}) {
     const field = natural ? "naturalHaltValues" : "haltValues";
-    const values = normalizeHaltValues(rawValues);
+    const values = natural
+      ? normalizeHaltValues(rawValues)
+      : removeEquippedArmorHalt(rawValues, getEquippedArmorEffects(this));
     await this.updatePeasantSourceData({ [`system.${field}`]: values }, { render });
     return { ok: true, changed: true, field, values };
   }
@@ -2293,11 +2982,10 @@ export class PeasantActor extends Actor {
   static createDefaultPeasantSkillEntry(entry = {}) {
     const existing = (entry && typeof entry === "object") ? entry : {};
     const merged = {
-      type: "standard",
+      type: "skill",
       specialGrade: 0,
       class: 1,
       rank: "0",
-      sig: false,
       name: "",
       tohit: null,
       accuracy: null,
@@ -2309,11 +2997,15 @@ export class PeasantActor extends Actor {
       description: "",
       ...existing
     };
-    merged.tohit = parseOptionalInteger(merged.tohit, { min: 1 });
-    merged.accuracy = parseOptionalInteger(merged.accuracy, { allowSign: true });
-    merged.ap = parseOptionalInteger(merged.ap, { min: 0 });
-    merged.sp = parseOptionalInteger(merged.sp, { min: 0 });
-    return merged;
+    const normalized = normalizeSkillEntry(merged, {
+      collection: "skills",
+      createId: PeasantActor.createPeasantNotableCombatId
+    });
+    normalized.tohit = parseOptionalInteger(normalized.tohit, { min: 1 });
+    normalized.accuracy = parseOptionalInteger(normalized.accuracy, { allowSign: true });
+    normalized.ap = parseOptionalInteger(normalized.ap, { min: 0 });
+    normalized.sp = parseOptionalInteger(normalized.sp, { min: 0 });
+    return normalized;
   }
 
   getPeasantSkillsForUpdate() {
@@ -2358,27 +3050,19 @@ export class PeasantActor extends Actor {
   }
 
   async setPeasantSkillType(index, rawType, options = {}) {
-    const type = String(rawType ?? "standard").trim() || "standard";
+    const type = String(rawType ?? "skill").trim() || "skill";
     const skills = this.getPeasantSkillsForUpdate();
     const skill = this.ensurePeasantSkillEntryAt(skills, index);
     if (!skill) return { ok: false, changed: false };
 
-    if (type === "standard") {
-      skill.type = "standard";
+    if (isSkillProgressionType(type)) {
+      skill.type = type;
       skill.class = skill.class || 1;
       skill.rank = skill.rank !== undefined ? String(skill.rank) : "0";
-      skill.sig = skill.sig || false;
       skill.usesMax = skill.usesMax || 0;
       skill.usesCurrent = skill.usesCurrent || 0;
     } else {
       skill.type = type;
-      if (type === "Other") {
-        delete skill.class;
-        delete skill.rank;
-        delete skill.sig;
-        delete skill.usesMax;
-        delete skill.usesCurrent;
-      }
     }
 
     return this.setPeasantSkills(skills, options);
@@ -2393,26 +3077,19 @@ export class PeasantActor extends Actor {
   }
 
   async setPeasantSkillUsesMax(index, rawValue, options = {}) {
-    const skills = this.getPeasantSkillsForUpdate();
-    const skill = this.ensurePeasantSkillEntryAt(skills, index);
-    if (!skill) return { ok: false, changed: false };
-
-    const value = Number.parseInt(rawValue, 10) || 0;
-    const current = Number.parseInt(skill.usesCurrent, 10) || 0;
-    skill.usesMax = value;
-    if (!current) skill.usesCurrent = value;
-    else if (current > value) skill.usesCurrent = value;
-    return this.setPeasantSkills(skills, options);
+    await this.ensurePeasantEntryIds("skills");
+    const skill = getActorSourceSystem(this)?.skills?.[Number.parseInt(index, 10)];
+    if (!skill?.id) return { ok: false, changed: false };
+    const result = await this.setPeasantEntryUses({ collection: "skills", entryId: skill.id }, { max: rawValue });
+    return { ...result, skills: getActorSourceSystem(this)?.skills ?? [] };
   }
 
   async setPeasantSkillUsesCurrent(index, rawValue, options = {}) {
-    const skills = this.getPeasantSkillsForUpdate();
-    const skill = this.ensurePeasantSkillEntryAt(skills, index);
-    if (!skill) return { ok: false, changed: false };
-
-    const max = Number.parseInt(skill.usesMax, 10) || 0;
-    skill.usesCurrent = Math.min(Number.parseInt(rawValue, 10) || 0, Math.max(0, max));
-    return this.setPeasantSkills(skills, options);
+    await this.ensurePeasantEntryIds("skills");
+    const skill = getActorSourceSystem(this)?.skills?.[Number.parseInt(index, 10)];
+    if (!skill?.id) return { ok: false, changed: false };
+    const result = await this.setPeasantEntryUses({ collection: "skills", entryId: skill.id }, { current: rawValue });
+    return { ...result, skills: getActorSourceSystem(this)?.skills ?? [] };
   }
 
   async setPeasantSkillToHitAccuracy(index, { tohit = "", accuracy = "" } = {}, options = {}) {
@@ -2441,17 +3118,14 @@ export class PeasantActor extends Actor {
   }
 
   async consumePeasantSkillUse(index, options = {}) {
-    const skills = this.getPeasantSkillsForUpdate();
-    const numericIndex = Number.parseInt(index, 10);
-    if (!Number.isFinite(numericIndex) || numericIndex < 0 || numericIndex >= skills.length) return { ok: false, changed: false };
-    if (!skills[numericIndex]?.sig) return { ok: true, changed: false, skills };
-
-    const current = Number.parseInt(skills[numericIndex].usesCurrent, 10) || 0;
-    if (current <= 0) return { ok: true, changed: false, skills };
-
-    skills[numericIndex].usesCurrent = Math.max(0, current - 1);
-    await this.updatePeasantStateData({ "system.skills": skills }, options);
-    return { ok: true, changed: true, skills };
+    await this.ensurePeasantEntryIds("skills");
+    const skill = getActorSourceSystem(this)?.skills?.[Number.parseInt(index, 10)];
+    if (!skill?.id) return { ok: false, changed: false };
+    const result = await this.consumePeasantEntryUses(
+      { collection: "skills", entryId: skill.id },
+      { usageId: options.usageId ?? "base", pool: options.pool ?? "primary" }
+    );
+    return { ...result, skills: getActorSourceSystem(this)?.skills ?? [] };
   }
 
   getPeasantFlexibleAdvantagesForUpdate(names = null, descriptions = null) {

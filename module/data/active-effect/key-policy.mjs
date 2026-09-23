@@ -1,3 +1,12 @@
+import { getSirLocationEntries } from "../actor/identity-options.mjs";
+import {
+  MANIFEST_SPELL_EFFECT_CHANGE_KEYS,
+  isManifestSpellEffectChangeKey
+} from "./spell-effect-change-keys.mjs";
+import { isPassiveSkillEffectDefinition, isSkillEditorDefinition } from "../actor/skill-entry-conditions.mjs";
+
+export const DEFENSIVE_REFLEXES_TO_HIT_KEY = "system.defensiveReflexes.toHit";
+
 function compareKeys(a, b) {
   return a.localeCompare(b, undefined, { sensitivity: "base" });
 }
@@ -48,12 +57,14 @@ const STATE_ACTIVE_EFFECT_KEY_PATTERNS = Object.freeze([
 ]);
 
 const UNSUPPORTED_ACTIVE_EFFECT_KEY_PATTERNS = Object.freeze([
+  /^system\.conditions\.overcharged$/,
   /^system\.hp\.grid(?:\.|$)/,
   /^system\.skills(?:\.|$)/,
   /^system\.notableCombats(?:\.|$)/,
   /^system\.edgeResources(?:\.|$)/,
   /^system\.flexibleAdvantages(?:\.|$)/,
   /^system\.flexibleAdvantageDescriptions(?:\.|$)/,
+  /^system\.customSirs$/,
   /^system\.combatMods\.haltBuffs(?:\.|$)/,
   /^system\.(?:haltValues|naturalHaltValues|naturalhaltValues)(?:\.|$)/,
   /\.usesCurrent$/,
@@ -73,7 +84,8 @@ const VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEYS = Object.freeze([
   "system.naturalhaltValues.head",
   "system.naturalhaltValues.arms",
   "system.naturalhaltValues.legs",
-  "system.naturalhaltValues.torso"
+  "system.naturalhaltValues.torso",
+  DEFENSIVE_REFLEXES_TO_HIT_KEY
 ]);
 
 const VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEY_SET = new Set(VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEYS);
@@ -91,8 +103,19 @@ const HIDDEN_ACTIVE_EFFECT_PICKER_KEYS = Object.freeze([
   "system.currency.gp",
   "system.currency.pp",
   "system.currency.rs",
+  "system.category",
+  "system.consumed",
+  "system.customSirs",
+  "system.devastatingWounds",
+  "system.description",
+  "system.edgeCustomLabel",
+  "system.edgeLabelMode",
+  "system.editMode",
+  "system.equipped",
   "system.eyes",
   "system.faith",
+  "system.fallBlessingUses.max",
+  "system.fallBlessingUses.value",
   "system.flaws",
   "system.gender",
   "system.hair",
@@ -101,16 +124,24 @@ const HIDDEN_ACTIVE_EFFECT_PICKER_KEYS = Object.freeze([
   "system.imageOffsetY",
   "system.ideals",
   "system.imageScale",
+  "system.inventory",
+  "system.magicType",
   "system.personalityTraits",
+  "system.portraitScale",
   "system.portraitHeight",
   "system.portantOffsetX",
   "system.portraitOffsetX",
   "system.portraitOffsetY",
   "system.portraitWidth",
+  "system.quality",
+  "system.quantity",
   "system.skin",
   "system.sp",
   "system.sp.value",
   "system.sp.max",
+  "system.hp.rows",
+  "system.hp.cols",
+  "system.value",
   "system.weight",
   "system.weightUnit"
 ]);
@@ -121,12 +152,20 @@ const HIDDEN_ACTIVE_EFFECT_PICKER_KEY_SET = new Set(
 
 export function getPeasantActiveEffectKeyMetadata(path) {
   const key = String(path ?? "").trim();
+  if (isManifestSpellEffectChangeKey(key)) {
+    return {
+      key,
+      category: PEASANT_ACTIVE_EFFECT_KEY_CATEGORIES.DYNAMIC,
+      label: "Reversible",
+      title: "Spell Effect value. Peasant Core reads it from this effect while the effect is active."
+    };
+  }
   if (!key.startsWith("system.")) {
     return {
       key,
       category: PEASANT_ACTIVE_EFFECT_KEY_CATEGORIES.UNSUPPORTED,
-      label: "Unsupported",
-      title: "Only system data paths are supported."
+      label: "Manual",
+      title: "Manual key. Passed to Foundry as entered, but not included in the searchable list."
     };
   }
 
@@ -143,8 +182,8 @@ export function getPeasantActiveEffectKeyMetadata(path) {
     return {
       key,
       category: PEASANT_ACTIVE_EFFECT_KEY_CATEGORIES.UNSUPPORTED,
-      label: "Unsupported",
-      title: "This path is not offered because it is a raw array or derived structure."
+      label: "Manual",
+      title: "Manual key. Passed to Foundry as entered, but not included in the searchable list."
     };
   }
 
@@ -182,17 +221,25 @@ export function isPeasantActiveEffectUnsupportedKey(path) {
 }
 
 export function isPeasantActiveEffectVirtualDynamicKey(path) {
-  return VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEY_SET.has(String(path ?? "").trim());
+  const key = String(path ?? "").trim();
+  return VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEY_SET.has(key) || isManifestSpellEffectChangeKey(key);
 }
 
-export function isPeasantActiveEffectFoundryDynamicKey(path) {
+export function isPeasantActiveEffectFoundryDynamicKey(path, { gridHealth = false } = {}) {
   const key = String(path ?? "").trim();
-  return isPeasantActiveEffectDynamicKey(key) && !isPeasantActiveEffectVirtualDynamicKey(key);
+  return !!key
+    && !isPeasantActiveEffectStateKey(key)
+    && !isPeasantActiveEffectVirtualDynamicKey(key)
+    && !(gridHealth && key === "system.health.max");
 }
 
 export function isPeasantActiveEffectKeyDisplayed(path) {
-  const key = String(path ?? "").trim().toLocaleLowerCase();
-  return !!key && !HIDDEN_ACTIVE_EFFECT_PICKER_KEY_SET.has(key);
+  const rawKey = String(path ?? "").trim();
+  if (/^system\.naturalhaltValues(?:\.|$)/.test(rawKey)) return false;
+  const key = rawKey.toLocaleLowerCase();
+  return !!key
+    && !HIDDEN_ACTIVE_EFFECT_PICKER_KEY_SET.has(key)
+    && !/^system\.(?:general|physical|mental)\d+$/.test(key);
 }
 
 function walkSchema(prefix, schemaField, keys, seen = new Set()) {
@@ -241,12 +288,31 @@ function getEffectIterable(collection) {
 
 export function collectPeasantActiveEffectKeys({
   actorDataModels = globalThis.CONFIG?.Actor?.dataModels ?? {},
-  itemDataModels = globalThis.CONFIG?.Item?.dataModels ?? {}
+  itemDataModels = globalThis.CONFIG?.Item?.dataModels ?? {},
+  sirLocationEntries = getSirLocationEntries(),
+  effect = null
 } = {}) {
+  const parent = effect?.parent;
+  if (parent?.documentName === "Actor") {
+    const actorModel = actorDataModels?.[parent.type];
+    actorDataModels = actorModel ? { [parent.type]: actorModel } : actorDataModels;
+    itemDataModels = {};
+  } else if (parent?.documentName === "Item") {
+    const itemModel = itemDataModels?.[parent.type];
+    itemDataModels = itemModel ? { [parent.type]: itemModel } : itemDataModels;
+  }
+
   const keys = new Set();
   for (const dataModel of Object.values(actorDataModels)) addDataModelKeys(keys, dataModel);
   for (const dataModel of Object.values(itemDataModels)) addDataModelKeys(keys, dataModel);
   for (const key of VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEYS) keys.add(key);
+  if (!effect || effect.type === "spellEffect") {
+    for (const key of Object.values(MANIFEST_SPELL_EFFECT_CHANGE_KEYS)) keys.add(key);
+  }
+  for (const entry of sirLocationEntries) {
+    const key = String(entry?.key ?? "").trim();
+    if (entry?.custom && /^[A-Za-z0-9_-]+$/.test(key)) keys.add(`system.customSirs.${key}`);
+  }
   return Array.from(keys).filter(isPeasantActiveEffectKeyDisplayed).sort(compareKeys);
 }
 
@@ -263,7 +329,7 @@ export function collectPeasantActiveEffectChangeKeys(actor) {
     for (const effect of getEffectIterable(collection)) {
       if (!effect || seen.has(effect)) continue;
       seen.add(effect);
-      if (effect.disabled) continue;
+      if (effect.disabled || (isSkillEditorDefinition(effect) && !isPassiveSkillEffectDefinition(effect, actor))) continue;
       for (const change of effect.changes ?? effect._source?.changes ?? []) {
         const key = String(change?.key ?? "").trim();
         if (key.startsWith("system.")) keys.add(key);

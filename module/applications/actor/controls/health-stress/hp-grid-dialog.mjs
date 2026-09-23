@@ -1,6 +1,6 @@
 import { isSimplifiedHpActor } from "../../../../data/actor/helpers.mjs";
-import { performConsciousnessCheck } from "../../../../dice/rolls.mjs";
 import { qs, qsa, toElement } from "../../../dom.mjs";
+import { rollActorConsciousnessCheck } from "../roll-actions.mjs";
 import { renderDialogModeToggle } from "./dialog-mode-toggle.mjs";
 
 const PC_CONSCIOUSNESS_SAVE_FLAG = "rollConsciousnessAsSaves";
@@ -376,11 +376,7 @@ function bindHpGridDialog(sheet, root) {
       const th = Number.parseInt(button.dataset.th, 10);
       if (!Number.isFinite(th)) return;
       const asSave = !!sheet.actor?.getFlag?.("peasant-core", PC_CONSCIOUSNESS_SAVE_FLAG);
-      await performConsciousnessCheck({
-        tn: th,
-        asSave,
-        speaker: ChatMessage.getSpeaker({ actor: sheet.actor })
-      });
+      await rollActorConsciousnessCheck({ actor: sheet.actor, tn: th, asSave });
     }, { signal });
   }
 }

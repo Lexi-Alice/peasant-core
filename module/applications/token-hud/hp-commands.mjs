@@ -2,7 +2,7 @@ import { parseHpValueCommand } from "../../data/actor/hp-commands.mjs";
 import { getBarBrawlInputAttribute } from "../../integrations/bar-brawl.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 
-const HP_COMMAND_HELP = "Use +# or -# (optional: L, B, C, H for damage; G for greater heal).";
+const HP_COMMAND_HELP = "Use +# or -# (optional: L, B, C, H for damage; G for greater heal; S for special heal).";
 
 function isHealthAttribute(attribute) {
   return String(attribute || "").split(".").pop() === "health";
@@ -31,8 +31,8 @@ function getAttrPathForInput(token, input) {
 
 function setHealthInputHint(input) {
   try {
-    input.setAttribute("placeholder", "+5G / -3L");
-    input.setAttribute("title", "HP command: -#(L/B/C/H) or +#(G)");
+    input.setAttribute("placeholder", "+5G / +5S / -3L");
+    input.setAttribute("title", "HP command: -#(L/B/C/H) or +#(G/S)");
   } catch (e) { /* ignore */ }
 }
 

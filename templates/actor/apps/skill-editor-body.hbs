@@ -1,0 +1,401 @@
+<section class="pc-notable-combat-tag-editor-body pc-skill-editor-body">
+  <header class="pc-notable-combat-editor-header pc-skill-editor-header pc-item-header">
+    <div class="pc-item-image-frame pc-notable-combat-image-frame {{#if editable}}editing{{/if}}" data-pc-notable-combat-image-frame>
+      <img class="pc-item-image" src="{{combatImageSrc}}" alt="{{combatImageAlt}}">
+      {{#if editable}}
+        <div class="pc-item-image-controls">
+          <button type="button" class="pc-item-image-control-btn" data-pc-notable-combat-image-picker data-tooltip="Change Image" aria-label="Change Image">
+            <i class="fa-solid fa-image" aria-hidden="true"></i>
+          </button>
+        </div>
+      {{/if}}
+    </div>
+    <div class="pc-notable-combat-editor-summary pc-item-identity">
+      <div class="pc-skill-editor-title-line">
+        <div class="pc-item-title-row">
+          <input type="text" class="pc-item-name pc-entry-name-input pc-notable-combat-name-input pc-input" value="{{entryName}}" placeholder="Name" autocomplete="off" {{#unless editable}}disabled{{/unless}}>
+        </div>
+        {{#if showProgressionInputs}}
+        <div class="pc-skill-editor-identity-grid {{#unless showRankInput}}pc-skill-editor-identity-grid--single{{/unless}}">
+          {{#if showClassInput}}
+          <label class="pc-notable-combat-stat-field">
+            <span>Class</span>
+            <input type="number" class="pc-entry-class-input pc-notable-combat-class-input pc-input" value="{{entryClassInput}}" min="1" max="10" step="1" inputmode="numeric" {{#unless editable}}disabled{{/unless}}>
+          </label>
+          {{/if}}
+          {{#if showRankInput}}
+          <label class="pc-notable-combat-stat-field">
+            <span>Rank</span>
+            <input type="text" class="pc-entry-rank-input pc-notable-combat-rank-input pc-input" value="{{entryRankInput}}" autocomplete="off" {{#unless editable}}disabled{{/unless}}>
+          </label>
+          {{/if}}
+          {{#if showSpecialGradeInput}}
+            <label class="pc-notable-combat-stat-field pc-skill-editor-special-grade">
+              <span>{{specialGradeLabel}}</span>
+              <input type="number" class="pc-entry-special-grade-input pc-notable-combat-special-grade-input pc-input" value="{{specialGradeInput}}" min="0" step="1" inputmode="numeric" {{#unless editable}}disabled{{/unless}}>
+            </label>
+          {{/if}}
+        </div>
+        {{/if}}
+      </div>
+
+      <div class="pc-skill-editor-primary-meta">
+        <label class="pc-notable-combat-stat-field">
+          <span>Category</span>
+          <select class="pc-entry-category-select pc-select" {{#unless editable}}disabled{{/unless}}>
+            {{#each categoryOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}} {{#if hidden}}hidden{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+        <div class="pc-skill-editor-type-choice">
+          <label class="pc-notable-combat-stat-field">
+            <span>Type</span>
+            <select class="pc-entry-type-select pc-notable-combat-type-select pc-select" {{#unless editable}}disabled{{/unless}}>
+              {{#each entryTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+          <input type="text" class="pc-entry-type-custom pc-input" value="{{typeCustomValue}}" placeholder="Custom type" aria-label="Custom Type" autocomplete="off" {{#unless typeIsCustom}}hidden{{/unless}} {{#unless editable}}disabled{{/unless}}>
+        </div>
+        {{#if showWeaponType}}
+        <div class="pc-skill-editor-type-choice">
+          <label class="pc-notable-combat-stat-field">
+            <span>Weapon Type</span>
+            <select class="pc-entry-weapon-type-select pc-select" {{#unless editable}}disabled{{/unless}}>
+              {{#each weaponTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}} {{#if hidden}}hidden{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+          <input type="text" class="pc-entry-weapon-type-custom pc-input" value="{{weaponTypeCustomValue}}" placeholder="Custom weapon type" aria-label="Custom Weapon Type" autocomplete="off" {{#unless weaponTypeIsCustom}}hidden{{/unless}} {{#unless editable}}disabled{{/unless}}>
+        </div>
+        {{/if}}
+        {{#if showDefenseType}}
+        <div class="pc-skill-editor-type-choice">
+          <label class="pc-notable-combat-stat-field">
+            <span>Defense Type</span>
+            <select class="pc-entry-defense-type-select pc-select" {{#unless editable}}disabled{{/unless}}>
+              {{#each defenseTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}} {{#if hidden}}hidden{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+          <input type="text" class="pc-entry-defense-type-custom pc-input" value="{{defenseTypeCustomValue}}" placeholder="Custom defense type" aria-label="Custom Defense Type" autocomplete="off" {{#unless defenseTypeIsCustom}}hidden{{/unless}} {{#unless editable}}disabled{{/unless}}>
+        </div>
+        {{/if}}
+        {{#if showTrickType}}
+        <div class="pc-skill-editor-type-choice">
+          <label class="pc-notable-combat-stat-field">
+            <span>Trick Type</span>
+            <select class="pc-entry-trick-type-select pc-select" {{#unless editable}}disabled{{/unless}}>
+              {{#each trickTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}} {{#if hidden}}hidden{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+          <input type="text" class="pc-entry-trick-type-custom pc-input" value="{{trickTypeCustomValue}}" placeholder="Custom trick type" aria-label="Custom Trick Type" autocomplete="off" {{#unless trickTypeIsCustom}}hidden{{/unless}} {{#unless editable}}disabled{{/unless}}>
+        </div>
+        {{/if}}
+        {{#if showSignatureType}}
+        <div class="pc-skill-editor-type-choice">
+          <label class="pc-notable-combat-stat-field">
+            <span>Signature Type</span>
+            <select class="pc-entry-signature-type-select pc-select" {{#unless editable}}disabled{{/unless}}>
+              {{#each signatureTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}} {{#if hidden}}hidden{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+          <input type="text" class="pc-entry-signature-type-custom pc-input" value="{{signatureTypeCustomValue}}" placeholder="Custom signature type" aria-label="Custom Signature Type" autocomplete="off" {{#unless signatureTypeIsCustom}}hidden{{/unless}} {{#unless editable}}disabled{{/unless}}>
+        </div>
+        {{/if}}
+        {{#if showGateType}}
+        <div class="pc-skill-editor-type-choice">
+          <label class="pc-notable-combat-stat-field">
+            <span>Gate Type</span>
+            <select class="pc-entry-gate-type-select pc-select" {{#unless editable}}disabled{{/unless}}>
+              {{#each gateTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}} {{#if hidden}}hidden{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+          <input type="text" class="pc-entry-gate-type-custom pc-input" value="{{gateTypeCustomValue}}" placeholder="Custom gate type" aria-label="Custom Gate Type" autocomplete="off" {{#unless gateTypeIsCustom}}hidden{{/unless}} {{#unless editable}}disabled{{/unless}}>
+        </div>
+        {{/if}}
+      </div>
+    </div>
+  </header>
+
+  <section class="pc-skill-editor-meta" aria-label="{{entryKindLabel}} identity">
+    <div class="pc-skill-editor-stat-band {{#if showCharacteristicMode}}pc-skill-editor-stat-band--multiple{{/if}}">
+      <div class="pc-skill-editor-characteristic-block">
+        <span class="pc-skill-editor-row-label">Characteristics{{#if rollOverrideScope}}<button type="button" class="pc-skill-override-control" data-pc-roll-override="characteristics" data-pc-roll-override-customized="{{characteristicsCustomized}}" aria-label="{{#if characteristicsCustomized}}Restore Default Characteristics{{else}}Customize Characteristics{{/if}}" data-tooltip="{{#if characteristicsCustomized}}Restore Default{{else}}Customize{{/if}}"><i class="fa-solid {{#if characteristicsCustomized}}fa-rotate-left{{else}}fa-pen{{/if}}" aria-hidden="true"></i></button>{{/if}}</span>
+        <div class="pc-skill-editor-characteristic-row">
+          <div class="pc-skill-editor-characteristics" role="group" aria-label="Characteristics">
+            {{#each characteristicOptions}}
+              <label class="checkbox"><input type="checkbox" data-pc-entry-characteristic value="{{value}}" {{#if selected}}checked{{/if}} {{#if @root.rollOverrideScope}}{{#unless @root.characteristicsCustomized}}disabled{{/unless}}{{/if}} {{#unless @root.editable}}disabled{{/unless}}> {{value}}</label>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+
+      <div class="pc-skill-editor-control-band" {{#unless showCharacteristicMode}}{{#unless allowToHitAcc}}{{#unless isSkill}}hidden{{/unless}}{{/unless}}{{/unless}}>
+        {{#if showCharacteristicMode}}
+          <label class="pc-notable-combat-stat-field pc-skill-editor-characteristic-mode">
+            <span>Mode{{#if rollOverrideScope}}<button type="button" class="pc-skill-override-control" data-pc-roll-override="characteristicMode" data-pc-roll-override-customized="{{characteristicModeCustomized}}" aria-label="{{#if characteristicModeCustomized}}Restore Default Mode{{else}}Customize Mode{{/if}}" data-tooltip="{{#if characteristicModeCustomized}}Restore Default{{else}}Customize{{/if}}"><i class="fa-solid {{#if characteristicModeCustomized}}fa-rotate-left{{else}}fa-pen{{/if}}" aria-hidden="true"></i></button>{{/if}}</span>
+            <select class="pc-entry-characteristic-mode-select pc-select" {{#if rollOverrideScope}}{{#unless characteristicModeCustomized}}disabled{{/unless}}{{/if}} {{#unless editable}}disabled{{/unless}}>
+              {{#each characteristicModeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+        {{/if}}
+        <div class="pc-skill-editor-roll-stack">
+          {{#if allowToHitAcc}}
+            <div class="pc-skill-editor-roll-row">
+              <label class="pc-notable-combat-stat-field">
+                <span>To-Hit{{#if rollOverrideScope}}<button type="button" class="pc-skill-override-control" data-pc-roll-override="tohit" data-pc-roll-override-customized="{{tohitCustomized}}" aria-label="{{#if tohitCustomized}}Restore Default To-Hit{{else}}Customize To-Hit{{/if}}" data-tooltip="{{#if tohitCustomized}}Restore Default{{else}}Customize{{/if}}"><i class="fa-solid {{#if tohitCustomized}}fa-rotate-left{{else}}fa-pen{{/if}}" aria-hidden="true"></i></button>{{/if}}</span>
+                <input type="text" class="pc-entry-tohit-input pc-notable-combat-tohit-input pc-input" value="{{entryToHitInput}}" inputmode="numeric" pattern="\d*" autocomplete="off" {{#if rollOverrideScope}}{{#unless tohitCustomized}}disabled{{/unless}}{{/if}} {{#unless editable}}disabled{{/unless}}>
+              </label>
+              <label class="pc-notable-combat-stat-field">
+                <span>Accuracy{{#if rollOverrideScope}}<button type="button" class="pc-skill-override-control" data-pc-roll-override="accuracy" data-pc-roll-override-customized="{{accuracyCustomized}}" aria-label="{{#if accuracyCustomized}}Restore Default Accuracy{{else}}Customize Accuracy{{/if}}" data-tooltip="{{#if accuracyCustomized}}Restore Default{{else}}Customize{{/if}}"><i class="fa-solid {{#if accuracyCustomized}}fa-rotate-left{{else}}fa-pen{{/if}}" aria-hidden="true"></i></button>{{/if}}</span>
+                <input type="text" class="pc-entry-accuracy-input pc-notable-combat-accuracy-input pc-input" value="{{entryAccuracyInput}}" inputmode="numeric" pattern="[+=\-]?\d*" autocomplete="off" {{#if rollOverrideScope}}{{#unless accuracyCustomized}}disabled{{/unless}}{{/if}} {{#unless editable}}disabled{{/unless}}>
+              </label>
+            </div>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+
+    {{#if isSkill}}
+      <div class="pc-skill-editor-advancement-row {{#if showUsageSelector}}pc-skill-editor-advancement-row--usage{{/if}}" aria-label="Skill advancement">
+        {{#if showUsageSelector}}
+          <div class="pc-skill-editor-usage-inline" aria-label="Selected usage">
+            <label class="pc-notable-combat-stat-field pc-skill-editor-usage-field">
+              <span>Usage</span>
+              <select class="pc-entry-usage-select pc-select" data-pc-usage-select aria-label="Usage" {{#unless editable}}disabled{{/unless}}>
+                {{#each usageOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}{{#if isDefault}} (Default){{/if}}</option>{{/each}}
+              </select>
+            </label>
+            {{#if editable}}<button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-pc-usage-menu data-tooltip="Usage Options" aria-label="Usage Options"></button>{{/if}}
+          </div>
+        {{/if}}
+        <label class="pc-notable-combat-stat-field"><span>AP</span><input type="text" class="pc-entry-ap-input pc-input" value="{{apInput}}" inputmode="numeric" {{#unless editable}}disabled{{/unless}}></label>
+        <label class="pc-notable-combat-stat-field"><span>SP</span><input type="text" class="pc-entry-sp-input pc-input" value="{{spInput}}" inputmode="numeric" {{#unless editable}}disabled{{/unless}}></label>
+      </div>
+    {{/if}}
+
+    {{#if isSignature}}
+      <fieldset class="pc-foundry-section pc-skill-editor-counter-row">
+        <legend>Signature Uses</legend>
+        <label class="pc-notable-combat-stat-field"><span>Current</span><input type="number" class="pc-entry-signature-current pc-input" value="{{signatureCurrent}}" min="0" max="{{signatureMax}}" {{#unless editable}}disabled{{/unless}}></label>
+        <span class="pc-skill-editor-counter-separator">/</span>
+        <label class="pc-notable-combat-stat-field"><span>Maximum</span><input type="number" class="pc-entry-signature-max pc-input" value="{{signatureMax}}" min="0" {{#unless editable}}disabled{{/unless}}></label>
+        <label class="checkbox pc-skill-editor-duress-toggle"><input type="checkbox" class="pc-entry-duress-uses" {{#if showDuressUses}}checked{{/if}} {{#unless editable}}disabled{{/unless}}> Duress Uses</label>
+        {{#if showDuressUses}}
+          <label class="pc-notable-combat-stat-field pc-skill-editor-duress-field"><span>Duress Current</span><input type="number" class="pc-entry-duress-current pc-input" value="{{duressCurrent}}" min="0" max="{{duressMax}}" {{#unless editable}}disabled{{/unless}}></label>
+          <span class="pc-skill-editor-counter-separator">/</span>
+          <label class="pc-notable-combat-stat-field pc-skill-editor-duress-field"><span>Duress Maximum</span><input type="number" class="pc-entry-duress-max pc-input" value="{{duressMax}}" min="0" {{#unless editable}}disabled{{/unless}}></label>
+        {{/if}}
+      </fieldset>
+    {{/if}}
+  </section>
+
+  {{#if showUsageSelector}}
+  {{#unless isSkill}}
+    <section class="pc-skill-editor-usage-row" aria-label="Selected usage">
+      <label class="pc-notable-combat-stat-field pc-skill-editor-usage-field">
+        <span>Usage</span>
+        <select class="pc-entry-usage-select pc-select" data-pc-usage-select aria-label="Usage" {{#unless editable}}disabled{{/unless}}>
+          {{#each usageOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}{{#if isDefault}} (Default){{/if}}</option>{{/each}}
+        </select>
+      </label>
+      {{#if editable}}<button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-pc-usage-menu data-tooltip="Usage Options" aria-label="Usage Options"></button>{{/if}}
+    </section>
+  {{/unless}}
+  {{/if}}
+
+  <nav class="pc-item-tabs tabs sheet-tabs" role="tablist" aria-label="{{entryKindLabel}} sections">
+    <button type="button" class="pc-item-tab" data-pc-notable-combat-tab="description" role="tab">
+      <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+      <span>Description</span>
+    </button>
+    <button type="button" class="pc-item-tab" data-pc-notable-combat-tab="details" role="tab">
+      <i class="fa-solid fa-list" aria-hidden="true"></i>
+      <span>Details</span>
+    </button>
+    <button type="button" class="pc-item-tab" data-pc-notable-combat-tab="effects" role="tab">
+      <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+      <span>Effects</span>
+    </button>
+  </nav>
+
+  <section class="pc-item-tab-panel pc-notable-combat-editor-panel active" data-pc-notable-combat-panel="description" role="tabpanel">
+    <fieldset class="pc-foundry-section pc-notable-combat-description-section">
+      <legend>Description</legend>
+      <prose-mirror name="combatDescription" class="pc-notable-combat-description-editor pc-item-description-editor inventory-editor peasant-desc-editor" value="{{combatDescription}}" data-document-uuid="{{documentUuid}}"></prose-mirror>
+    </fieldset>
+  </section>
+
+  <section class="pc-item-tab-panel pc-notable-combat-editor-panel" data-pc-notable-combat-panel="details" role="tabpanel" hidden>
+    <fieldset class="pc-foundry-section pc-skill-tags-section">
+      <legend class="control pc-skill-tags-legend">
+        <span>Tags</span>
+        {{#if editable}}<button type="button" class="icon fa-regular fa-square-plus inline-control" data-pc-add-tag-toggle data-tooltip aria-label="Add Tag"></button>{{/if}}
+    </legend>
+    {{#if editable}}
+    <fieldset class="pc-foundry-section pc-skill-tag-chooser" data-pc-tag-chooser hidden>
+      <legend>Add Tag</legend>
+      <div class="pc-skill-tag-combobox" data-pc-tag-combobox>
+        <input type="search" class="pc-input" data-pc-tag-search role="combobox" aria-autocomplete="list" aria-expanded="false" aria-label="Add Tag" placeholder="Search tags" autocomplete="off" spellcheck="false">
+        <input type="hidden" class="tag-type-select">
+        <div class="pc-skill-tag-options" data-pc-tag-options role="listbox" hidden>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="resourceCosts" role="option">Resource Costs</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="speed" role="option">Speed</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="range" role="option">Range</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="rangeRate" role="option">Range-Rate</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="damage" role="option">Damage</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="desperate" role="option">Desperate</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="overkill" role="option">Overkill</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="magnetism" role="option">Magnetism</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="heal" role="option">Heal</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="manifest" role="option">Manifest</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="manifestDome" role="option">Manifest Dome</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="manifestResistance" role="option">Manifest Resistance</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="tagUses" role="option">Uses</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="sections" role="option">Sections</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="targetingType" role="option">Targeting Type</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="defense" role="option">Defense</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="reach" role="option">Reach</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="stability" role="option">Stability</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="strengthen" role="option">Strengthen</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="custom" role="option">Custom</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="self" role="option">Self</div>
+          <div class="pc-skill-tag-option pc-skill-tag-option-empty" data-pc-tag-empty hidden>No matching tags</div>
+        </div>
+      </div>
+    </fieldset>
+    {{/if}}
+
+    <div class="pc-inventory-section pc-skill-tags-browser">
+      <header class="pc-inventory-section-header pc-skill-tags-list-header">
+        <h3 class="pc-inventory-section-title">
+          <i class="fa-solid fa-tags" aria-hidden="true"></i>
+          <span>Tag</span>
+        </h3>
+        <div class="pc-inventory-column pc-skill-tags-summary-column">Summary</div>
+        <div class="pc-inventory-column" aria-hidden="true"></div>
+      </header>
+
+      <div class="current-tags-section" data-pc-local-tags-list>
+        <div class="current-tags-list"></div>
+      </div>
+
+      <div data-pc-tag-draft-home>
+        {{#if editable}}
+        <section class="pc-skill-tag-draft" data-pc-tag-draft hidden>
+          <div class="tag-input-area"></div>
+          <div class="pc-skill-tag-draft-actions">
+            <button type="button" class="peasant-tag-add" data-pc-tag-save><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span>Save Tag</span></button>
+          </div>
+        </section>
+        {{/if}}
+      </div>
+    </div>
+    </fieldset>
+  </section>
+
+  <section class="pc-item-tab-panel pc-notable-combat-editor-panel" data-pc-notable-combat-panel="effects" role="tabpanel" hidden>
+    <fieldset class="pc-foundry-section pc-notable-combat-effects-section">
+      <legend class="control"><span>Effects</span>{{#if editable}}<button type="button" class="add-effect-btn icon fa-regular fa-square-plus inline-control" data-pc-notable-combat-add-effect data-tooltip aria-label="Add Effect"></button>{{/if}}</legend>
+      <section class="pc-inventory-browser pc-item-effects-browser pc-notable-combat-effects-browser" aria-label="Active Effects" data-pc-notable-combat-effects-browser data-pc-notable-combat-effects-grouped="{{#if effectsGroupedByType}}true{{else}}false{{/if}}">
+        <div class="pc-inventory-toolbar pc-item-effects-toolbar">
+          <div class="pc-inventory-search pc-item-effects-search" role="search" aria-label="Search Active Effects">
+            <i class="fa-solid fa-search" aria-hidden="true"></i>
+            <input type="search" class="pc-inventory-search-input pc-item-effects-search-input pc-input" placeholder="Search effects" autocomplete="off" aria-label="Search Active Effects" data-pc-notable-combat-effects-search>
+            <button type="button" class="pc-inventory-toolbar-button pc-item-effects-sort-toggle active" data-tooltip="{{effectSortToggle.label}}" aria-label="{{effectSortToggle.label}}" aria-pressed="true" data-sort-mode="{{effectSortToggle.mode}}" data-pc-notable-combat-effects-sort-toggle>
+              <i class="{{effectSortToggle.icon}}" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="pc-inventory-toolbar-button pc-item-effects-group-toggle{{#if effectGroupToggle.active}} active{{/if}}" data-tooltip="{{effectGroupToggle.label}}" aria-label="{{effectGroupToggle.label}}" aria-pressed="{{effectGroupToggle.pressed}}" data-pc-notable-combat-effects-group-toggle>
+              <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <section class="pc-inventory-list pc-item-effects-list" data-pc-notable-combat-effects-list>
+          <div class="pc-inventory-view pc-item-effects-view" data-pc-notable-combat-effects-view="grouped">
+            {{#each effectSections as |section|}}
+              {{#if section.visible}}
+                <div class="pc-inventory-section pc-item-effects-section" data-pc-notable-combat-effects-section data-effect-type="{{section.type}}">
+                  <header class="pc-inventory-section-header pc-item-effects-section-header">
+                    <h3 class="pc-inventory-section-title pc-item-effects-section-title">
+                      <i class="{{section.icon}}" aria-hidden="true"></i>
+                      <span>{{section.label}}</span>
+                    </h3>
+                    <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-status">Status</div>
+                    <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-controls"></div>
+                  </header>
+
+                  <ol class="pc-inventory-items pc-item-effects-items">
+                    {{#each section.effects as |effect|}}
+                      <li class="pc-inventory-item pc-item-effect" data-pc-notable-combat-effect data-effect-id="{{effect.id}}" data-effect-link-id="{{effect.linkId}}" data-effect-scope="{{effect.scope}}" data-effect-type="{{effect.type}}" data-search="{{effect.searchText}}" data-sort-manual="{{effect.sort}}" data-sort-alpha="{{effect.sortName}}">
+                        <div class="pc-inventory-item-row pc-item-effect-row">
+                          <button type="button" class="pc-inventory-item-summary pc-item-effect-summary" data-tooltip="{{effect.name}}" aria-label="Open {{effect.name}}" data-pc-notable-combat-open-effect>
+                            <img class="pc-inventory-item-image pc-item-effect-icon" src="{{effect.icon}}" alt="">
+                            <span class="pc-inventory-item-name-stack pc-item-effect-name-stack">
+                              <span class="pc-inventory-item-name pc-item-effect-name">{{effect.name}}</span>
+                              <span class="pc-inventory-item-subtitle pc-item-effect-subtitle">{{effect.subtitle}}</span>
+                            </span>
+                          </button>
+
+                          <div class="pc-inventory-row-field pc-item-effect-state">{{effect.status}}</div>
+
+                          <div class="pc-inventory-row-controls pc-item-effect-controls">
+                            {{#if @root.editable}}
+                              <button type="button" class="pc-inventory-menu-toggle pc-item-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-notable-combat-effect-menu></button>
+                            {{/if}}
+                          </div>
+                        </div>
+                      </li>
+                    {{/each}}
+                  </ol>
+                </div>
+              {{/if}}
+            {{/each}}
+          </div>
+
+          <div class="pc-inventory-view pc-item-effects-view" data-pc-notable-combat-effects-view="flat" hidden>
+            {{#if effectFlatSection.visible}}
+              <div class="pc-inventory-section pc-item-effects-section" data-pc-notable-combat-effects-section data-effect-type="{{effectFlatSection.type}}">
+                <header class="pc-inventory-section-header pc-item-effects-section-header">
+                  <h3 class="pc-inventory-section-title pc-item-effects-section-title">
+                    <i class="{{effectFlatSection.icon}}" aria-hidden="true"></i>
+                    <span>{{effectFlatSection.label}}</span>
+                  </h3>
+                  <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-status">Status</div>
+                  <div class="pc-inventory-column pc-item-effects-column pc-item-effects-column-controls"></div>
+                </header>
+
+                <ol class="pc-inventory-items pc-item-effects-items">
+                  {{#each effectFlatSection.effects as |effect|}}
+                    <li class="pc-inventory-item pc-item-effect" data-pc-notable-combat-effect data-effect-id="{{effect.id}}" data-effect-link-id="{{effect.linkId}}" data-effect-scope="{{effect.scope}}" data-effect-type="{{effect.type}}" data-search="{{effect.searchText}}" data-sort-manual="{{effect.sort}}" data-sort-alpha="{{effect.sortName}}">
+                      <div class="pc-inventory-item-row pc-item-effect-row">
+                        <button type="button" class="pc-inventory-item-summary pc-item-effect-summary" data-tooltip="{{effect.name}}" aria-label="Open {{effect.name}}" data-pc-notable-combat-open-effect>
+                          <img class="pc-inventory-item-image pc-item-effect-icon" src="{{effect.icon}}" alt="">
+                          <span class="pc-inventory-item-name-stack pc-item-effect-name-stack">
+                            <span class="pc-inventory-item-name pc-item-effect-name">{{effect.name}}</span>
+                            <span class="pc-inventory-item-subtitle pc-item-effect-subtitle">{{effect.subtitle}}</span>
+                          </span>
+                        </button>
+
+                        <div class="pc-inventory-row-field pc-item-effect-state">{{effect.status}}</div>
+
+                        <div class="pc-inventory-row-controls pc-item-effect-controls">
+                          {{#if @root.editable}}
+                            <button type="button" class="pc-inventory-menu-toggle pc-item-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-notable-combat-effect-menu></button>
+                          {{/if}}
+                        </div>
+                      </div>
+                    </li>
+                  {{/each}}
+                </ol>
+              </div>
+            {{/if}}
+          </div>
+
+          {{#unless hasEffects}}
+            <div class="pc-inventory-empty-state">No effects configured.</div>
+          {{/unless}}
+          <div class="pc-inventory-empty-state pc-notable-combat-effects-search-empty" hidden>No matching effects.</div>
+        </section>
+
+      </section>
+    </fieldset>
+  </section>
+</section>

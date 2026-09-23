@@ -11,9 +11,9 @@ import {
   sanitizeCombatHaltBuffs,
   sanitizeCombatHaltBuffType
 } from "../../../data/actor/combat-modifiers.mjs";
-import { computeBaseSaves } from "../../../data/actor/attributes.mjs";
-import { applyToHitFloor } from "../../../dice/roll-targets.mjs";
+import { getActorAoeReflexSaveTn } from "../../combat/aoe-reflex-save.mjs";
 import { delegate, qs, qsa, readStringInput, toElement } from "../../dom.mjs";
+import { setupProtectedHaltInputs } from "./sheet-listener-helpers.mjs";
 
 export function setupCombatModifierControls(sheet, html, { blurActiveEditableInSheet, enqueueSheetUpdate, runQueuedInputUpdate } = {}) {
   const root = toElement(html);
@@ -222,44 +222,13 @@ export function setupCombatModifierControls(sheet, html, { blurActiveEditableInS
 }
 
 function setupHaltInputSanitizer(sheet, html, runQueuedInputUpdate) {
-  const normalizeHaltValue = (raw) => normalizeHaltSlashValueEditable(raw);
   const finalizeHaltValue = (raw) => normalizeHaltSlashValue(raw);
-
-  const haltInputs = qsa(html, 'input[data-field="system.haltValues"], input[data-field="system.naturalHaltValues"], input[name="system.haltValues"], input[name="system.naturalHaltValues"]');
-  for (const el of haltInputs) {
-    const normalized = normalizeHaltValue(el.value);
-    if (normalized !== el.value) el.value = normalized;
-  }
+  const haltInputs = setupProtectedHaltInputs(
+    html,
+    'input[data-field="system.haltValues"], input[data-field="system.naturalHaltValues"], input[name="system.haltValues"], input[name="system.naturalHaltValues"]'
+  );
 
   for (const inputElement of haltInputs) {
-    inputElement.addEventListener("keydown", (ev) => {
-      if (ev.key !== "Backspace" && ev.key !== "Delete") return;
-      const input = ev.currentTarget;
-      const value = input.value || "";
-      const start = input.selectionStart ?? 0;
-      const end = input.selectionEnd ?? start;
-      if (start !== end) return;
-      if (ev.key === "Backspace" && start > 0 && value[start - 1] === "/") {
-        ev.preventDefault();
-      }
-      if (ev.key === "Delete" && value[start] === "/") {
-        ev.preventDefault();
-      }
-    });
-
-    inputElement.addEventListener("input", (ev) => {
-      const input = ev.currentTarget;
-      const before = input.value || "";
-      const pos = input.selectionStart ?? before.length;
-      const normalized = normalizeHaltValue(before);
-      if (normalized !== before) {
-        const delta = normalized.length - before.length;
-        const nextPos = Math.max(0, Math.min(normalized.length, pos + delta));
-        input.value = normalized;
-        try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
-      }
-    });
-
     const finalizeInput = async (ev) => {
       const input = ev.currentTarget;
       const finalized = finalizeHaltValue(input.value || "");
@@ -293,19 +262,11 @@ function setupHaltHardLocationToggle(sheet, html) {
 }
 
 function setupReflexAoeSaveControls(sheet, html, runQueuedInputUpdate) {
-  const getDefaultReflexAoeSaveTarget = () => {
-    const combatMods = sheet.actor.system.combatMods || { toHit: 0 };
-    const toHitMod = Number.parseInt(combatMods.toHit, 10) || 0;
-    const baseSaves = computeBaseSaves(sheet.actor.system);
-    const reflexBase = Number.isFinite(baseSaves.reflex) ? baseSaves.reflex : 7;
-    return applyToHitFloor(reflexBase, toHitMod, 2).toHit;
-  };
-
   delegate(html, "click", ".reflex-aoe-add", async (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     if (!sheet.isEditMode) return;
-    const defaultTarget = getDefaultReflexAoeSaveTarget();
+    const defaultTarget = getActorAoeReflexSaveTn(sheet.actor);
     await sheet.actor.setPeasantReflexAoeSave?.(true, String(defaultTarget));
     setTimeout(() => {
       const input = qs(toElement(sheet.element), ".reflex-aoe-save-input");

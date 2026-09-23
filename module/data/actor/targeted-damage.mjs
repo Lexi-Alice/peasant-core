@@ -1,4 +1,5 @@
 import { COMBAT_HALT_BUFF_TYPE_HALT, COMBAT_HALT_BUFF_TYPE_NATURAL, getCombatHaltBuffTotals, parseHaltSlashValues } from "./combat-modifiers.mjs";
+import { addEquippedArmorHalt, getEquippedArmorEffects } from "./equipped-armor.mjs";
 
 export const PC_ARMOR_CHARGE_MULTIPLIER_FLAG = "armorChargeMultiplier";
 export const PC_DEFAULT_ARMOR_CHARGE_MULTIPLIER = 2;
@@ -106,7 +107,7 @@ export function isArmorPenLocationLike({ isAP = false, rawText = "", locationRes
 export function getLowestHaltDamageLocation(actor) {
   if (!actor) return "Torso";
 
-  const haltParts = parseHaltSlashValues(actor.system?.haltValues || "0/0/0/0");
+  const haltParts = addEquippedArmorHalt(actor.system?.haltValues, getEquippedArmorEffects(actor));
   const naturalHaltParts = parseHaltSlashValues(actor.system?.naturalHaltValues || "0/0/0/0");
   const combatHaltTotals = getCombatHaltBuffTotals(actor.system?.combatMods?.haltBuffs);
   const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];
@@ -127,7 +128,7 @@ export function getLowestHaltDamageLocation(actor) {
 export function getHighestHaltDamageLocation(actor) {
   if (!actor) return "Torso";
 
-  const haltParts = parseHaltSlashValues(actor.system?.haltValues || "0/0/0/0");
+  const haltParts = addEquippedArmorHalt(actor.system?.haltValues, getEquippedArmorEffects(actor));
   const naturalHaltParts = parseHaltSlashValues(actor.system?.naturalHaltValues || "0/0/0/0");
   const combatHaltTotals = getCombatHaltBuffTotals(actor.system?.combatMods?.haltBuffs);
   const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];

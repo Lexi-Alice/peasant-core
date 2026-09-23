@@ -1,5 +1,6 @@
 import { applyPeasantNumericActiveEffectChange, clampPeasantInteger } from "./change-modes.mjs";
 import { isPeasantActiveEffectStateKey } from "./key-policy.mjs";
+import { isSkillEditorDefinition } from "../actor/skill-entry-conditions.mjs";
 
 const SYSTEM_ID = "peasant-core";
 const APPLIED_STATE_OPERATIONS_FLAG = "appliedStateOperations";
@@ -188,7 +189,7 @@ async function applyPeasantActiveEffectStateOperation(effect, change) {
 }
 
 export async function applyPeasantActiveEffectStateOperations(effect, { force = false } = {}) {
-  if (!effect || effect.disabled) return false;
+  if (!effect || effect.disabled || isSkillEditorDefinition(effect)) return false;
 
   const changes = (effect.changes ?? effect._source?.changes ?? [])
     .filter(change => isPeasantActiveEffectStateKey(change?.key));

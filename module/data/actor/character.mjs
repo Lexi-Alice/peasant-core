@@ -2,6 +2,13 @@ import { HPGridModel } from "./hp-model.mjs";
 import { normalizeCustomTagEntry, normalizeRangeRateValue } from "./combat-tags.mjs";
 import { normalizeHaltValues } from "./combat-modifiers.mjs";
 import { parseOptionalInteger } from "./helpers.mjs";
+import { createSkillEditorFields, createSkillMechanicFields } from "./skill-entry-fields.mjs";
+import {
+  DEFAULT_SIR_LOCATIONS,
+  getSirLocationEntries,
+  normalizeSirValue,
+  normalizeSirValueMap
+} from "./identity-options.mjs";
 const { fields } = foundry.data;
 
 export class PeasantCharacterModel extends foundry.abstract.DataModel {
@@ -22,6 +29,24 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       if (hasOwn(next, "sp")) next.sp = parseOptionalInteger(next.sp, { min: 0 });
       return next;
     };
+    const migrateLegacySignatureType = (entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const next = { ...entry };
+      const category = String(next.category ?? "").trim().toLowerCase();
+      if (next.sig && ["", "martial", "tradewrite", "mundane"].includes(category)) next.type = "Signature";
+      delete next.sig;
+      return next;
+    };
+    const migrateSignatureUsageMetadata = (entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const signatureUsage = entry.signatureUsage;
+      if (!signatureUsage || typeof signatureUsage !== "object" || Array.isArray(signatureUsage)) return entry;
+      const { label: _label, note: _note, duressEnabled, ...remainingSignatureUsage } = signatureUsage;
+      if (!hasOwn(remainingSignatureUsage, "duressUses") && hasOwn(signatureUsage, "duressEnabled")) {
+        remainingSignatureUsage.duressUses = !!duressEnabled;
+      }
+      return { ...entry, signatureUsage: remainingSignatureUsage };
+    };
     const migrateDiceBonus = (rollData) => {
       if (!rollData || typeof rollData !== "object") return rollData;
       const next = { ...rollData };
@@ -40,6 +65,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
     if (hasOwn(data, "naturalHaltValues")) data.naturalHaltValues = normalizeHaltValues(data.naturalHaltValues);
     if (hasOwn(data, "reflexAoeSaveTarget")) data.reflexAoeSaveTarget = parseOptionalInteger(data.reflexAoeSaveTarget, { min: 1 });
     if (hasOwn(data, "initiative")) data.initiative = parseOptionalInteger(data.initiative, { allowSign: true });
+    for (const { field } of DEFAULT_SIR_LOCATIONS) {
+      if (hasOwn(data, field)) data[field] = normalizeSirValue(data[field]);
+    }
+    if (hasOwn(data, "customSirs")) data.customSirs = normalizeSirValueMap(data.customSirs);
     if (hasOwn(data, "uselessCollection")) {
       const sourceValue = (data.uselessCollection && typeof data.uselessCollection === "object")
         ? data.uselessCollection.value
@@ -48,7 +77,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
     }
 
     if (Array.isArray(data?.skills)) {
-      data.skills = data.skills.map(migrateSkillOptionalNumbers);
+      data.skills = data.skills
+        .map(migrateLegacySignatureType)
+        .map(migrateSignatureUsageMetadata)
+        .map(migrateSkillOptionalNumbers);
     }
 
     if (Array.isArray(data?.combatMods?.haltBuffs)) {
@@ -64,7 +96,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
     }
 
     if (Array.isArray(data?.notableCombats)) {
-      data.notableCombats = data.notableCombats.map((combat) => {
+      data.notableCombats = data.notableCombats
+        .map(migrateLegacySignatureType)
+        .map(migrateSignatureUsageMetadata)
+        .map((combat) => {
         if (!combat || typeof combat !== "object") return combat;
         const customTags = Array.isArray(combat.customTags)
           ? combat.customTags.map(normalizeCustomTagEntry).filter((tag) => !!tag.name)
@@ -76,6 +111,8 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         const migratedDamage = migrateDiceBonus(combat.damage);
         const migratedHeal = migrateDiceBonus(combat.heal);
         const migratedManifest = migrateDiceBonus(combat.manifest);
+        const migratedManifestDome = migrateDiceBonus(combat.manifestDome);
+        const migratedManifestResistance = migrateDiceBonus(combat.manifestResistance);
         const migratedCustomTags = hasOwn(combat, "customTags") || hasOwn(combat, "customTag")
           ? {
               customTags: normalizedCustomTags,
@@ -88,6 +125,8 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
           ...(migratedDamage ? { damage: migratedDamage } : {}),
           ...(migratedHeal ? { heal: migratedHeal } : {}),
           ...(migratedManifest ? { manifest: migratedManifest } : {}),
+          ...(migratedManifestDome ? { manifestDome: migratedManifestDome } : {}),
+          ...(migratedManifestResistance ? { manifestResistance: migratedManifestResistance } : {}),
           ...(hasOwn(combat, "rangeRate") ? { rangeRate: normalizeRangeRateValue(combat.rangeRate) } : {}),
           ...migratedCustomTags
         };
@@ -95,6 +134,15 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
     }
 
     return data;
+  }
+
+  prepareBaseData() {
+    super.prepareBaseData();
+    const customSirs = normalizeSirValueMap(this.customSirs);
+    for (const entry of getSirLocationEntries()) {
+      if (entry.custom && !Object.prototype.hasOwnProperty.call(customSirs, entry.key)) customSirs[entry.key] = 0;
+    }
+    this.customSirs = customSirs;
   }
 
   static defineSchema() {
@@ -141,6 +189,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         max: new fields.NumberField({ integer: true, min: 0, initial: 0 })
       }),
+      fallBlessingUses: new fields.SchemaField({
+        value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
+        max: new fields.NumberField({ integer: true, min: 0, initial: 1 })
+      }, { initial: { value: 0, max: 1 } }),
       edgeResources: new fields.ArrayField(new fields.SchemaField({
         labelMode: new fields.StringField({ initial: "edge" }),
         customLabel: new fields.StringField({ initial: "" }),
@@ -195,17 +247,21 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         }), { initial: [] })
       }),
       // SIR fields
-      sirGrimmstad: new fields.StringField({ initial: "" }),
-      sirSavonia: new fields.StringField({ initial: "" }),
-      sirThingollr: new fields.StringField({ initial: "" }),
-      sirRoyce: new fields.StringField({ initial: "" }),
-      sirGarren: new fields.StringField({ initial: "" }),
-      sirVestinia: new fields.StringField({ initial: "" }),
-      sirLupine: new fields.StringField({ initial: "" }),
-      sirLeon: new fields.StringField({ initial: "" }),
-      sirUrsa: new fields.StringField({ initial: "" }),
-      sirDoomi: new fields.StringField({ initial: "" }),
-      sirSkeever: new fields.StringField({ initial: "" }),
+      sirGrimmstad: new fields.NumberField({ integer: true, initial: 0 }),
+      sirSavonia: new fields.NumberField({ integer: true, initial: 0 }),
+      sirThingollr: new fields.NumberField({ integer: true, initial: 0 }),
+      sirRoyce: new fields.NumberField({ integer: true, initial: 0 }),
+      sirGarren: new fields.NumberField({ integer: true, initial: 0 }),
+      sirVestinia: new fields.NumberField({ integer: true, initial: 0 }),
+      sirLupine: new fields.NumberField({ integer: true, initial: 0 }),
+      sirLeon: new fields.NumberField({ integer: true, initial: 0 }),
+      sirUrsa: new fields.NumberField({ integer: true, initial: 0 }),
+      sirDoomi: new fields.NumberField({ integer: true, initial: 0 }),
+      sirSkeever: new fields.NumberField({ integer: true, initial: 0 }),
+      customSirs: new fields.TypedObjectField(
+        new fields.NumberField({ integer: true, initial: 0 }),
+        { initial: {} }
+      ),
       // Biography
       alignment: new fields.StringField({ initial: "" }),
       faith: new fields.StringField({ initial: "" }),
@@ -224,20 +280,24 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       biography: new fields.StringField({ initial: "" }),
       // Skills
       skills: new fields.ArrayField(new fields.SchemaField({
-        type: new fields.StringField({ initial: "standard" }), // standard, stance, perk, etc.
+        id: new fields.StringField({ initial: "" }),
+        type: new fields.StringField({ initial: "skill" }), // Category-constrained entry Type.
         specialGrade: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         class: new fields.NumberField({ integer: true, min: 1, max: 10, initial: 1 }),
         rank: new fields.StringField({ initial: "0" }), // Can be "0"-"4" or "u"/"U" for untrained
-        sig: new fields.BooleanField({ initial: false }),
         usesMax: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         usesCurrent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         name: new fields.StringField({ initial: "" }),
+        img: new fields.StringField({ initial: "" }),
+        effectIds: new fields.ArrayField(new fields.StringField({ initial: "" }), { initial: [] }),
         tohit: new fields.NumberField({ integer: true, min: 1, nullable: true, initial: null }),
         accuracy: new fields.NumberField({ integer: true, nullable: true, initial: null }),
         ap: new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }),
         sp: new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }),
         indent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-        description: new fields.HTMLField({ initial: "" })
+        description: new fields.HTMLField({ initial: "" }),
+        ...createSkillMechanicFields(fields),
+        ...createSkillEditorFields(fields)
       }), { initial: [] }),
       // Flexible Advantages
       flexibleAdvantages: new fields.ArrayField(new fields.StringField(), { initial: [] }),
@@ -321,11 +381,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       // Notable Combats
       notableCombats: new fields.ArrayField(new fields.SchemaField({
         id: new fields.StringField({ initial: "" }),
-        type: new fields.StringField({ initial: "standard" }), // standard, Stance, Perk, Style, Cantrip, Historic, TM, Other
+        type: new fields.StringField({ initial: "skill" }), // Category-constrained entry Type.
         specialGrade: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         class: new fields.NumberField({ integer: true, min: 1, max: 10, initial: 1 }),
         rank: new fields.StringField({ initial: "0" }), // Can be "0"-"4" or "u"/"U" for untrained
-        sig: new fields.BooleanField({ initial: false }),
         usesMax: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         usesCurrent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         name: new fields.StringField({ initial: "" }),
@@ -335,130 +394,15 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         accuracy: new fields.NumberField({ integer: true, nullable: true, initial: null }),
         indent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         description: new fields.HTMLField({ initial: "" }),
-        // Tags for combat modifiers - use empty/zero values instead of null for better compatibility
-        // DEPRECATED: staminaCost and attunementCost - use resourceCosts array instead
-        staminaCost: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-        attunementCost: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-        // Resource costs array - replaces staminaCost/attunementCost with more options
-        resourceCosts: new fields.ArrayField(new fields.SchemaField({
-          type: new fields.StringField({ initial: "" }), // Stamina, Attunement, HP, Physical Stress, Mental Stress
-          value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          damageType: new fields.StringField({ initial: "" }) // For HP: Blunt, Lethal, Critical
-        }), { initial: [] }),
-        // Speed tag
-        speed: new fields.SchemaField({
-          type: new fields.StringField({ initial: "" }), // Full Round, Standard, Movement, Reflex, Instant, Split Second
-          splitSecondCurrent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          splitSecondMax: new fields.NumberField({ integer: true, min: 0, initial: 0 })
-        }),
-        range: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-        rangeRate: new fields.ArrayField(new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }), { initial: [null, null, null, null] }),
-        damage: new fields.SchemaField({
-          enabled: new fields.BooleanField({ initial: false }),
-          diceCount: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          diceValue: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          diceBonus: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          flat: new fields.NumberField({ integer: true, initial: 0 }),
-          type: new fields.StringField({ initial: "" }) // Blunt, Lethal, Hybrid, Crit
-        }),
-        desperate: new fields.NumberField({ integer: true, initial: 0 }),
-        overkill: new fields.BooleanField({ initial: false }),
-        magnetism: new fields.SchemaField({
-          grade: new fields.NumberField({ integer: true, min: 0, initial: 0 })
-        }),
-        heal: new fields.SchemaField({
-          enabled: new fields.BooleanField({ initial: false }),
-          diceCount: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          diceValue: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          diceBonus: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          flat: new fields.NumberField({ integer: true, initial: 0 }),
-          type: new fields.StringField({ initial: "" }) // Temporary, Greater
-        }),
-        manifest: new fields.SchemaField({
-          enabled: new fields.BooleanField({ initial: false }),
-          diceCount: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          diceValue: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          diceBonus: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          flat: new fields.NumberField({ integer: true, initial: 0 })
-        }),
-        tagUses: new fields.SchemaField({
-          current: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          max: new fields.NumberField({ integer: true, min: 0, initial: 0 })
-        }),
-        sections: new fields.SchemaField({
-          current: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          max: new fields.NumberField({ integer: true, min: 0, initial: 0 })
-        }),
-        aoe: new fields.SchemaField({
-          value: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          type: new fields.StringField({ initial: "" }) // Legacy: Area, Blast, Tile
-        }),
-        customTag: new fields.SchemaField({
-          name: new fields.StringField({ initial: "" }),
-          value: new fields.StringField({ initial: "" })
-        }),
-        customTags: new fields.ArrayField(new fields.SchemaField({
-          name: new fields.StringField({ initial: "" }),
-          value: new fields.StringField({ initial: "" })
-        }), { initial: [] }),
-        targetingType: new fields.StringField({ initial: "" }), // Melee, Projectile, Normal Targeting, Smite, AoE, Area Blast, Tile Blast
-        defense: new fields.SchemaField({
-          responses: new fields.ArrayField(new fields.StringField(), { initial: [] }),
-          effectiveness: new fields.SchemaField({
-            melee: new fields.SchemaField({
-              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
-              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
-            }),
-            projectile: new fields.SchemaField({
-              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
-              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
-            }),
-            normal: new fields.SchemaField({
-              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
-              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
-            }),
-            smite: new fields.SchemaField({
-              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
-              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
-            }),
-            aoe: new fields.SchemaField({
-              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
-              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
-            }),
-            areaBlast: new fields.SchemaField({
-              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
-              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
-            }),
-            tileBlast: new fields.SchemaField({
-              mosPer: new fields.NumberField({ min: 0, initial: 0 }),
-              accuracyPenalty: new fields.NumberField({ integer: true, initial: 0 })
-            })
-          }),
-          block: new fields.BooleanField({ initial: false }),
-          // Legacy field retained temporarily so older worlds can migrate cleanly to `block`.
-          contactless: new fields.BooleanField({ initial: false }),
-          blockType: new fields.StringField({ initial: "Shield" }),
-          shieldArm: new fields.StringField({ initial: "LeftArm" }),
-          hardness: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          hp: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
-          masteryBonus: new fields.BooleanField({ initial: false }),
-          // Legacy field retained temporarily while older worlds migrate away from this option.
-          alwaysBraced: new fields.BooleanField({ initial: false }),
-          appliesDebuff: new fields.BooleanField({ initial: false }),
-          debuffToHit: new fields.NumberField({ integer: true, initial: 0 }),
-          appliesBefore: new fields.BooleanField({ initial: false })
-        }),
-        reach: new fields.NumberField({ integer: true, min: 0, initial: 0 }), // Numeric reach value
-        stability: new fields.BooleanField({ initial: false }), // Double dice count, halve dice result (flat unaffected)
-        strengthen: new fields.BooleanField({ initial: false }), // Stability variant: keep highest natural dice count from doubled roll
-        self: new fields.BooleanField({ initial: false }),
-        // Tag display order - array of tag type names in display order
-        tagOrder: new fields.ArrayField(new fields.StringField(), { initial: [] })
+        ...createSkillMechanicFields(fields),
+        ...createSkillEditorFields(fields)
       }), { initial: [] }),
       
       // Conditions / Wounds - separate left/right for arms and legs
+      devastatingWounds: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
       conditions: new fields.SchemaField({
         wounded: new fields.BooleanField({ initial: false }),
+        overcharged: new fields.BooleanField({ initial: false }),
         head: new fields.StringField({ initial: "" }), // "", "disabled", "crippled"
         rightArm: new fields.StringField({ initial: "" }),
         leftArm: new fields.StringField({ initial: "" }),
@@ -470,11 +414,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         legs: new fields.StringField({ initial: "" })
       })
       ,
-      // Blessing state stored as { type: "spring"|"summer"|"fall"|"winter", target: "build"|... }
+      // Blessing state stores the chosen season only.
       blessing: new fields.SchemaField({
-        type: new fields.StringField({ initial: "" }),
-        target: new fields.StringField({ initial: "" })
-      }, { initial: { type: "", target: "" } })
+        type: new fields.StringField({ initial: "" })
+      }, { initial: { type: "" } })
       ,
       // Selected characteristic to receive a -1 To-Hit penalty (stored as human-friendly names: Strength/Dexterity/Mental/Social)
       toHitPenaltyTarget: new fields.StringField({ initial: "" }),

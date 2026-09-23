@@ -4,45 +4,56 @@ export function setupNotableCombatTagSaveControls(sheet, $container, combatIndex
   tagEditor,
   getCombatData,
   openDescriptionEditor,
-  onChanged
+  onChanged,
+  saveTag
 } = {}) {
   const tagEditorState = tagEditor.state;
-
-  $container.on("click", ".peasant-tag-add", async (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-
+  const saveCurrent = async () => {
     const tagType = $container.find(".tag-type-select").val();
     if (!tagType) {
-      ui.notifications?.warn?.("Please select a tag type first.");
-      return;
+      ui.notifications?.warn?.("Please choose a tag first.");
+      return false;
     }
 
     if (tagType === "description") {
       openDescriptionEditor?.();
-      return;
+      return false;
     }
     const { tagAdded, tagData, warning } = collectNotableCombatTagData($container, tagType, { combatData: getCombatData() });
 
     if (!tagAdded) {
       ui.notifications?.warn?.(warning);
-      return;
+      return false;
     }
 
     const wasEditingTag = tagEditorState.mode === "edit";
     const actorTagMode = tagType === "custom" && tagEditorState.tagType === "custom" ? tagEditorState.mode : "add";
-    const result = await sheet.actor.setPeasantNotableCombatTag(combatIndex, tagType, tagData, {
-      mode: actorTagMode,
-      customIndex: tagEditorState.customIndex
-    });
+    const result = typeof saveTag === "function"
+      ? await saveTag(tagType, tagData, {
+        mode: actorTagMode,
+        customId: tagEditorState.customId,
+        customIndex: tagEditorState.customIndex
+      })
+      : await sheet.actor.setPeasantNotableCombatTag(combatIndex, tagType, tagData, {
+        mode: actorTagMode,
+        customIndex: tagEditorState.customIndex
+      });
     if (!result?.changed) {
       ui.notifications?.warn?.("Please enter valid values for the tag.");
-      return;
+      return false;
     }
 
     tagEditor.reset({ clearForm: true });
     onChanged?.();
 
     ui.notifications?.info?.(wasEditingTag ? "Tag updated successfully." : "Tag added successfully.");
+    return true;
+  };
+
+  $container.on("click", "[data-pc-tag-save]", async (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    await saveCurrent();
   });
+  return { saveCurrent };
 }

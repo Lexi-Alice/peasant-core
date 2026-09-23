@@ -12,6 +12,7 @@ import {
   getCombatCostModifiers,
   getCombatFlatDamageModifier,
   getCombatHaltBuffTotals,
+  getEffectiveSkillCombatModifiers,
   normalizeHaltSlashValue,
   parseHaltSlashValues,
   sanitizeCombatCostResourceType,
@@ -42,17 +43,52 @@ import { formatOptionalIntegerInput, hasOptionalInteger, parseOptionalInteger } 
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
+import { getNotableCombatImage } from "../notable-combat-image.mjs";
+import { isRollableSkillType, isSkillProgressionType, isSignatureSkillType, normalizeSkillTypeForCategory } from "../skill-entry-types.mjs";
+import { resolveSkillUsage } from "../skill-entries.mjs";
+
+export function prepareNotableCombatTree(combats, { includeHidden = false } = {}) {
+  const prepared = combats.map(combat => ({ ...combat, treeDepth: 0, treeLanes: [], treeHasChildren: false }));
+  const visibleRows = [];
+
+  for (const [index, combat] of prepared.entries()) {
+    if (!includeHidden && !combat.isDisplayable) continue;
+
+    const requestedDepth = Math.max(0, Number.parseInt(combat.indent, 10) || 0);
+    const previousDepth = visibleRows.at(-1)?.depth ?? -1;
+    const depth = Math.min(requestedDepth, previousDepth + 1);
+    visibleRows.push({ index, depth });
+  }
+
+  for (const [index, row] of visibleRows.entries()) {
+    prepared[row.index].treeDepth = row.depth;
+    prepared[row.index].treeHasChildren = (visibleRows[index + 1]?.depth ?? 0) > row.depth;
+    if (row.depth === 0) continue;
+
+    prepared[row.index].treeLanes = Array.from({ length: row.depth }, (_, lane) => {
+      const laneDepth = lane + 1;
+      const nextAtOrAbove = visibleRows.slice(index + 1).find(candidate => candidate.depth <= laneDepth);
+      const continues = nextAtOrAbove?.depth === laneDepth;
+      if (laneDepth === row.depth) return continues ? "branch" : "last";
+      return continues ? "rail" : "blank";
+    });
+  }
+
+  return prepared;
+}
 
 export function prepareActorNotableCombatContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
   const sourceNotableCombats = ((isEditMode ? sourceSystem : actor.system)?.notableCombats || []);
-  const combatMods = actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0, costMod: 0 };
+  const combatMods = getEffectiveSkillCombatModifiers(actor);
   const toHitMod = parseInt(combatMods.toHit) || 0;
   const accuracyMod = parseInt(combatMods.accuracy) || 0;
   const diceRateMod = parseInt(combatMods.diceRate) || 0;
   const flatDamageMod = getCombatFlatDamageModifier(combatMods);
   const costModifiersByType = getCombatCostModifiers(combatMods);
 
-  data.notableCombats = (sourceNotableCombats || []).map(combat => {
+  const notableCombats = (sourceNotableCombats || []).map(sourceCombat => {
+    const resolved = resolveSkillUsage(sourceCombat);
+    const combat = resolved.ok ? resolved.data : sourceCombat;
     const tohitValue = parseOptionalInteger(combat.tohit, { min: 1 });
     const accuracyValue = parseOptionalInteger(combat.accuracy, { allowSign: true });
     const hasBaseTohit = hasOptionalInteger(tohitValue);
@@ -62,11 +98,11 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
     const combatCalc = applyToHitAccuracy(baseTohit, baseAccuracy, toHitMod, accuracyMod, 2);
     const accuracyNum = combatCalc.accuracy;
     const modifiedTohit = combatCalc.toHit;
-    const isStandard = !combat.type || combat.type === "standard";
-    const combatType = String(combat.type || "").trim();
+    const combatType = normalizeSkillTypeForCategory(combat.type, combat.category);
     const combatTypeKey = combatType.toLowerCase();
-    const noToHitTypes = new Set(["stance", "perk", "style", "cantrip", "tm"]);
-    const allowToHitAcc = isStandard || !noToHitTypes.has(combatTypeKey);
+    const isSignature = isSignatureSkillType(combatType);
+    const isSkillType = isSkillProgressionType(combatType);
+    const allowToHitAcc = isRollableSkillType(combatType);
     let isDisplayable = false;
     const specialGradeRaw = parseInt(combat.specialGrade);
     const specialGrade = Number.isFinite(specialGradeRaw) ? Math.max(0, specialGradeRaw) : 0;
@@ -75,7 +111,7 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
     const isUntrainedRank = (rankStr === "u");
     const hasValidRank = isUntrainedRank || combat.rank === 0 || Number.isFinite(parseInt(combat.rank));
 
-    if (isStandard) {
+    if (isSkillType) {
       isDisplayable = combat.class && hasValidRank && combat.name && hasBaseTohit;
     } else {
       isDisplayable = combat.name;
@@ -86,16 +122,16 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
     const hasDescription = descriptionText.length > 0;
 
     let classRankDisplay = undefined;
-    if (isStandard) {
+    if (isSkillType) {
       const rankDisplay = isUntrainedRank ? "U" : (hasValidRank ? `R${combat.rank}` : "");
       classRankDisplay = `C${combat.class}${rankDisplay}`;
     }
     let specialTypeDisplay = combat.type || "";
-    if (!isStandard) {
+    if (!isSkillType) {
       if (combatTypeKey === "tm" || combatTypeKey === "perk") {
         specialTypeDisplay = hasSpecialGrade ? `Grade ${specialGrade} ${combatType}` : (combat.type || "");
       } else if (combatTypeKey === "spellcraft" || combatTypeKey === "gate") {
-        specialTypeDisplay = hasSpecialGrade ? `C${specialGrade}` : "C";
+        specialTypeDisplay = `C${combat.class}`;
       }
     }
 
@@ -184,23 +220,39 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
     }
 
     const hasManifest = hasCombatDice(combat.manifest);
+    const hasManifestDome = hasCombatDice(combat.manifestDome);
+    const hasManifestResistance = hasCombatDice(combat.manifestResistance);
     let manifestDisplay = "";
+    let manifestDomeDisplay = "";
+    let manifestResistanceDisplay = "";
     let modifiedManifestDice = 0;
     let modifiedManifestValue = 0;
     let modifiedManifestFlat = 0;
-    if (hasManifest) {
-      const manifestResult = applyDieRate(
-        combat.manifest.diceCount,
-        combat.manifest.diceValue,
-        combat.manifest.flat || 0,
+    const getModifiedManifest = (manifestData) => {
+      const result = applyDieRate(
+        manifestData.diceCount,
+        manifestData.diceValue,
+        manifestData.flat || 0,
         diceRateMod,
-        combat.manifest.diceBonus || 0
+        manifestData.diceBonus || 0
       );
+      const flat = result.flat + flatDamageMod;
+      return {
+        diceCount: result.diceCount,
+        diceValue: result.diceValue,
+        flat,
+        display: formatCombatDiceDisplay(result.diceCount, result.diceValue, flat)
+      };
+    };
+    if (hasManifest) {
+      const manifestResult = getModifiedManifest(combat.manifest);
       modifiedManifestDice = manifestResult.diceCount;
       modifiedManifestValue = manifestResult.diceValue;
-      modifiedManifestFlat = manifestResult.flat + flatDamageMod;
-      manifestDisplay = formatCombatDiceDisplay(modifiedManifestDice, modifiedManifestValue, modifiedManifestFlat);
+      modifiedManifestFlat = manifestResult.flat;
+      manifestDisplay = manifestResult.display;
     }
+    if (hasManifestDome) manifestDomeDisplay = getModifiedManifest(combat.manifestDome).display;
+    if (hasManifestResistance) manifestResistanceDisplay = getModifiedManifest(combat.manifestResistance).display;
 
     const hasTagUses = combat.tagUses && combat.tagUses.max > 0;
     const hasSections = combat.sections && combat.sections.max > 0;
@@ -240,6 +292,8 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
       desperate: { has: hasDesperate, label: "Desperate", value: formatDesperateTagValue(desperate) },
       heal: { has: hasHeal, label: "Heal", value: healDisplay, rollable: true },
       manifest: { has: hasManifest, label: "Manifest", value: manifestDisplay, rollable: true },
+      manifestDome: { has: hasManifestDome, label: "Manifest Dome", value: manifestDomeDisplay, rollable: true },
+      manifestResistance: { has: hasManifestResistance, label: "Manifest Resistance", value: manifestResistanceDisplay, rollable: true },
       tagUses: { has: hasTagUses, label: "Uses", current: combat.tagUses?.current || 0, max: combat.tagUses?.max || 0, isUses: true },
       sections: { has: hasSections, label: "Sections", current: combat.sections?.current || 0, max: combat.sections?.max || 0, isSections: true },
       targetingType: { has: hasTargetingType, label: "", value: targetingTypeDisplay },
@@ -272,7 +326,11 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
 
     return {
       ...combat,
-      isStandard,
+      usageId: resolved.ok ? resolved.usageId : "base",
+      type: combatType,
+      isSignature,
+      imageSrc: getNotableCombatImage(combat),
+      isSkillType,
       allowToHitAcc,
       classRankDisplay,
       specialTypeDisplay,
@@ -317,6 +375,10 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
       healDisplay,
       hasManifest,
       manifestDisplay,
+      hasManifestDome,
+      manifestDomeDisplay,
+      hasManifestResistance,
+      manifestResistanceDisplay,
       hasTagUses,
       hasSections,
       hasAoe: false,
@@ -339,9 +401,11 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
       activeTags,
       customTags,
       tagOrder: combat.tagOrder || [],
-      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasDesperate || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasTagUses || hasSections || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
+      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasDesperate || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasManifestDome || hasManifestResistance || hasTagUses || hasSections || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
     };
   });
+
+  data.notableCombats = prepareNotableCombatTree(notableCombats, { includeHidden: isEditMode });
 }
 
 function formatDesperateTagValue(desperate) {

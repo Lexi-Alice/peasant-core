@@ -3,12 +3,27 @@ import { formatOptionalIntegerInput, parseOptionalInteger } from "../../../data/
 import { getActorSourceSystem, resolveItemIndex, resolveRowIndex, sanitizeOptionalIntegerInputElement } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, qs, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
+import { openSkillEditor } from "./skill-editor.mjs";
 
 export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, enqueue, runQueued } = {}) {
   const root = toElement(html);
   if (!root) return;
 
   setupRankInputControls(root);
+
+  delegate(root, "click", ".skill-edit-btn", async (ev, button) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (!sheet.isEditMode) return;
+    await blurActiveEditableInSheet?.();
+    const row = button.closest(".skill-item");
+    const index = resolveRowIndex(row, "data-skill-index");
+    if (Number.isNaN(index)) return;
+    await sheet.actor.ensurePeasantEntryIds?.("skills");
+    const skill = getActorSourceSystem(sheet.actor).skills?.[index];
+    if (!skill?.id) return;
+    await openSkillEditor(sheet, { collection: "skills", entryId: skill.id });
+  });
 
   delegate(root, "click", ".add-skill-btn", async (ev) => {
     ev.preventDefault();
@@ -30,13 +45,13 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     if (Number.isNaN(index)) return;
 
     await enqueue("_skillsSaveQueue", "Skill type toggle", async () => {
-      await sheet.actor.setPeasantSkillType?.(index, "Other");
+      await sheet.actor.setPeasantSkillType?.(index, "Custom");
     });
   });
 
   delegate(root, "change", ".skill-select", async (ev, select) => {
     if (!sheet.isEditMode) return;
-    const newType = select.value || "standard";
+    const newType = select.value || "skill";
     const row = select.closest(".skill-item");
     const index = resolveRowIndex(row, "data-skill-index");
     if (Number.isNaN(index)) return;
@@ -91,44 +106,6 @@ export function setupSkillRowControls(sheet, html, { blurActiveEditableInSheet, 
     await enqueue("_skillsSaveQueue", "Skill delete", async () => {
       await sheet.actor.removePeasantSkill?.(index);
     });
-  });
-
-  delegate(root, "change", ".skill-sig-checkbox", async (ev, checkbox) => {
-    if (!sheet.isEditMode) return;
-    try {
-      await enqueue("_skillsSaveQueue", "Skill sig change", async () => {
-        const row = checkbox.closest(".skill-item");
-        const index = resolveRowIndex(row, "data-skill-index");
-        const skills = collectSkillsFromDOMForSig(sheet);
-
-        sheet._lastSkillsSnapshot = skills;
-
-        try {
-          pcLog.debug("SIG click persist: index", index, "skills snapshot:", skills.map(s => ({ name: s.name, sig: s.sig, usesCurrent: s.usesCurrent })));
-        } catch (e) {
-          /* ignore */
-        }
-
-        pcLog.debug("SIG persist update payload:", skills);
-        try {
-          const result = await sheet.actor.setPeasantSkills?.(skills);
-          if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
-        } catch (updateErr) {
-          console.warn("SIG persist update failed:", updateErr);
-          ui.notifications?.error?.("Failed to save signature toggle. See console for details.");
-          throw updateErr;
-        }
-
-        try {
-          pcLog.debug("SIG click persist complete; actor.skills now:", sheet.actor.system.skills.map(s => ({ name: s.name, sig: s.sig, usesCurrent: s.usesCurrent })));
-        } catch (e) {
-          /* ignore */
-        }
-
-      });
-    } catch (err) {
-      console.warn("Failed to persist SIG checkbox click:", err);
-    }
   });
 
   delegate(root, "change", ".skill-uses-max", async (ev, input) => {
@@ -319,65 +296,4 @@ function setupRankInputControls(html) {
 function normalizeRankValue(raw) {
   const match = String(raw || "").match(/[1234uU]/);
   return match ? match[0] : "";
-}
-
-function collectSkillsFromDOMForSig(sheet) {
-  const skillEls = qsa(toElement(sheet.element), ".skills-list .skill-item");
-  const skills = [];
-  const existing = JSON.parse(JSON.stringify(getActorSourceSystem(sheet.actor).skills || []));
-  for (let i = 0; i < skillEls.length; i++) {
-    const el = skillEls[i];
-    const hasSelect = !!qs(el, ".skill-select");
-    const base = existing[i] || {};
-    if (!hasSelect) {
-      const cls = Number.parseInt(qs(el, ".skill-class")?.value, 10) || 1;
-      const rkRaw = (qs(el, ".skill-rank")?.value || "").trim();
-      let rk;
-      if (rkRaw.toLowerCase() === "u") {
-        rk = rkRaw;
-      } else {
-        const rkNum = Number.parseInt(rkRaw, 10);
-        rk = Number.isNaN(rkNum) ? (base.rank ?? 0) : rkNum;
-      }
-      const usesMaxInput = qs(el, ".skill-uses-max");
-      const usesMaxVal = usesMaxInput ? (Number.isNaN(Number.parseInt(usesMaxInput.value, 10)) ? 0 : Number.parseInt(usesMaxInput.value, 10)) : (base.usesMax || 0);
-      const usesCurrentInput = qs(el, ".skill-uses-current");
-      const usesCurrentVal = usesCurrentInput
-        ? (Number.isNaN(Number.parseInt(usesCurrentInput.value, 10)) ? 0 : Number.parseInt(usesCurrentInput.value, 10))
-        : (base.usesCurrent !== undefined ? base.usesCurrent : (usesMaxVal || 0));
-      const baseGrade = Number.isNaN(Number.parseInt(base.specialGrade, 10)) ? 0 : Number.parseInt(base.specialGrade, 10);
-      skills.push({
-        type: "standard",
-        class: cls,
-        specialGrade: baseGrade,
-        rank: rk,
-        sig: !!qs(el, ".skill-sig-checkbox")?.checked,
-        name: qs(el, ".skill-name")?.value || "",
-        tohit: qs(el, ".skill-tohit")?.value || "",
-        accuracy: qs(el, ".skill-accuracy")?.value || "",
-        ap: qs(el, ".skill-ap")?.value || "",
-        sp: qs(el, ".skill-sp")?.value || "",
-        usesMax: usesMaxVal,
-        usesCurrent: usesCurrentVal,
-        indent: Number.parseInt(el.getAttribute("data-indent"), 10) || 0,
-        description: base.description || ""
-      });
-    } else {
-      const gradeInput = qs(el, ".skill-special-grade");
-      const baseGrade = Number.isNaN(Number.parseInt(base.specialGrade, 10)) ? 0 : Number.parseInt(base.specialGrade, 10);
-      const gradeVal = gradeInput ? (Number.isNaN(Number.parseInt(gradeInput.value, 10)) ? 0 : Number.parseInt(gradeInput.value, 10)) : baseGrade;
-      skills.push({
-        type: qs(el, ".skill-select")?.value || "standard",
-        specialGrade: Math.max(0, gradeVal),
-        name: qs(el, ".skill-name")?.value || "",
-        tohit: qs(el, ".skill-tohit")?.value || "",
-        accuracy: qs(el, ".skill-accuracy")?.value || "",
-        ap: qs(el, ".skill-ap")?.value || "",
-        sp: qs(el, ".skill-sp")?.value || "",
-        indent: Number.parseInt(el.getAttribute("data-indent"), 10) || 0,
-        description: base.description || ""
-      });
-    }
-  }
-  return skills;
 }

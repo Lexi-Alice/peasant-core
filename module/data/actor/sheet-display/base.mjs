@@ -46,17 +46,17 @@ import { formatOptionalIntegerInput, hasOptionalInteger } from "../helpers.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
+import { addEquippedArmorHalt, getArmorAdjustedMovement, getEquippedArmorEffects } from "../equipped-armor.mjs";
+import { getUntrainedArmorMovementPenalty } from "../active-armor.mjs";
 
 export function prepareActorSheetBaseContext(data, actor, { isEditable = true, isEditMode = false, sourceSystem = null } = {}) {
   const system = actor?.system ?? {};
   const editSystem = sourceSystem ?? system;
+  const sirSystem = isEditMode && sourceSystem ? sourceSystem : system;
   data.artPanelCollapsed = !!actor?.getFlag?.("peasant-core", PC_ART_PANEL_COLLAPSED_FLAG);
   data.editable = isEditable && isEditMode;
   data.peasantCoreSettingGroups = getPeasantCoreSettingGroups(actor, data.editable !== false);
-  data.sirLocations = getSirLocationRows(actor).map((row) => {
-    if (row.isCustom || !row.field) return row;
-    return { ...row, value: editSystem?.[row.field] ?? "" };
-  });
+  data.sirLocations = getSirLocationRows(actor, { system: sirSystem });
 
   data.bolsteredHpValue = Math.max(0, Number(system?.bolsteredHp) || 0);
   const runMultiplierRaw = Number(actor?.getFlag?.("peasant-core", PC_RUN_MULTIPLIER_FLAG));
@@ -68,21 +68,23 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
     ? Math.floor(sprintMultiplierRaw)
     : PC_DEFAULT_SPRINT_MULTIPLIER;
 
-  data.haltValuesInput = normalizeHaltSlashValue(editSystem?.haltValues || [0, 0, 0, 0]);
+  const equippedArmor = getEquippedArmorEffects(actor);
+  const armorMovementPenalty = getUntrainedArmorMovementPenalty(actor);
+  data.haltValuesInput = normalizeHaltSlashValue(addEquippedArmorHalt(editSystem?.haltValues, equippedArmor));
   data.naturalHaltValuesInput = normalizeHaltSlashValue(editSystem?.naturalHaltValues || [0, 0, 0, 0]);
   data.combatModsInput = normalizeCombatModsForSheet(editSystem?.combatMods);
 
   data.runMultiplier = runMultiplier;
   data.sprintMultiplier = sprintMultiplier;
 
-  const portraitMovement = Math.max(0, Number(system?.movement) || 0);
+  const portraitMovement = getArmorAdjustedMovement(system?.movement, equippedArmor, armorMovementPenalty);
   const initiative = system?.initiative;
   const initiativeInput = editSystem?.initiative;
   const initiativeDisplay = hasOptionalInteger(initiative)
     ? formatOptionalIntegerInput(initiative, { showPlus: true })
     : "+0";
   data.initiativeInput = formatOptionalIntegerInput(initiativeInput, { showPlus: true });
-  data.movementInput = Math.max(0, Number(editSystem?.movement) || 0);
+  data.movementInput = getArmorAdjustedMovement(editSystem?.movement, equippedArmor, armorMovementPenalty);
   data.portraitStats = {
     movement: portraitMovement,
     run: portraitMovement * runMultiplier,

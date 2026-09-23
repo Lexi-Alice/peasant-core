@@ -11,6 +11,7 @@ import {
   normalizeCombatPhase
 } from "../data/combat-turn-order.mjs";
 import { PeasantCombatant } from "./combatant.mjs";
+import { prepareCombatDurationCarryover } from "../data/active-effect/spell-effect-lifecycle.mjs";
 import { pcLog } from "../utils/logging.mjs";
 
 const sortCombatantsAscending = function(a, b) {
@@ -177,6 +178,12 @@ const resolveTurnIndex = function(combat, state) {
 };
 
 export class PeasantCombat extends Combat {
+  static async _preDeleteOperation(documents, operation, user) {
+    const allowed = await super._preDeleteOperation(documents, operation, user);
+    if (allowed === false) return false;
+    for (const combat of documents) await prepareCombatDurationCarryover(combat);
+  }
+
   _sortCombatants(a, b) {
     return sortCombatantsAscending(a, b);
   }
@@ -631,6 +638,21 @@ export class PeasantCombat extends Combat {
     
     // Advance round (this also resets turn to 0)
     await Combat.prototype.nextRound.call(this);
+    // Core starts its private turn-event workflow without awaiting it; finish native expiry before rewriting turn order.
+    if (game.user?.isActiveGM) {
+      await foundry.documents.ActiveEffect.registry.refresh("updateWorldTime", {
+        worldTime: game.time.worldTime,
+        dt: 0,
+        options: {},
+        userId: game.user.id,
+        combat: this,
+        round: this.round
+      });
+      await foundry.documents.ActiveEffect.registry.refresh("roundEnd", {
+        combat: this,
+        round: currentRound
+      });
+    }
     
     // Check if next round already has history
     const nextRound = this.round;

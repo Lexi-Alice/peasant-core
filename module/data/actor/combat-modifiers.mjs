@@ -151,3 +151,23 @@ export function getCombatCostModifiers(rawCombatMods) {
 
   return totals;
 }
+
+export function getDevastatingWoundCount(actorOrSystem) {
+  const system = actorOrSystem?.system ?? actorOrSystem ?? {};
+  const count = Number(system.devastatingWounds);
+  return Number.isSafeInteger(count) && count >= 0 ? count : 0;
+}
+
+export function getDevastatingWoundAccuracyModifier(actorOrSystem) {
+  const count = getDevastatingWoundCount(actorOrSystem);
+  return count === 0 ? 0 : -2 * count;
+}
+
+export function getEffectiveSkillCombatModifiers(actor, rawCombatMods = actor?.system?.combatMods) {
+  const modifiers = rawCombatMods && typeof rawCombatMods === "object" ? rawCombatMods : {};
+  const accuracy = Number(modifiers.accuracy);
+  return {
+    ...modifiers,
+    accuracy: (Number.isFinite(accuracy) ? accuracy : 0) + getDevastatingWoundAccuracyModifier(actor)
+  };
+}

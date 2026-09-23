@@ -15,6 +15,9 @@ export async function showRangeRatePrompt({
   rollMode = "",
   edgeChainContext = null,
   edgeExplodeReroll = null,
+  usageContext = null,
+  skipResourceCosts = false,
+  mageBarrierAction = null,
   rollNotableCombat = null
 } = {}) {
   const rrValues = normalizeRangeRateValue(combat?.rangeRate);
@@ -79,16 +82,12 @@ export async function showRangeRatePrompt({
               cardClass,
               rollMode,
               edgeChainContext,
-              edgeExplodeReroll
+              edgeExplodeReroll,
+              usageContext,
+              skipResourceCosts,
+              mageBarrierAction
             });
             finalize(result);
-            return true;
-          }
-        },
-        cancel: {
-          label: "Cancel",
-          callback: async () => {
-            finalize({ rolled: false, cancelled: true });
             return true;
           }
         }

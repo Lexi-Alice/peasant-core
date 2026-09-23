@@ -329,7 +329,7 @@ async function reorderInventoryItem(sheet, sourceItem, targetRow, { sortBefore =
 }
 
 async function openCreateInventoryItemDialog(sheet) {
-  if (!sheet?.canModifyActor || !sheet.isEditMode) return;
+  if (!sheet?.canModifyActor) return;
   const ItemClass = globalThis.Item?.implementation ?? globalThis.Item;
   if (typeof ItemClass?.createDialog !== "function") {
     ui.notifications?.warn?.("Unable to open the item creation dialog.");
@@ -551,7 +551,7 @@ export function setupInventoryControls(sheet, html, { runQueuedInputUpdate = nul
   });
   applyInventoryGroupMode(root, sheet);
 
-  delegate(browser, "click", "[data-pc-inventory-add-item]", async (event) => {
+  delegate(root, "click", "[data-pc-inventory-add-item]", async (event) => {
     event.preventDefault();
     event.stopPropagation();
     await openCreateInventoryItemDialog(sheet);

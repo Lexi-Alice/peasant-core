@@ -57,9 +57,9 @@ export function getCombatDesperateDieRateModifier(actor, combat) {
   };
 }
 
-export function buildAutomatedCombatDamageData(actor, combat, { appliedDamageType = null } = {}) {
+export function buildAutomatedCombatDamageData(actor, combat, { appliedDamageType = null, combatMods = null } = {}) {
   const combatName = combat.name || "Combat";
-  const combatMods = actor.system?.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
+  combatMods = combatMods || actor.system?.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
   const baseDiceRateMod = Number.parseInt(combatMods.diceRate, 10) || 0;
   const desperate = getCombatDesperateDieRateModifier(actor, combat);
   const diceRateMod = baseDiceRateMod + desperate.modifier;
@@ -119,7 +119,7 @@ export function buildAutomatedCombatDamageData(actor, combat, { appliedDamageTyp
   };
 }
 
-export function getAutomatedCombatDamagePreview(actor, combat, { appliedDamageType = null } = {}) {
+export function getAutomatedCombatDamagePreview(actor, combat, { appliedDamageType = null, combatMods = null } = {}) {
   if (!actor || !combat?.damage) return "";
-  return buildAutomatedCombatDamageData(actor, combat, { appliedDamageType }).previewText;
+  return buildAutomatedCombatDamageData(actor, combat, { appliedDamageType, combatMods }).previewText;
 }

@@ -1,16 +1,28 @@
 import { applyDefensePenaltiesToRollResult } from "../../data/actor/defense-penalties.mjs";
+import { getEffectiveSkillCombatModifiers } from "../../data/actor/combat-modifiers.mjs";
 import { hasOptionalInteger, parseOptionalInteger } from "../../data/actor/helpers.mjs";
+import { getNotableCombatImage } from "../../data/actor/notable-combat-image.mjs";
+import { isSignatureSkillType } from "../../data/actor/skill-entry-types.mjs";
 import { applyToHitAccuracy } from "../../dice/roll-targets.mjs";
 import { performSkillRoll, performUntrainedSkillRoll } from "../../dice/rolls.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { getActorRollSpeaker } from "./actor-targets.mjs";
-import { maybeForcePassFailedNotableRoll } from "./force-pass.mjs";
+import { maybeForcePassFailedRoll } from "./force-pass.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
 import { markRollFailureDueToDefense } from "./roll-chat-updates.mjs";
 
-export async function consumeNotableCombatRollUse(actor, combatIndex, sheet = null) {
+export async function consumeNotableCombatRollUse(actor, combatIndex, sheet = null, usageContext = null) {
   try {
-    const result = await actor?.consumePeasantCombatUse?.(combatIndex);
+    const result = usageContext?.version === 1
+      ? await actor?.consumePeasantEntryUses?.(
+          { collection: usageContext.ref?.collection, entryId: usageContext.ref?.entryId },
+          {
+            usageId: usageContext.ref?.usageId || "base",
+            pool: usageContext.signaturePool || "primary",
+            spendSignature: isSignatureSkillType(usageContext.data?.type)
+          }
+        )
+      : await actor?.consumePeasantCombatUse?.(combatIndex);
     return result;
   } catch (err) {
     console.warn("Failed to consume combat use after autoroll:", err);
@@ -32,11 +44,12 @@ export async function executeResolvedNotableCombatRoll({
   targetLabel = "",
   cardClass = "",
   edgeChainContext = null,
-  edgeExplodeReroll = null
+  edgeExplodeReroll = null,
+  combatMods = null
 } = {}) {
-  const combatMods = actor.system?.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0, costMod: 0 };
-  const toHitMod = Number.parseInt(combatMods.toHit, 10) || 0;
-  const accuracyMod = Number.parseInt(combatMods.accuracy, 10) || 0;
+  const resolvedCombatMods = combatMods || getEffectiveSkillCombatModifiers(actor);
+  const toHitMod = Number.parseInt(resolvedCombatMods.toHit, 10) || 0;
+  const accuracyMod = Number.parseInt(resolvedCombatMods.accuracy, 10) || 0;
   const resolvedDefenseAccuracyPenalty = Math.abs(Number(defenseAccuracyPenalty) || 0);
   const resolvedDefenseToHitPenalty = Number(defenseToHitPenalty) || 0;
 
@@ -80,6 +93,7 @@ export async function executeResolvedNotableCombatRoll({
   }
 
   const speaker = getActorRollSpeaker(actor, attackerToken);
+  const imageSrc = getNotableCombatImage(combat);
   let rollResult = null;
 
   if (isUntrained) {
@@ -93,17 +107,19 @@ export async function executeResolvedNotableCombatRoll({
       skillName: untrainedName,
       speaker,
       cardClass,
+      imageSrc,
       edgeChainContext,
       edgeExplodeReroll
     });
   } else {
-    rollResult = await performSkillRoll({ toHit: finalToHit, accuracy: accuracyValue, skillName: combatName, speaker, cardClass, edgeChainContext, edgeExplodeReroll });
+    rollResult = await performSkillRoll({ toHit: finalToHit, accuracy: accuracyValue, skillName: combatName, speaker, cardClass, imageSrc, edgeChainContext, edgeExplodeReroll });
   }
 
-  const forcePassResult = await maybeForcePassFailedNotableRoll({
+  const forcePassResult = await maybeForcePassFailedRoll({
     actor,
     rollLabel: combatName,
-    rollResult
+    rollResult,
+    cancelChainOnClose: !String(cardClass || "").split(/\s+/).includes("pc-defense-roll-card")
   });
   if (isChainCancelledResult(forcePassResult)) {
     return {

@@ -1,4 +1,5 @@
 import { sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
+import { normalizeHaltSlashValueEditable } from "../../../data/actor/combat-modifiers.mjs";
 import { getActorSourceSystem } from "../../../data/actor/source-system.mjs";
 import { qsa, qs, toElement } from "../../dom.mjs";
 
@@ -42,6 +43,39 @@ export function sanitizeOptionalIntegerInputElement(input, options = {}) {
   input.value = normalized;
   const nextPos = Math.max(0, Math.min(normalized.length, normalizedBeforeCursor.length));
   try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
+}
+
+export function setupProtectedHaltInputs(root, selector = "[data-pc-protected-halt-input]") {
+  const inputs = qsa(root, selector);
+  for (const input of inputs) {
+    const normalized = normalizeHaltSlashValueEditable(input.value);
+    if (normalized !== input.value) input.value = normalized;
+    if (input.dataset.pcProtectedHaltInputBound === "true") continue;
+    input.dataset.pcProtectedHaltInputBound = "true";
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Backspace" && event.key !== "Delete") return;
+      const value = input.value || "";
+      const start = input.selectionStart ?? 0;
+      const end = input.selectionEnd ?? start;
+      if (start !== end) return;
+      if (
+        (event.key === "Backspace" && start > 0 && value[start - 1] === "/")
+        || (event.key === "Delete" && value[start] === "/")
+      ) event.preventDefault();
+    });
+
+    input.addEventListener("input", () => {
+      const before = input.value || "";
+      const pos = input.selectionStart ?? before.length;
+      const next = normalizeHaltSlashValueEditable(before);
+      if (next === before) return;
+      input.value = next;
+      const nextPos = Math.max(0, Math.min(next.length, pos + next.length - before.length));
+      try { input.setSelectionRange(nextPos, nextPos); } catch (error) { /* ignore */ }
+    });
+  }
+  return inputs;
 }
 
 export function initializeSheetSaveQueues(sheet) {

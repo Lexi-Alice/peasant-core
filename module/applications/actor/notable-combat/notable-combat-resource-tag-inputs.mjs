@@ -12,14 +12,14 @@ export function renderResourceCostTagInputs(area, combatData) {
   if (!root) return;
 
   const existingCosts = combatData.resourceCosts || [];
-  let costsHtml = `<div class="resource-costs-container" style="display:flex;flex-direction:column;gap:8px;">`;
-  costsHtml += `<div class="resource-costs-list" style="display:flex;flex-direction:column;gap:6px;">`;
+  let costsHtml = `<div class="resource-costs-container">`;
+  costsHtml += `<div class="resource-costs-list">`;
 
   const costsToRender = existingCosts.length > 0 ? existingCosts : [{ type: "", value: 0, damageType: "" }];
   costsToRender.forEach((cost, idx) => {
     costsHtml += `
-      <div class="resource-cost-row" data-cost-index="${idx}" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        <select class="tag-rc-type ${PC_TAG_SELECT_CLASS}">
+      <div class="resource-cost-row pc-tag-field-row--compact" data-cost-index="${idx}">
+        <select class="tag-rc-type ${PC_TAG_SELECT_CLASS} pc-tag-select-compact">
           <option value="">-- Type --</option>
           <option value="Stamina" ${cost.type === "Stamina" ? "selected" : ""}>Stamina</option>
           <option value="Attunement" ${cost.type === "Attunement" ? "selected" : ""}>Attunement</option>
@@ -28,7 +28,7 @@ export function renderResourceCostTagInputs(area, combatData) {
           <option value="Mental Stress" ${cost.type === "Mental Stress" ? "selected" : ""}>Mental Stress</option>
         </select>
         <input type="number" class="tag-rc-value ${PC_TAG_INPUT_CLASS} pc-tag-input-sm" value="${cost.value || ""}" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
-        <select class="tag-rc-dmgtype ${PC_TAG_SELECT_CLASS}" style="display:${cost.type === "HP" ? "inline-block" : "none"};">
+        <select class="tag-rc-dmgtype ${PC_TAG_SELECT_CLASS} pc-tag-select-compact" style="display:${cost.type === "HP" ? "inline-block" : "none"};">
           <option value="">-- Dmg Type --</option>
           <option value="Blunt" ${cost.damageType === "Blunt" ? "selected" : ""}>Blunt</option>
           <option value="Lethal" ${cost.damageType === "Lethal" ? "selected" : ""}>Lethal</option>
@@ -40,7 +40,7 @@ export function renderResourceCostTagInputs(area, combatData) {
   });
 
   costsHtml += `</div>`;
-  costsHtml += `<button type="button" class="add-cost-row peasant-tag-add">+ Add Cost</button>`;
+  costsHtml += `<button type="button" class="add-cost-row peasant-tag-add pc-tag-add-cost-compact">+ Add Cost</button>`;
   costsHtml += `</div>`;
   root.innerHTML = costsHtml;
 
@@ -66,8 +66,8 @@ export function renderResourceCostTagInputs(area, combatData) {
     if (!list) return;
     const newIdx = list.querySelectorAll(".resource-cost-row").length;
     list.insertAdjacentHTML("beforeend", `
-      <div class="resource-cost-row" data-cost-index="${newIdx}" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        <select class="tag-rc-type ${PC_TAG_SELECT_CLASS}">
+      <div class="resource-cost-row pc-tag-field-row--compact" data-cost-index="${newIdx}">
+        <select class="tag-rc-type ${PC_TAG_SELECT_CLASS} pc-tag-select-compact">
           <option value="">-- Type --</option>
           <option value="Stamina">Stamina</option>
           <option value="Attunement">Attunement</option>
@@ -76,7 +76,7 @@ export function renderResourceCostTagInputs(area, combatData) {
           <option value="Mental Stress">Mental Stress</option>
         </select>
         <input type="number" class="tag-rc-value ${PC_TAG_INPUT_CLASS} pc-tag-input-sm" value="" min="0" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>
-        <select class="tag-rc-dmgtype ${PC_TAG_SELECT_CLASS}" style="display:none;">
+        <select class="tag-rc-dmgtype ${PC_TAG_SELECT_CLASS} pc-tag-select-compact" style="display:none;">
           <option value="">-- Dmg Type --</option>
           <option value="Blunt">Blunt</option>
           <option value="Lethal">Lethal</option>

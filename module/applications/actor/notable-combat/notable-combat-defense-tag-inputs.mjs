@@ -33,7 +33,7 @@ export function renderDefenseTagInputs($area, combatData) {
         <div class="defense-section-label">Can respond to?</div>
         <div class="defense-response-list">${responseOptionsHtml}</div>
       </div>
-      <div class="defense-section">
+      <div class="defense-section defense-effectiveness-section" style="display:${isBlock && defenseData.blockType === "Mage" ? "none" : "block"};">
         <div class="defense-section-label">Effectiveness vs?</div>
         <div class="defense-effectiveness-grid">
           <div class="defense-effectiveness-head">Targeting Type</div>
@@ -66,9 +66,13 @@ export function renderDefenseTagInputs($area, combatData) {
             <span class="defense-hardness-label">Hardness</span>
             <input type="number" class="tag-defense-hardness ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.hardness || ""}" min="0" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
           </label>
-          <label class="defense-inline-field defense-hp-field" style="display:${defenseData.blockType === "Weapon" ? "none" : "flex"};">
-            <span>HP</span>
+          <label class="defense-inline-field defense-hp-field" style="display:${defenseData.blockType === "Shield" ? "flex" : "none"};">
+            <span class="defense-hp-label">HP</span>
             <input type="number" class="tag-defense-hp ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.hp || ""}" min="0" step="1" placeholder="0" ${PC_TAG_INTEGER_ATTRS}>
+          </label>
+          <label class="defense-inline-field defense-max-hp-field" style="display:${defenseData.blockType === "Mage" ? "flex" : "none"};">
+            <span>Maximum Barrier</span>
+            <input type="number" class="tag-defense-max-hp ${PC_TAG_INPUT_CLASS} pc-tag-input-lg" value="${defenseData.maxHp || 40}" min="1" step="1" placeholder="40" ${PC_TAG_INTEGER_ATTRS}>
           </label>
           <div class="defense-toggle-row defense-mastery-bonus-row" style="grid-column: 1 / -1; display:${defenseData.blockType === "Weapon" ? "flex" : "none"}; margin-top:10px;">
             <span>Mastery Bonus?</span>
@@ -154,9 +158,12 @@ export function renderDefenseTagInputs($area, combatData) {
     const blockType = String($area.find(".tag-defense-block-type").val() || "Shield").trim();
     const isShield = blockType === "Shield";
     const isWeapon = blockType === "Weapon";
+    const isMage = blockType === "Mage";
+    $area.find(".defense-effectiveness-section").toggle(!blockSelected || !isMage);
     $area.find(".defense-shield-arm-field").css("display", isShield ? "flex" : "none");
     $area.find(".defense-hardness-field").css("display", (isShield || isWeapon) ? "flex" : "none");
-    $area.find(".defense-hp-field").css("display", isWeapon ? "none" : "flex");
+    $area.find(".defense-hp-field").css("display", isShield ? "flex" : "none");
+    $area.find(".defense-max-hp-field").css("display", isMage ? "flex" : "none");
     $area.find(".defense-mastery-bonus-row").css("display", isWeapon ? "flex" : "none");
   };
 

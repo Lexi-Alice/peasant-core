@@ -1,0 +1,12 @@
+<footer class="form-footer pc-notable-combat-tag-editor-footer pc-skill-editor-footer">
+  <button type="button" class="pc-notable-combat-description-save" data-pc-notable-combat-footer="description">
+    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+    <span>Save Description</span>
+  </button>
+  {{#if canActivateEntry}}
+    <button type="button" class="pc-skill-editor-use" data-pc-entry-use>
+      <i class="fa-solid fa-dice-d20" aria-hidden="true"></i>
+      <span>{{entryUseLabel}}</span>
+    </button>
+  {{/if}}
+</footer>

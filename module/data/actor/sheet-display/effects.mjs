@@ -1,3 +1,6 @@
+import { formatSpellEffectSubtitle } from "../../active-effect/spell-effect-lifecycle.mjs";
+import { isPassiveSkillEffectDefinition, isSkillEditorDefinition } from "../skill-entry-conditions.mjs";
+
 function getDefaultEffectIcon() {
   return foundry?.utils?.getProperty?.(CONFIG, "ActiveEffect.documentClass.DEFAULT_ICON")
     || foundry?.utils?.getProperty?.(CONFIG, "ActiveEffect.defaultIcon")
@@ -10,6 +13,7 @@ function getActiveEffectTypeLabel(type) {
   if (type === "base") return "Base";
   if (type === "enchantment") return "Enchantment";
   if (type === "skill") return "Skill";
+  if (type === "spellEffect") return "Spell Effect";
   return "";
 }
 
@@ -79,9 +83,9 @@ async function prepareActorPassiveEffect(effect, actor, index) {
   const typeLabel = category === "skill" ? "Skill" : getActiveEffectTypeLabel(type);
   const status = getEffectStatusLabel(effect);
   const name = effect?.name ?? effect?.label ?? "Effect";
-  const subtitle = typeLabel ? `${typeLabel} - ${status}` : status;
+  const spellEffectSubtitle = formatSpellEffectSubtitle(effect);
+  const subtitle = spellEffectSubtitle || (typeLabel ? `${typeLabel} - ${status}` : status);
   const disabled = !!effect?.disabled;
-
   return {
     id: effect?.id ?? "",
     uuid: effect?.uuid ?? "",
@@ -94,11 +98,12 @@ async function prepareActorPassiveEffect(effect, actor, index) {
     subtitle,
     sourceName,
     sourceUuid: source?.uuid ?? "",
+    canManage: !!effect?.uuid && typeof effect?.update === "function",
     canToggle: !!effect?.uuid && typeof effect?.update === "function",
     toggleTooltip: disabled ? "Enable Effect" : "Disable Effect",
     sort: Number.isFinite(Number(effect?.sort)) ? Number(effect.sort) : index,
     sortName: formatSearchText(name, typeLabel),
-    searchText: formatSearchText(name, typeLabel, status, sourceName)
+    searchText: formatSearchText(name, typeLabel, status, sourceName, subtitle)
   };
 }
 
@@ -126,9 +131,11 @@ function addEffectToCollection(effects, seen, effect) {
 function getActorEffects(actor) {
   const effects = [];
   const seen = new Set();
+  const hiddenDefinitions = new Set([...(actor?.effects ?? [])].filter(effect =>
+    isSkillEditorDefinition(effect) && !isPassiveSkillEffectDefinition(effect, actor)));
 
   for (const effect of actor?.effects ?? []) {
-    addEffectToCollection(effects, seen, effect);
+    if (!hiddenDefinitions.has(effect)) addEffectToCollection(effects, seen, effect);
   }
 
   for (const item of actor?.items ?? []) {
@@ -139,7 +146,7 @@ function getActorEffects(actor) {
 
   if (typeof actor?.allApplicableEffects === "function") {
     for (const effect of actor.allApplicableEffects()) {
-      addEffectToCollection(effects, seen, effect);
+      if (!hiddenDefinitions.has(effect)) addEffectToCollection(effects, seen, effect);
     }
   }
 

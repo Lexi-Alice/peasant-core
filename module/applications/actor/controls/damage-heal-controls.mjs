@@ -1,4 +1,6 @@
 import { applyTargetedDamageWorkflow } from "../../combat/targeted-damage-workflow.mjs";
+import { attachRollUndoToChatMessage, captureActorRollUndo, collectRollUndoRecords } from "../../chat-undo.mjs";
+import { canSpendActiveArmorCharge } from "../../../data/actor/active-armor.mjs";
 import { delegate, qs } from "../../dom.mjs";
 import { renderSheetResourceDialog } from "./resource-dialogs.mjs";
 
@@ -17,6 +19,7 @@ export function setupDamageHealControls(sheet, html) {
 }
 
 function openDamageDialog(sheet, trigger) {
+  const armorChargeControl = getManualArmorChargeControl(sheet.actor);
   return renderSheetResourceDialog(sheet, "damage", {
     title: "Take Damage",
     content: `
@@ -52,10 +55,7 @@ function openDamageDialog(sheet, trigger) {
             <input type="checkbox" name="damageAP">
             <span>Armor Pen?</span>
           </label>
-          <label data-tooltip="Multiply armor HALT using the actor's Armor Charge multiplier" aria-label="Multiply armor HALT using the actor's Armor Charge multiplier">
-            <input type="checkbox" name="damageArmorCharge">
-            <span>Armor Charge?</span>
-          </label>
+          ${armorChargeControl}
         </div>
       </div>
     `,
@@ -71,19 +71,31 @@ function openDamageDialog(sheet, trigger) {
           const isAP = !!qs(html, "[name=damageAP]")?.checked;
           const useArmorCharge = !!qs(html, "[name=damageArmorCharge]")?.checked;
 
-          const result = await applyTargetedDamageWorkflow(sheet.actor, {
-            amount,
-            type,
-            location,
-            isAP,
-            useArmorCharge,
-            chatSpeaker: ChatMessage.getSpeaker({ actor: sheet.actor })
-          });
+          const capture = await captureActorRollUndo(
+            sheet.actor,
+            "Manual Damage",
+            () => applyTargetedDamageWorkflow(sheet.actor, {
+              amount,
+              type,
+              location,
+              isAP,
+              useArmorCharge,
+              chatSpeaker: ChatMessage.getSpeaker({ actor: sheet.actor })
+            }),
+            { includeSpellEffects: true }
+          );
+          const result = capture.result;
 
           if (!result.ok) {
             ui.notifications?.warn?.(result.message || "Failed to apply damage.");
             return false;
           }
+
+          await attachRollUndoToChatMessage(
+            result.chatMessage,
+            collectRollUndoRecords(capture.undoRecords, result.undoRecords),
+            { label: "Undo Damage Effects" }
+          );
 
           return true;
         }
@@ -95,6 +107,14 @@ function openDamageDialog(sheet, trigger) {
     height: 230,
     classes: ["pc-damage-dialog"]
   });
+}
+
+export function getManualArmorChargeControl(actor) {
+  if (!canSpendActiveArmorCharge(actor)) return "";
+  return `<label data-tooltip="Multiply armor HALT using the actor's Armor Charge multiplier. Select the already resolved penetration state separately." aria-label="Multiply armor HALT using the actor's Armor Charge multiplier">
+            <input type="checkbox" name="damageArmorCharge">
+            <span>Armor Charge?</span>
+          </label>`;
 }
 
 function openHealDialog(sheet, trigger) {
@@ -112,6 +132,7 @@ function openHealDialog(sheet, trigger) {
             <select name="healType" class="pc-select">
               <option value="temporary">Temporary Heal</option>
               <option value="greater">Greater Heal</option>
+              <option value="special">Special Heal</option>
             </select>
           </label>
         </div>

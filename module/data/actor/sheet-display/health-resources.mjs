@@ -26,6 +26,8 @@ import {
   sanitizeEdgeLabelMode
 } from "../edge-resources.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isSimplifiedHpActor } from "../helpers.mjs";
+import { addEquippedArmorHalt, getEquippedArmorEffects } from "../equipped-armor.mjs";
+import { getActiveArmorTraining } from "../active-armor.mjs";
 import {
   PC_ART_PANEL_COLLAPSED_FLAG,
   PC_DEFAULT_RUN_MULTIPLIER,
@@ -36,7 +38,7 @@ import {
   formatThresholdValue,
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
-import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
+import { getEffectiveWoundThresholds } from "../wounds.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
@@ -72,7 +74,6 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
       { value: 11, text: "Critical" }
     ];
     const hpGrid = system?.hp?.grid || [];
-    const hpCols = Number(system?.hp?.cols) || 0;
     data.hpWithLabels = hpGrid.map((row, index) => {
       return {
         cells: row,
@@ -81,32 +82,19 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
     });
 
     const isWounded = system.conditions?.wounded || false;
-    const woundMult = getWoundThresholdMultipliers(actor);
-    const headThreshold = hpCols * woundMult.head;
-    const armsThreshold = hpCols * woundMult.arms;
-    const legsThreshold = hpCols * woundMult.legs;
-    const torsoThreshold = hpCols * woundMult.torso;
-
-    if (isWounded) {
-      const reducedArms = headThreshold;
-      const reducedLegs = legsThreshold;
-      const reducedTorso = hpCols * Math.max(woundMult.head, woundMult.torso - 1);
-      data.woundThresholds = [
-        formatThresholdValue(headThreshold),
-        formatThresholdValue(reducedArms),
-        formatThresholdValue(reducedLegs),
-        formatThresholdValue(reducedTorso)
-      ].join("/");
-      data.woundThresholdsReduced = true;
-    } else {
-      data.woundThresholds = [
-        formatThresholdValue(headThreshold),
-        formatThresholdValue(armsThreshold),
-        formatThresholdValue(legsThreshold),
-        formatThresholdValue(torsoThreshold)
-      ].join("/");
-      data.woundThresholdsReduced = false;
-    }
+    const thresholds = getEffectiveWoundThresholds(actor);
+    const thresholdKeys = ["head", "arms", "legs", "torso"];
+    const formatThresholds = (key) => thresholdKeys
+      .map((location) => formatThresholdValue(thresholds[location][key]))
+      .join("/");
+    const effectiveThresholds = formatThresholds("effective");
+    const baseThresholds = formatThresholds("base");
+    data.woundThresholds = effectiveThresholds;
+    data.woundThresholdsReduced = thresholdKeys.some((location) => thresholds[location].effective !== thresholds[location].base);
+    data.woundThresholdsTooltip = data.woundThresholdsReduced
+      ? `Base thresholds H/A/L/T: ${baseThresholds}`
+      : "";
+    data.woundThresholdsAriaLabel = `Effective thresholds H/A/L/T: ${effectiveThresholds}`;
     data.isWounded = isWounded;
   }
 
@@ -163,7 +151,22 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
   const attunementBar = buildResourceBar("attunement", "Attunement");
   const capacityBar = buildResourceBar("capacity", "Capacity");
   const edgeBar = buildResourceBar("edge", data.edgeDisplayLabel || "Edge");
-  data.armorCharge = buildResourceBar("armorCharge", "Armor Charge");
+  const armorTraining = getActiveArmorTraining(actor);
+  const armorChargeCapacity = armorTraining.capacity;
+  const armorChargeValue = Math.max(0, Math.min(Number(system?.armorCharge?.value) || 0, armorChargeCapacity));
+  const armorChargeValueInput = Math.max(0, Math.min(numberInput(editSystem?.armorCharge?.value, armorChargeValue), armorChargeCapacity));
+  const armorGradeLabel = armorTraining.grade ? `${armorTraining.grade} armor` : "no physical armor";
+  const armorSkillLabel = armorTraining.skill
+    ? `Armor Class ${armorTraining.skill.class}, Rank ${armorTraining.skill.rank}`
+    : "no Armor skill";
+  data.armorCharge = {
+    ...buildResourceBar("armorCharge", "Armor Charge"),
+    value: armorChargeValue,
+    valueInput: armorChargeValueInput,
+    max: armorChargeCapacity,
+    maxInput: armorChargeCapacity,
+    tooltip: `Armor Charge ${armorChargeValue} / ${armorChargeCapacity}; ${armorGradeLabel}, ${armorSkillLabel}.`
+  };
   data.resourceBars = {
     stamina: staminaBar,
     attunement: attunementBar,
@@ -176,13 +179,15 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
     anyVisible: staminaBar.show || attunementBar.show || capacityBar.show || edgeBar.show
   };
 
-  const haltParts = parseHaltSlashValues(system.haltValues || "0/0/0/0");
+  const equippedArmor = getEquippedArmorEffects(actor);
+  const haltParts = addEquippedArmorHalt(system.haltValues, equippedArmor);
   const hardLocations = [
-    system.hardHead,
-    system.hardArms,
-    system.hardLegs,
-    system.hardTorso
+    system.hardHead || equippedArmor.hardHead,
+    system.hardArms || equippedArmor.hardArms,
+    system.hardLegs || equippedArmor.hardLegs,
+    system.hardTorso || equippedArmor.hardTorso
   ];
+  [data.haltHardHead, data.haltHardArms, data.haltHardLegs, data.haltHardTorso] = hardLocations.map(Boolean);
   const combatHaltTotals = getCombatHaltBuffTotals(system?.combatMods?.haltBuffs);
   const armorHaltBuffs = combatHaltTotals[COMBAT_HALT_BUFF_TYPE_HALT] || [0, 0, 0, 0];
 

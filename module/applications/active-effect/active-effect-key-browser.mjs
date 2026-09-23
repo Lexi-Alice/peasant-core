@@ -117,7 +117,7 @@ export class PeasantActiveEffectKeyBrowser {
     const viewportHeight = window.innerHeight;
     const margin = 8;
     const maxWidth = Math.min(420, viewportWidth - (margin * 2));
-    const width = Math.max(Math.min(rect.width, maxWidth), Math.min(260, maxWidth));
+    const width = Math.min(rect.width, maxWidth);
     const left = Math.min(
       Math.max(window.scrollX + margin, window.scrollX + rect.left),
       window.scrollX + viewportWidth - width - margin

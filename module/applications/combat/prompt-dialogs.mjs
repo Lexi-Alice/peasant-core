@@ -49,14 +49,14 @@ function showWaitingForDefenderResponseDialog() {
     default: "wait",
     render: (html) => {
       const viewportWidth = Number(window?.innerWidth) || 480;
-      const stableDialogWidth = Math.max(320, Math.min(380, viewportWidth - 32));
+      const stableDialogWidth = Math.max(240, Math.min(300, viewportWidth - 32));
       html.css({
         width: `${stableDialogWidth}px`,
         minWidth: `${stableDialogWidth}px`,
-        maxWidth: `${Math.max(300, viewportWidth - 32)}px`
+        maxWidth: `${stableDialogWidth}px`
       });
       html.find(".window-content, .dialog-content, form, .standard-form").css({ overflow: "hidden" });
-      html.find(".dialog-buttons, .form-footer, footer").hide();
+      html.find(".dialog-buttons, .form-footer, footer").remove();
       const renderedWindow = html.closest(".application, dialog")[0] || html[0];
       $(renderedWindow)
         .find('.header-control, [data-action="close"], [data-button="close"]')
@@ -229,11 +229,14 @@ export async function showForcePassPromptDialog({
   actor = null,
   rollLabel = "Skill Roll",
   stressCost = 0,
+  fixedSpendType = null,
   promptText = ""
 } = {}) {
   if (!actor || stressCost <= 0) return { forced: false, selection: "no", spendType: "general" };
   const resolvedPromptText = String(promptText || `Spend ${stressCost} stress to force pass?`).trim();
-  const stressTypeOptions = getForcePassStressTypeOptions(actor);
+  const normalizedFixedSpendType = String(fixedSpendType || "").trim().toLowerCase();
+  const stressTypeOptions = getForcePassStressTypeOptions(actor)
+    .filter((type) => !normalizedFixedSpendType || type.key === normalizedFixedSpendType);
   if (!stressTypeOptions.length) return { forced: false, selection: "no-stress", spendType: null };
   const defaultSpendType = stressTypeOptions[0].key;
   const stressTypeOptionsHtml = stressTypeOptions
@@ -245,9 +248,9 @@ export async function showForcePassPromptDialog({
       <div class="form-group" style="margin-bottom: 10px;">
         <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:#b0b0b0;">
           <span>${resolvedPromptText}</span>
-          <select class="pc-defense-prompt-select pc-select pc-dialog-field-md" name="forcePassStressType">
+          ${normalizedFixedSpendType ? "" : `<select class="pc-defense-prompt-select pc-select pc-dialog-field-md" name="forcePassStressType">
             ${stressTypeOptionsHtml}
-          </select>
+          </select>`}
         </label>
       </div>
     </form>
@@ -276,15 +279,9 @@ export async function showForcePassPromptDialog({
         yes: {
           label: "Yes",
           callback: async (html) => {
-            const spendType = String(html.find('[name="forcePassStressType"]').val() || defaultSpendType).trim().toLowerCase();
+            const spendType = normalizedFixedSpendType
+              || String(html.find('[name="forcePassStressType"]').val() || defaultSpendType).trim().toLowerCase();
             finalize({ forced: true, selection: "yes", spendType });
-            return true;
-          }
-        },
-        no: {
-          label: "No",
-          callback: async () => {
-            finalize({ forced: false, selection: "no", spendType: "general" });
             return true;
           }
         }
@@ -315,7 +312,13 @@ export async function showForcePassPromptDialog({
           }, 150);
         }
       }
-    }, { classes: ["pc-force-pass-dialog", "peasant-macro-dialog-force"] });
+    }, {
+      classes: [
+        "pc-force-pass-dialog",
+        ...(normalizedFixedSpendType ? ["pc-save-force-pass-dialog"] : []),
+        "peasant-macro-dialog-force"
+      ]
+    });
   });
 }
 

@@ -1,5 +1,6 @@
 import { PEASANT_ITEM_TYPES } from "../../data/item/_module.mjs";
 import { PeasantItem } from "../../documents/_module.mjs";
+import { normalizeHaltSlashValue, normalizeHaltSlashValueEditable, normalizeHaltValues } from "../../data/actor/combat-modifiers.mjs";
 import { ensureSlideToggleElement } from "../components/slide-toggle.mjs";
 import { delegate, qs, qsa } from "../dom.mjs";
 import { configurePeasantItemSheetHooks } from "./hooks.mjs";
@@ -31,6 +32,13 @@ const PC_ACTIVE_EFFECT_SECTIONS = Object.freeze([
 ]);
 const PC_EFFECT_DRAG_PREFIX = "peasant-core.item-effect-sort";
 const PC_EFFECT_DRAG_BLOCK_SELECTOR = "input, select, textarea, a, [data-pc-item-effect-menu]";
+const PC_ARMOR_EQUIPMENT_CATEGORIES = new Set(["light-armor", "medium-armor", "heavy-armor"]);
+const PC_ARMOR_HARD_LOCATION_FIELDS = Object.freeze({
+  Head: "hardHead",
+  Arms: "hardArms",
+  Legs: "hardLegs",
+  Torso: "hardTorso"
+});
 const PC_EFFECT_SORT_MODES = Object.freeze({
   manual: {
     next: "alpha",
@@ -134,6 +142,16 @@ function registerExpandedItemDescriptionEditor() {
 
 function formatOptionalNumber(value) {
   return value === null || value === undefined ? "" : String(value);
+}
+
+function sanitizeArmorAoeSaveModifierInput(value, { allowIncomplete = false } = {}) {
+  const text = String(value ?? "").trim().toUpperCase();
+  if (text === "CS") return text;
+  if (text === "C") return allowIncomplete ? text : "";
+  if (/[CS]/.test(text)) return "";
+  const sign = text.match(/^[+-]/)?.[0] ?? "";
+  const digits = text.replace(/\D/g, "");
+  return `${sign}${digits}`;
 }
 
 function getSelectedOptions(options, value, fallback) {
@@ -396,6 +414,8 @@ export class PeasantItemSheet extends ItemSheetBase {
     const effectSortConfig = PC_EFFECT_SORT_MODES[effectSortMode];
     const effectsGroupedByType = this._areItemEffectsGroupedByType();
     const isShieldEquipment = type === "equipment" && system.category === "shield";
+    const isArmorEquipment = type === "equipment" && PC_ARMOR_EQUIPMENT_CATEGORIES.has(system.category);
+    const armor = system.armor ?? {};
 
     return Object.assign(context, {
       item: this.item,
@@ -410,12 +430,21 @@ export class PeasantItemSheet extends ItemSheetBase {
       isConsumable: type === "consumable",
       isLoot: type === "loot",
       isShieldEquipment,
+      isArmorEquipment,
       imageSrc: this.item?.img || getDefaultItemImage(),
       imageStyle: formatItemImageStyle(system),
       quantityInput: formatOptionalNumber(system.quantity ?? 1),
       valueInput: formatOptionalNumber(system.value ?? 0),
       sunderCurrentInput: formatOptionalNumber(system.sunder?.current ?? 0),
       sunderMaxInput: formatOptionalNumber(system.sunder?.max ?? 0),
+      armorHaltInput: normalizeHaltSlashValue(armor.haltValues ?? [0, 0, 0, 0]),
+      armorHardHead: !!armor.hardHead,
+      armorHardArms: !!armor.hardArms,
+      armorHardLegs: !!armor.hardLegs,
+      armorHardTorso: !!armor.hardTorso,
+      armorRunStaminaModifierInput: formatOptionalNumber(armor.runStaminaModifier ?? 0),
+      armorMovementProfileInput: String(armor.movementProfile || "0"),
+      armorAoeSaveModifierInput: String(armor.aoeSaveModifier || "0"),
       shieldHpInput: formatOptionalNumber(system.shield?.hp ?? 0),
       shieldHardnessInput: formatOptionalNumber(system.shield?.hardness ?? 0),
       qualityOptions: getItemQualityOptions(system.quality),
@@ -466,6 +495,7 @@ export class PeasantItemSheet extends ItemSheetBase {
     if (typeof super._onRender === "function") await super._onRender(context, options);
     if (this._itemImageTransformDirty) await this._saveItemImageTransform();
     this._bindItemTabButtons();
+    this._bindArmorEquipmentControls();
     this._bindItemEffectControls();
     this._applyItemTab(this._activeItemTab);
     this._renderModeToggle();
@@ -942,6 +972,112 @@ export class PeasantItemSheet extends ItemSheetBase {
     this._setupItemEffectManualSortControls(root, browser);
     this._applyItemEffectGroupMode(root);
   }
+
+  _bindArmorEquipmentControls() {
+    const root = getApplicationElement(this);
+    if (!root) return;
+
+    for (const input of qsa(root, 'input[data-field="system.armor.haltValues"]')) {
+      const normalized = normalizeHaltSlashValueEditable(input.value);
+      if (normalized !== input.value) input.value = normalized;
+      input.removeEventListener("keydown", this._onArmorHaltInputKeydown);
+      input.removeEventListener("input", this._onArmorHaltInput);
+      input.removeEventListener("change", this._onArmorHaltFinalize);
+      input.removeEventListener("blur", this._onArmorHaltFinalize);
+      input.addEventListener("keydown", this._onArmorHaltInputKeydown);
+      input.addEventListener("input", this._onArmorHaltInput);
+      input.addEventListener("change", this._onArmorHaltFinalize);
+      input.addEventListener("blur", this._onArmorHaltFinalize);
+    }
+
+    for (const input of qsa(root, 'input[name="system.armor.aoeSaveModifier"]')) {
+      const sanitized = sanitizeArmorAoeSaveModifierInput(input.value) || "0";
+      if (sanitized !== input.value) input.value = sanitized;
+      input.removeEventListener("input", this._onArmorAoeSaveModifierInput);
+      input.removeEventListener("change", this._onArmorAoeSaveModifierFinalize);
+      input.removeEventListener("blur", this._onArmorAoeSaveModifierFinalize);
+      input.addEventListener("input", this._onArmorAoeSaveModifierInput);
+      input.addEventListener("change", this._onArmorAoeSaveModifierFinalize);
+      input.addEventListener("blur", this._onArmorAoeSaveModifierFinalize);
+    }
+
+    for (const letter of qsa(root, "[data-pc-armor-hard-location]")) {
+      letter.removeEventListener("click", this._onArmorHardLocationClick);
+      letter.removeEventListener("keydown", this._onArmorHardLocationKeydown);
+      letter.addEventListener("click", this._onArmorHardLocationClick);
+      letter.addEventListener("keydown", this._onArmorHardLocationKeydown);
+    }
+  }
+
+  _onArmorHaltInputKeydown = (event) => {
+    if (event.key !== "Backspace" && event.key !== "Delete") return;
+    const input = event.currentTarget;
+    const value = input.value || "";
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? start;
+    if (start !== end) return;
+    if ((event.key === "Backspace" && start > 0 && value[start - 1] === "/") || (event.key === "Delete" && value[start] === "/")) {
+      event.preventDefault();
+    }
+  };
+
+  _onArmorHaltInput = (event) => {
+    const input = event.currentTarget;
+    const before = input.value || "";
+    const pos = input.selectionStart ?? before.length;
+    const normalized = normalizeHaltSlashValueEditable(before);
+    if (normalized === before) return;
+    const delta = normalized.length - before.length;
+    const nextPos = Math.max(0, Math.min(normalized.length, pos + delta));
+    input.value = normalized;
+    try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
+  };
+
+  _onArmorHaltFinalize = async (event) => {
+    const input = event.currentTarget;
+    const finalized = normalizeHaltSlashValue(input.value || "");
+    if (finalized !== input.value) input.value = finalized;
+    if (!this.isEditable || !this.isEditMode) return;
+
+    const current = normalizeHaltSlashValue(this.item?.system?.armor?.haltValues ?? [0, 0, 0, 0]);
+    if (finalized === current) return;
+    await this.item.update({ "system.armor.haltValues": normalizeHaltValues(finalized) });
+  };
+
+  _onArmorAoeSaveModifierInput = (event) => {
+    const input = event.currentTarget;
+    const before = input.value || "";
+    const pos = input.selectionStart ?? before.length;
+    const sanitized = sanitizeArmorAoeSaveModifierInput(before, { allowIncomplete: true });
+    if (sanitized === before) return;
+    const delta = sanitized.length - before.length;
+    const nextPos = Math.max(0, Math.min(sanitized.length, pos + delta));
+    input.value = sanitized;
+    try { input.setSelectionRange(nextPos, nextPos); } catch (e) { /* ignore */ }
+  };
+
+  _onArmorAoeSaveModifierFinalize = (event) => {
+    const input = event.currentTarget;
+    const sanitized = sanitizeArmorAoeSaveModifierInput(input.value) || "0";
+    if (sanitized !== input.value) input.value = sanitized;
+  };
+
+  _onArmorHardLocationClick = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.isEditable || !this.isEditMode) return;
+
+    const location = event.currentTarget?.dataset?.pcArmorHardLocation;
+    const field = PC_ARMOR_HARD_LOCATION_FIELDS[location];
+    if (!field) return;
+
+    await this.item.update({ [`system.armor.${field}`]: !this.item?.system?.armor?.[field] });
+  };
+
+  _onArmorHardLocationKeydown = (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    this._onArmorHardLocationClick(event);
+  };
 
   _onItemTabClick = (event) => {
     event.preventDefault();

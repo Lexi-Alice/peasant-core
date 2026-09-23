@@ -9,6 +9,8 @@ function buildDamageTakenChatCard({
   damageToGrid = 0,
   normalizedType = "blunt",
   isHybrid = false,
+  devastatingWoundsGained = 0,
+  breakCriticalDamage = 0,
   events = []
 } = {}) {
   const headline = String(events?.[events.length - 1] || "Damage Taken").trim() || "Damage Taken";
@@ -26,6 +28,8 @@ function buildDamageTakenChatCard({
       <div>Damage to HP Grid: ${hpGridText}</div>
       ${tempHpUsed > 0 ? `<div>Temporary HP Absorbed: ${tempHpUsed}</div>` : ""}
       ${bolsteredHpUsed > 0 ? `<div>Bolstered HP Absorbed: ${bolsteredHpUsed}</div>` : ""}
+      ${devastatingWoundsGained > 0 ? `<div>Devastating Wounds Gained: ${devastatingWoundsGained}</div>` : ""}
+      ${breakCriticalDamage > 0 ? `<div>Threshold Break Critical Damage: ${breakCriticalDamage}</div>` : ""}
     </div>
   </fieldset>`;
 }
@@ -36,15 +40,17 @@ export async function applyTargetedDamageWorkflow(actor, {
   location = "Torso",
   isAP = false,
   useArmorCharge = false,
+  armorGrade = "",
   ignoreHaltReduction = false,
   woundLocation = null,
   suppressLocationBreaks = false,
+  domeAlreadyResolved = false,
   chatSpeaker = null
 } = {}) {
   if (!actor) return { ok: false, message: "Actor not found." };
 
   const result = typeof actor.applyPeasantTargetedDamage === "function"
-    ? await actor.applyPeasantTargetedDamage({ amount, type, location, isAP, useArmorCharge, ignoreHaltReduction, woundLocation, suppressLocationBreaks })
+    ? await actor.applyPeasantTargetedDamage({ amount, type, location, isAP, useArmorCharge, armorGrade, ignoreHaltReduction, woundLocation, suppressLocationBreaks, domeAlreadyResolved })
     : { ok: false, message: "Peasant Core targeted damage workflow is not available for this actor." };
 
   let chatMessage = null;
@@ -59,6 +65,8 @@ export async function applyTargetedDamageWorkflow(actor, {
       damageToGrid: result.damageToGrid,
       normalizedType: result.normalizedType,
       isHybrid: result.isHybrid,
+      devastatingWoundsGained: result.devastatingWoundsGained,
+      breakCriticalDamage: result.breakCriticalDamage,
       events: result.events
     });
     chatMessage = await ChatMessage.create({ user: game.user.id, speaker, content: chatContent });

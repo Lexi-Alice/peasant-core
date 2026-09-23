@@ -23,7 +23,7 @@
           <option value="Custom" {{#if customRaceSelected}} selected{{/if}}>Custom</option>
         </select>
         {{#if customRaceSelected}}
-          <input type="text" name="system.customRace" class="character-field-popover-input pc-input" value="{{source.system.customRace}}" placeholder="Custom race" />
+          <input type="text" name="system.customRace" class="character-field-popover-input pc-input" value="{{source.system.customRace}}" placeholder="Custom heraldry" />
         {{/if}}
       </div>
     {{else}}
@@ -144,7 +144,7 @@
               </button>
             {{/if}}
             <div class="pc-portrait-lozenge pc-portrait-armor-charge" aria-label="Armor Charge">
-              <div class="pc-portrait-armor-charge-field" data-resource="armorCharge" role="meter" aria-valuemin="0" aria-valuenow="{{armorCharge.value}}" aria-valuemax="{{armorCharge.max}}" data-tooltip="Armor Charge {{armorCharge.value}} / {{armorCharge.max}}">
+              <div class="pc-portrait-armor-charge-field" data-resource="armorCharge" role="meter" aria-valuemin="0" aria-valuenow="{{armorCharge.value}}" aria-valuemax="{{armorCharge.max}}" data-tooltip="{{armorCharge.tooltip}}">
                 <span class="pc-portrait-armor-charge-frame">
                   <img src="systems/peasant-core/ui/armor-charge%20badge.webp" alt="" aria-hidden="true">
                 </span>
@@ -153,11 +153,7 @@
                   <span class="pc-portrait-resource-separator">/</span>
                   <span class="pc-portrait-resource-max">{{armorCharge.max}}</span>
                 </span>
-                {{#if @root.editable}}
-                  <input type="number" class="pc-portrait-resource-max-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge maximum" hidden>
-                {{else}}
-                  <input type="number" class="pc-portrait-resource-value-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.valueInput}}" min="0" max="{{armorCharge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge current" hidden>
-                {{/if}}
+                <input type="number" class="pc-portrait-resource-value-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.valueInput}}" min="0" max="{{armorCharge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge current" hidden>
               </div>
               <span class="pc-portrait-lozenge-label">Armor Charge</span>
             </div>
@@ -454,10 +450,10 @@
           <div class="halt-section pc-portrait-halt-list {{#if simplifiedHp}}simplified-halt-section{{/if}}">
             <div class="halt-row">
               <div class="halt-label-group">
-                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardHead}}hard{{/if}}{{else}}{{#if actor.system.hardHead}}hard{{/if}}{{/if}}" data-loc="Head" data-type="halt" data-tooltip="Head" aria-label="Head">H</span>
-                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardArms}}hard{{/if}}{{else}}{{#if actor.system.hardArms}}hard{{/if}}{{/if}}" data-loc="Arms" data-type="halt" data-tooltip="Arms" aria-label="Arms">A</span>
-                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardLegs}}hard{{/if}}{{else}}{{#if actor.system.hardLegs}}hard{{/if}}{{/if}}" data-loc="Legs" data-type="halt" data-tooltip="Legs" aria-label="Legs">L</span>
-                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardTorso}}hard{{/if}}{{else}}{{#if actor.system.hardTorso}}hard{{/if}}{{/if}}" data-loc="Torso" data-type="halt" data-tooltip="Torso" aria-label="Torso">T</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardHead}}hard{{/if}}{{else}}{{#if @root.haltHardHead}}hard{{/if}}{{/if}}" data-loc="Head" data-type="halt" data-tooltip="{{#if @root.editable}}{{#if source.system.hardHead}}Hard Head{{else}}Head{{/if}}{{else}}{{#if @root.haltHardHead}}Hard Head{{else}}Head{{/if}}{{/if}}" aria-label="{{#if @root.editable}}{{#if source.system.hardHead}}Hard Head{{else}}Head{{/if}}{{else}}{{#if @root.haltHardHead}}Hard Head{{else}}Head{{/if}}{{/if}}">H</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardArms}}hard{{/if}}{{else}}{{#if @root.haltHardArms}}hard{{/if}}{{/if}}" data-loc="Arms" data-type="halt" data-tooltip="{{#if @root.editable}}{{#if source.system.hardArms}}Hard Arms{{else}}Arms{{/if}}{{else}}{{#if @root.haltHardArms}}Hard Arms{{else}}Arms{{/if}}{{/if}}" aria-label="{{#if @root.editable}}{{#if source.system.hardArms}}Hard Arms{{else}}Arms{{/if}}{{else}}{{#if @root.haltHardArms}}Hard Arms{{else}}Arms{{/if}}{{/if}}">A</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardLegs}}hard{{/if}}{{else}}{{#if @root.haltHardLegs}}hard{{/if}}{{/if}}" data-loc="Legs" data-type="halt" data-tooltip="{{#if @root.editable}}{{#if source.system.hardLegs}}Hard Legs{{else}}Legs{{/if}}{{else}}{{#if @root.haltHardLegs}}Hard Legs{{else}}Legs{{/if}}{{/if}}" aria-label="{{#if @root.editable}}{{#if source.system.hardLegs}}Hard Legs{{else}}Legs{{/if}}{{else}}{{#if @root.haltHardLegs}}Hard Legs{{else}}Legs{{/if}}{{/if}}">L</span>
+                <span class="halt-letter {{#if @root.editable}}{{#if source.system.hardTorso}}hard{{/if}}{{else}}{{#if @root.haltHardTorso}}hard{{/if}}{{/if}}" data-loc="Torso" data-type="halt" data-tooltip="{{#if @root.editable}}{{#if source.system.hardTorso}}Hard Torso{{else}}Torso{{/if}}{{else}}{{#if @root.haltHardTorso}}Hard Torso{{else}}Torso{{/if}}{{/if}}" aria-label="{{#if @root.editable}}{{#if source.system.hardTorso}}Hard Torso{{else}}Torso{{/if}}{{else}}{{#if @root.haltHardTorso}}Hard Torso{{else}}Torso{{/if}}{{/if}}">T</span>
                 :
               </div>
               {{#if @root.editable}}
@@ -472,10 +468,10 @@
               {{#if @root.editable}}
                 <div class="halt-label-group">
                   <span class="halt-title" style="margin-right: 4px;">Natural</span>
-                  <span class="halt-letter {{#if source.system.naturalHardHead}}hard{{/if}}" data-loc="Head" data-type="natural">H</span>
-                  <span class="halt-letter {{#if source.system.naturalHardArms}}hard{{/if}}" data-loc="Arms" data-type="natural">A</span>
-                  <span class="halt-letter {{#if source.system.naturalHardLegs}}hard{{/if}}" data-loc="Legs" data-type="natural">L</span>
-                  <span class="halt-letter {{#if source.system.naturalHardTorso}}hard{{/if}}" data-loc="Torso" data-type="natural">T</span>
+                  <span class="halt-letter {{#if source.system.naturalHardHead}}hard{{/if}}" data-loc="Head" data-type="natural" data-tooltip="{{#if source.system.naturalHardHead}}Hard Head{{else}}Head{{/if}}" aria-label="{{#if source.system.naturalHardHead}}Hard Head{{else}}Head{{/if}}">H</span>
+                  <span class="halt-letter {{#if source.system.naturalHardArms}}hard{{/if}}" data-loc="Arms" data-type="natural" data-tooltip="{{#if source.system.naturalHardArms}}Hard Arms{{else}}Arms{{/if}}" aria-label="{{#if source.system.naturalHardArms}}Hard Arms{{else}}Arms{{/if}}">A</span>
+                  <span class="halt-letter {{#if source.system.naturalHardLegs}}hard{{/if}}" data-loc="Legs" data-type="natural" data-tooltip="{{#if source.system.naturalHardLegs}}Hard Legs{{else}}Legs{{/if}}" aria-label="{{#if source.system.naturalHardLegs}}Hard Legs{{else}}Legs{{/if}}">L</span>
+                  <span class="halt-letter {{#if source.system.naturalHardTorso}}hard{{/if}}" data-loc="Torso" data-type="natural" data-tooltip="{{#if source.system.naturalHardTorso}}Hard Torso{{else}}Torso{{/if}}" aria-label="{{#if source.system.naturalHardTorso}}Hard Torso{{else}}Torso{{/if}}">T</span>
                   <span style="margin-left: 2px;">:</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
@@ -484,10 +480,10 @@
               {{else}}
                 <div class="halt-label-group">
                   <span class="halt-title" style="margin-right: 4px;">Natural</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardHead}}hard{{/if}}" data-tooltip="Head" aria-label="Head">H</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardArms}}hard{{/if}}" data-tooltip="Arms" aria-label="Arms">A</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardLegs}}hard{{/if}}" data-tooltip="Legs" aria-label="Legs">L</span>
-                  <span class="halt-letter {{#if actor.system.naturalHardTorso}}hard{{/if}}" data-tooltip="Torso" aria-label="Torso">T</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardHead}}hard{{/if}}" data-tooltip="{{#if actor.system.naturalHardHead}}Hard Head{{else}}Head{{/if}}" aria-label="{{#if actor.system.naturalHardHead}}Hard Head{{else}}Head{{/if}}">H</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardArms}}hard{{/if}}" data-tooltip="{{#if actor.system.naturalHardArms}}Hard Arms{{else}}Arms{{/if}}" aria-label="{{#if actor.system.naturalHardArms}}Hard Arms{{else}}Arms{{/if}}">A</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardLegs}}hard{{/if}}" data-tooltip="{{#if actor.system.naturalHardLegs}}Hard Legs{{else}}Legs{{/if}}" aria-label="{{#if actor.system.naturalHardLegs}}Hard Legs{{else}}Legs{{/if}}">L</span>
+                  <span class="halt-letter {{#if actor.system.naturalHardTorso}}hard{{/if}}" data-tooltip="{{#if actor.system.naturalHardTorso}}Hard Torso{{else}}Torso{{/if}}" aria-label="{{#if actor.system.naturalHardTorso}}Hard Torso{{else}}Torso{{/if}}">T</span>
                   <span style="margin-left: 2px;">:</span>
                 </div>
                 <span class="halt-value">{{#each naturalHaltDisplay as |part index|}}<span class="{{#if part.isHard}}hard-val{{/if}}">{{part.value}}</span>{{#unless @last}}/{{/unless}}{{/each}}</span>
@@ -499,7 +495,7 @@
                 <span>Wound</span>
               </button>
               <span class="halt-title">Thresholds:</span>
-              <span class="halt-value {{#if woundThresholdsReduced}}wounded-thresholds{{/if}}">{{woundThresholds}}</span>
+              <span class="halt-value {{#if woundThresholdsReduced}}wounded-thresholds{{/if}}" data-tooltip="{{woundThresholdsTooltip}}" aria-label="{{woundThresholdsAriaLabel}}">{{woundThresholds}}</span>
             </div>
             {{/unless}}
           </div>
@@ -513,7 +509,7 @@
       <div class="attributes-table pc-hex-attributes">
         <div class="pc-hex-row pc-hex-score-row" aria-label="Attributes">
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" data-tooltip="Click to open Blessing menu" aria-label="Open Build Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.build" value="{{source.system.build}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Build score">
@@ -526,7 +522,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" data-tooltip="Click to open Blessing menu" aria-label="Open Reflex Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.reflex" value="{{source.system.reflex}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Reflex score">
@@ -546,7 +542,11 @@
               {{else}}
                 {{#if reflexAoeSaveDisplay}}
                   <span class="reflex-aoe-paren">(</span>
-                  <button type="button" class="attr-reflex-aoe-save-clickable" data-action="rollAttributeSave" data-save="reflex" data-tn="{{reflexAoeSaveTn}}" data-save-label="AoE Reflex Save">{{reflexAoeSaveDisplay}}</button>
+                  {{#if reflexAoeSaveAutoFail}}
+                    <span class="attr-reflex-save-primary" data-tooltip="Equipped armor automatically fails AoE Reflex Saves">{{reflexAoeSaveDisplay}}</span>
+                  {{else}}
+                    <button type="button" class="attr-reflex-aoe-save-clickable" data-action="rollAttributeSave" data-save="reflex" data-tn="{{reflexAoeSaveTn}}" data-save-label="AoE Reflex Save">{{reflexAoeSaveDisplay}}</button>
+                  {{/if}}
                   <span class="reflex-aoe-paren">)</span>
                 {{/if}}
               {{/if}}
@@ -555,7 +555,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" data-tooltip="Click to open Blessing menu" aria-label="Open Intuition Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.intuition" value="{{source.system.intuition}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Intuition score">
@@ -568,7 +568,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" data-tooltip="Click to open Blessing menu" aria-label="Open Learn Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.learn" value="{{source.system.learn}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Learn score">
@@ -581,7 +581,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" data-tooltip="Click to open Blessing menu" aria-label="Open Charisma Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
+            <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.charisma" value="{{source.system.charisma}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Charisma score">

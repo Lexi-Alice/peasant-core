@@ -10,6 +10,48 @@ import { pcLog } from "../../utils/logging.mjs";
 import { isChainCancelledResult, showForcePassPromptDialog } from "./prompt-dialogs.mjs";
 import { markRollForcedPass } from "./roll-chat-updates.mjs";
 
+const PC_SYSTEM_ID = "peasant-core";
+export const PC_STRESS_ROLL_FLAG = "stressRoll";
+
+function serializeStressRollResult(rollResult) {
+  return {
+    toHit: Number.isFinite(Number(rollResult?.toHit)) ? Number(rollResult.toHit) : null,
+    accuracy: Number.isFinite(Number(rollResult?.accuracy)) ? Number(rollResult.accuracy) : null,
+    initialDice: Array.isArray(rollResult?.initialDice) ? rollResult.initialDice.map(Number) : [],
+    allDice: Array.isArray(rollResult?.allDice) ? rollResult.allDice.map(Number) : [],
+    keptDice: Array.isArray(rollResult?.keptDice) ? rollResult.keptDice.map(Number) : [],
+    additionalDice: Array.isArray(rollResult?.additionalDice) ? rollResult.additionalDice.map(Number) : [],
+    initialTotal: Number.isFinite(Number(rollResult?.initialTotal)) ? Number(rollResult.initialTotal) : null,
+    total: Number.isFinite(Number(rollResult?.total)) ? Number(rollResult.total) : null,
+    baseMoS: Number.isFinite(Number(rollResult?.baseMoS)) ? Number(rollResult.baseMoS) : null,
+    accuracyMoS: Number.isFinite(Number(rollResult?.accuracyMoS)) ? Number(rollResult.accuracyMoS) : 0,
+    criticalMoS: Number.isFinite(Number(rollResult?.criticalMoS)) ? Number(rollResult.criticalMoS) : 0,
+    totalMoS: Number.isFinite(Number(rollResult?.totalMoS)) ? Number(rollResult.totalMoS) : null,
+    isSuccess: !!rollResult?.isSuccess,
+    resultText: String(rollResult?.resultText || "").trim(),
+    criticalType: String(rollResult?.criticalType || "").trim()
+  };
+}
+
+async function markStressRollRetryAvailable({ actor, rollLabel, rollResult, kind, stressCostMultiplier, fixedSpendType }) {
+  const message = rollResult?.chatMessage;
+  if (!message?.setFlag) return;
+  await message.setFlag(PC_SYSTEM_ID, PC_STRESS_ROLL_FLAG, {
+    version: 1,
+    status: "available",
+    processing: false,
+    kind: ["save", "check"].includes(kind) ? kind : "roll",
+    actorId: actor?.id || null,
+    actorUuid: actor?.uuid || null,
+    actorName: actor?.name || "Actor",
+    rollLabel: String(rollLabel || "Roll").trim() || "Roll",
+    stressCostMultiplier: Math.max(1, Number(stressCostMultiplier) || 1),
+    fixedSpendType: String(fixedSpendType || "").trim().toLowerCase() || null,
+    rollResult: serializeStressRollResult(rollResult),
+    createdAt: Date.now()
+  });
+}
+
 function isCriticalFailureRollResult(rollResult) {
   if (!rollResult || typeof rollResult !== "object") return false;
   const criticalType = String(rollResult.criticalType || "").trim().toLowerCase();
@@ -44,10 +86,14 @@ function getStressUpgradedTotalMoS(rollResult) {
   return Math.max(0, accuracyMoS + criticalMoS);
 }
 
-export async function maybeForcePassFailedNotableRoll({
+export async function maybeForcePassFailedRoll({
   actor = null,
   rollLabel = "Skill Roll",
-  rollResult = null
+  rollResult = null,
+  kind = "roll",
+  stressCostMultiplier = 1,
+  fixedSpendType = null,
+  cancelChainOnClose = true
 } = {}) {
   if (!actor || !rollResult) {
     return { forced: false, stressCost: 0, spendType: null, reason: "not-failed" };
@@ -67,7 +113,8 @@ export async function maybeForcePassFailedNotableRoll({
     return { forced: false, stressCost: 0, spendType: null, reason: "accuracy-or-non-dice-failure" };
   }
 
-  const stressCost = getForcePassStressCostFromRollResult(rollResult);
+  const stressCost = getForcePassStressCostFromRollResult(rollResult)
+    * Math.max(1, Number(stressCostMultiplier) || 1);
   if (stressCost <= 0) {
     return { forced: false, stressCost, spendType: null, reason: "no-cost" };
   }
@@ -76,17 +123,26 @@ export async function maybeForcePassFailedNotableRoll({
     actor,
     rollLabel,
     stressCost,
+    fixedSpendType,
     promptText: isGlancingSuccess
       ? `Spend ${stressCost} stress to make this a full success?`
       : ""
   });
   if (isChainCancelledResult(promptResult)) {
+    await markStressRollRetryAvailable({
+      actor,
+      rollLabel,
+      rollResult,
+      kind,
+      stressCostMultiplier,
+      fixedSpendType
+    });
     return {
       forced: false,
       stressCost,
       spendType: promptResult?.spendType || null,
       reason: "close",
-      chainCancelled: true
+      chainCancelled: cancelChainOnClose
     };
   }
   if (!promptResult?.forced) {
@@ -98,7 +154,7 @@ export async function maybeForcePassFailedNotableRoll({
     };
   }
 
-  const spendType = String(promptResult.spendType || "general").trim().toLowerCase();
+  const spendType = String(fixedSpendType || promptResult.spendType || "general").trim().toLowerCase();
   const availableCapacity = getStressCapacityForSpendType(actor, spendType);
   if (availableCapacity < stressCost) {
     ui.notifications?.warn?.(`Not enough ${getForcePassSpendTypeLabel(spendType)} capacity to spend ${stressCost} stress.`);
@@ -149,3 +205,5 @@ export async function maybeForcePassFailedNotableRoll({
     undoRecords: stressSpend.undoRecords
   };
 }
+
+export const maybeForcePassFailedNotableRoll = maybeForcePassFailedRoll;

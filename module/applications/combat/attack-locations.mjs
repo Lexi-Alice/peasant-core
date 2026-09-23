@@ -44,7 +44,8 @@ export async function resolveAttackLocationForTarget({
   target = null,
   attackRoll = null,
   defensePromptResult = null,
-  magnetismGrade = 0
+  magnetismGrade = 0,
+  armorCharge = null
 } = {}) {
   const targetLabel = target?.targetName || target?.actor?.name || "";
   const defendedByReflex = doesPromptResultCountAsActiveDefense(defensePromptResult);
@@ -56,7 +57,7 @@ export async function resolveAttackLocationForTarget({
       maxMoS: selectableMoS,
       attackerName: actor?.name || attackerToken?.name || "Attacker",
       targetLabel,
-      magnetismGrade: resolvedMagnetismGrade
+      armorCharge
     });
     if (isChainCancelledResult(promptResult)) {
       return { chainCancelled: true };

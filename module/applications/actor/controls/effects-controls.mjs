@@ -1,6 +1,14 @@
 import { qs, qsa } from "../../dom.mjs";
+import { enableSpellEffectWithCategoryResolution } from "../../../data/active-effect/spell-effects.mjs";
+import { findPassiveSkillEffectSource, isSkillEditorDefinition } from "../../../data/actor/skill-entry-conditions.mjs";
 
-const PC_ACTIVE_EFFECT_TYPES = Object.freeze(["base", "enchantment"]);
+const PC_ACTIVE_EFFECT_TYPES = Object.freeze(["base", "enchantment", "spellEffect"]);
+
+function rejectDefinitionEnable(effect, disabled, actor = effect?.parent) {
+  if (disabled || !isSkillEditorDefinition(effect) || findPassiveSkillEffectSource(actor, effect?.id)) return false;
+  ui.notifications?.warn?.("Skill and Notable effect definitions can only be applied from their configured usage.");
+  return true;
+}
 
 async function getPassiveEffectFromElement(sheet, element) {
   const row = element?.closest?.("[data-pc-passive-effect]");
@@ -105,8 +113,14 @@ async function togglePassiveEffect(sheet, control) {
   }
 
   const nextDisabled = control.getAttribute("aria-pressed") === "true";
+  if (rejectDefinitionEnable(effect, nextDisabled, sheet.actor)) return;
   try {
-    await effect.update({ disabled: nextDisabled });
+    if (effect.type === "spellEffect" && !nextDisabled) {
+      const enabled = await enableSpellEffectWithCategoryResolution(effect);
+      if (!enabled) return;
+    } else {
+      await effect.update({ disabled: nextDisabled });
+    }
     syncPassiveEffectToggleState(control, nextDisabled);
   } catch (err) {
     console.warn("Failed to toggle active effect:", err);
@@ -155,6 +169,12 @@ async function duplicatePassiveEffect(sheet, effect) {
 
 async function deletePassiveEffect(sheet, effect) {
   if (!effect || !sheet?.canModifyActor) return;
+  const source = isSkillEditorDefinition(effect)
+    ? findPassiveSkillEffectSource(sheet.actor, effect.id) : null;
+  if (source) {
+    ui.notifications?.warn?.(`Delete this effect from ${source.entryName} → ${source.usageName} in the ${source.collection === "skills" ? "Skill" : "Notable"} editor.`);
+    return;
+  }
   if (typeof effect.deleteDialog === "function") {
     await effect.deleteDialog({}, { render: false });
   } else {
@@ -169,9 +189,15 @@ async function setPassiveEffectDisabled(sheet, target, effect, disabled) {
     ui.notifications?.warn?.("Unable to toggle that effect from this sheet.");
     return;
   }
+  if (rejectDefinitionEnable(effect, disabled, sheet.actor)) return;
 
   try {
-    await effect.update({ disabled });
+    if (effect.type === "spellEffect" && !disabled) {
+      const enabled = await enableSpellEffectWithCategoryResolution(effect);
+      if (!enabled) return;
+    } else {
+      await effect.update({ disabled });
+    }
     syncPassiveEffectRowState(target?.closest?.("[data-pc-passive-effect]"), disabled);
   } catch (err) {
     console.warn("Failed to toggle active effect:", err);
@@ -180,7 +206,7 @@ async function setPassiveEffectDisabled(sheet, target, effect, disabled) {
 }
 
 async function openCreatePassiveEffectDialog(sheet) {
-  if (!sheet?.canModifyActor || !sheet.isEditMode) return;
+  if (!sheet?.canModifyActor) return;
 
   const ActiveEffectClass = globalThis.ActiveEffect?.implementation ?? globalThis.ActiveEffect;
   if (typeof ActiveEffectClass?.createDialog !== "function") {
@@ -207,17 +233,19 @@ async function openCreatePassiveEffectDialog(sheet) {
 
 function getPassiveEffectContextOptions(sheet, effect) {
   const disabled = !!effect?.disabled;
+  const passiveDefinition = isSkillEditorDefinition(effect)
+    && !!findPassiveSkillEffectSource(sheet.actor, effect.id);
   return [
     {
       label: "Edit",
       icon: "fa-solid fa-pen-to-square",
       onClick: () => openPassiveEffectSheet(effect, { mode: "edit" })
     },
-    {
+    ...(!passiveDefinition ? [{
       label: "Duplicate",
       icon: "fa-solid fa-copy",
       onClick: async () => duplicatePassiveEffect(sheet, effect)
-    },
+    }] : []),
     {
       label: "Delete",
       icon: "fa-solid fa-trash",
@@ -262,7 +290,7 @@ export function setupActorEffectControls(sheet, html, { readOnly = false } = {})
   search?.addEventListener("input", () => applyPassiveEffectsSearch(root));
 
   if (!readOnly) {
-    qs(browser, "[data-pc-passive-effect-add]")?.addEventListener("click", async (event) => {
+    qs(root, "[data-pc-passive-effect-add]")?.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
       await openCreatePassiveEffectDialog(sheet);

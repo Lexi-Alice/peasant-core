@@ -120,6 +120,12 @@ export function normalizeCombatDefense(rawDefense) {
   const blockType = normalizeCombatDefenseBlockType(safe.blockType);
   const hardnessRaw = Number.parseInt(safe.hardness, 10);
   const hpRaw = Number.parseInt(safe.hp, 10);
+  const maxHpRaw = Number.parseInt(safe.maxHp, 10);
+  const maxHp = blockType === "Mage"
+    ? (Number.isFinite(maxHpRaw) && maxHpRaw > 0
+      ? maxHpRaw
+      : Number.isFinite(hpRaw) && hpRaw > 0 ? hpRaw : 40)
+    : null;
   const weaponLegacyHardness = blockType === "Weapon" && Number.isFinite(hpRaw) && !Number.isFinite(hardnessRaw)
     ? hpRaw
     : hardnessRaw;
@@ -128,7 +134,7 @@ export function normalizeCombatDefense(rawDefense) {
     ? !!safe.appliesDebuff
     : (!!safe.appliesBefore || debuffToHitRaw !== 0);
 
-  return {
+  const normalized = {
     ...defaults,
     responses: normalizeCombatDefenseResponses(safe.responses),
     effectiveness,
@@ -138,12 +144,18 @@ export function normalizeCombatDefense(rawDefense) {
     hardness: block && (blockType === "Shield" || blockType === "Weapon")
       ? Math.max(0, Number.isFinite(weaponLegacyHardness) ? weaponLegacyHardness : 0)
       : 0,
-    hp: block && blockType !== "Weapon" ? Math.max(0, Number.isFinite(hpRaw) ? hpRaw : 0) : 0,
+    hp: block && blockType === "Shield"
+      ? Math.min(maxHp ?? Number.POSITIVE_INFINITY, Math.max(0, Number.isFinite(hpRaw) ? hpRaw : 0))
+      : 0,
     masteryBonus: block && blockType === "Weapon" ? !!safe.masteryBonus : false,
     appliesDebuff,
     debuffToHit: appliesDebuff ? debuffToHitRaw : 0,
     appliesBefore: appliesDebuff ? !!safe.appliesBefore : false
   };
+  if (blockType === "Mage") {
+    normalized.maxHp = maxHp;
+  }
+  return normalized;
 }
 
 export function normalizeShieldDurability(rawShield) {
@@ -176,6 +188,52 @@ export function getShieldBlockEffectiveHardness(rawDefense) {
   const defense = normalizeCombatDefense(rawDefense);
   if (!defense.block || defense.blockType !== "Shield") return 0;
   return getShieldDurabilityEffectiveHardness(defense);
+}
+
+export function resolveShieldBlockDamage(rawDefense, damage, { braced = false } = {}) {
+  const defense = normalizeCombatDefense({ ...rawDefense, block: true, blockType: "Shield" });
+  const damageAmount = Math.max(0, Number(damage) || 0);
+  const hardnessApplied = Math.min(
+    damageAmount,
+    getShieldBlockEffectiveHardness(defense) * (braced ? 2 : 1)
+  );
+  const damageAfterHardness = Math.max(0, damageAmount - hardnessApplied);
+  const shieldDamage = braced ? damageAfterHardness : Math.ceil(damageAfterHardness / 2);
+  let armDamage = braced ? 0 : Math.floor(damageAfterHardness / 2);
+  const shieldDamageApplied = Math.min(defense.hp, shieldDamage);
+  const shieldOverflowDamage = Math.max(0, shieldDamage - shieldDamageApplied);
+  armDamage += shieldOverflowDamage;
+  const shieldAfter = applyShieldDurabilityDamage(defense, shieldDamageApplied);
+
+  return {
+    hardnessApplied,
+    damageAfterHardness,
+    shieldDamage,
+    shieldDamageApplied,
+    shieldOverflowDamage,
+    shieldHpAfter: shieldAfter.hp,
+    shieldHardnessAfter: shieldAfter.hardness,
+    armDamage,
+    overkill: braced && shieldOverflowDamage > 0
+  };
+}
+
+export function resolveMageBlockDamage(rawDefense, damage) {
+  const defense = normalizeCombatDefense({ ...rawDefense, block: true, blockType: "Mage" });
+  const damageAmount = Math.max(0, Number(damage) || 0);
+  const rawHp = Number.parseInt(rawDefense?.hp, 10);
+  const hpBefore = Math.min(defense.maxHp, Math.max(0, Number.isFinite(rawHp) ? rawHp : 0));
+  const absorbed = Math.min(hpBefore, damageAmount);
+  const hpAfter = hpBefore - absorbed;
+  const overflow = Math.max(0, damageAmount - absorbed);
+
+  return {
+    hpBefore,
+    hpAfter,
+    absorbed,
+    overflow,
+    cleanHit: overflow > 0
+  };
 }
 
 export function getCombatDefenseSummary(rawDefense) {

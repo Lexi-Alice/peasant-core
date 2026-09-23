@@ -2,21 +2,31 @@ import { getCombatFlatDamageModifier } from "../../data/actor/combat-modifiers.m
 import { applyDieRate } from "../../dice/combat-dice.mjs";
 import { applyMessageMode, escapeHtml } from "../../utils/chat.mjs";
 import { getActorRollSpeaker } from "./actor-targets.mjs";
+import { evaluateCombatValueDice } from "../../dice/combat-value-rolls.mjs";
 
 export function normalizeAutomatedCombatHealType(rawType) {
   const type = String(rawType || "").trim().toLowerCase();
-  return type === "greater" ? "greater" : "temporary";
+  if (type === "greater" || type === "special") return type;
+  return "temporary";
 }
 
 export function getAutomatedCombatHealTypeLabel(rawType) {
-  return normalizeAutomatedCombatHealType(rawType) === "greater" ? "Greater" : "Temporary";
+  const type = normalizeAutomatedCombatHealType(rawType);
+  return type === "greater" ? "Greater" : type === "special" ? "Special" : "Temporary";
 }
 
-export async function rollAutomatedCombatHeal(actor, combat, { targetLabel = "", attackerToken = null } = {}) {
+export async function rollAutomatedCombatHeal(actor, combat, {
+  targetLabel = "",
+  attackerToken = null,
+  diceOverride = null,
+  chatMessage = null,
+  combatMods = null,
+  maximize = false
+} = {}) {
   if (!actor || !combat?.heal) return null;
 
   const combatName = combat.name || "Combat";
-  const combatMods = actor.system?.combatMods || { diceRate: 0, flatDamage: 0 };
+  combatMods = combatMods || actor.system?.combatMods || { diceRate: 0, flatDamage: 0 };
   const diceRateMod = Number.parseInt(combatMods.diceRate, 10) || 0;
   const flatDamageMod = getCombatFlatDamageModifier(combatMods);
   const healResult = applyDieRate(
@@ -41,26 +51,36 @@ export async function rollAutomatedCombatHeal(actor, combat, { targetLabel = "",
   let diceDetailLine = `<div>Dice: [] = 0</div>`;
 
   if (diceCount > 0 && diceValue > 0) {
-    roll = await new Roll(`${rolledDiceCount}d${diceValue}`).evaluate();
-    allDice = roll.dice.flatMap((d) => d.results.map((r) => r.result));
+    const fixedDice = Array.isArray(diceOverride)
+      ? diceOverride.map(Number).filter((value) => Number.isFinite(value) && value >= 1 && value <= diceValue)
+      : [];
+    if (maximize) {
+      allDice = Array.from({ length: rolledDiceCount }, () => diceValue);
+    } else if (fixedDice.length === rolledDiceCount) {
+      allDice = fixedDice;
+    } else {
+      roll = await new Roll(`${rolledDiceCount}d${diceValue}`).evaluate();
+      allDice = roll.dice.flatMap((d) => d.results.map((r) => r.result));
+    }
     const diceBreakdown = allDice.join(", ");
     const diceSum = allDice.reduce((sum, value) => sum + value, 0);
-    adjustedDiceTotal = diceSum;
-    diceDetailLine = `<div>Dice: [${diceBreakdown}] = ${diceSum}</div>`;
+    const evaluation = evaluateCombatValueDice({
+      dice: allDice,
+      naturalDiceCount,
+      useStability,
+      useStrengthen
+    });
+    adjustedDiceTotal = evaluation.adjustedDiceTotal;
+    diceDetailLine = `<div>${maximize ? "Maximized Dice" : "Dice"}: [${diceBreakdown}] = ${diceSum}</div>`;
 
     if (useStrengthen) {
-      const indexed = allDice.map((value, index) => ({ value, index }));
-      indexed.sort((a, b) => (b.value - a.value) || (a.index - b.index));
-      const keepCount = Math.min(naturalDiceCount, allDice.length);
-      const keepIndexSet = new Set(indexed.slice(0, keepCount).map((d) => d.index));
-      adjustedDiceTotal = allDice.reduce((sum, value, index) => sum + (keepIndexSet.has(index) ? value : 0), 0);
+      const keepIndexSet = new Set(evaluation.keptIndices);
       const droppedDisplay = allDice
         .map((die, index) => keepIndexSet.has(index) ? `${die}` : `<span style="color: #888;">${die}</span>`)
         .join(", ");
-      diceDetailLine = `<div>Strengthened Dice: [${droppedDisplay}] = ${adjustedDiceTotal}</div>`;
+      diceDetailLine = `<div>${maximize ? "Maximized Strengthened Dice" : "Strengthened Dice"}: [${droppedDisplay}] = ${adjustedDiceTotal}</div>`;
     } else if (useStability) {
-      adjustedDiceTotal = Math.floor(diceSum / 2);
-      diceDetailLine = `<div>Stabilized Dice: [${diceBreakdown}] / 2 = ${adjustedDiceTotal}</div>`;
+      diceDetailLine = `<div>${maximize ? "Maximized Stabilized Dice" : "Stabilized Dice"}: [${diceBreakdown}] / 2 = ${adjustedDiceTotal}</div>`;
     }
   }
 
@@ -94,12 +114,17 @@ export async function rollAutomatedCombatHeal(actor, combat, { targetLabel = "",
     </div>
   </fieldset>`;
 
-  const chatMessage = await ChatMessage.create(applyMessageMode({
-    user: game.user.id,
-    speaker,
-    content: chatHtml,
-    rolls: roll ? [roll] : undefined
-  }));
+  if (chatMessage?.update) {
+    await chatMessage.update({ content: chatHtml });
+  } else {
+    chatMessage = await ChatMessage.create(applyMessageMode({
+      user: game.user.id,
+      speaker,
+      content: chatHtml,
+      rolls: roll ? [roll] : undefined,
+      sound: null
+    }));
+  }
 
   return {
     total,

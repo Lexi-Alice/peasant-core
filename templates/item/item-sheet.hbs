@@ -116,6 +116,34 @@
                 </div>
               </div>
             {{/if}}
+            {{#if isArmorEquipment}}
+              <div class="pc-item-equipment-armor-row {{#if editable}}pc-item-equipment-armor-row-editable{{/if}}">
+                <span>Armor</span>
+                <div class="pc-item-equipment-armor-fields">
+                  <label class="pc-item-equipment-armor-field pc-item-equipment-armor-halt-field">
+                    <span class="pc-item-equipment-armor-halt-heading">
+                      <span class="halt-letter {{#if armorHardHead}}hard{{/if}}" data-pc-armor-hard-location="Head" data-loc="Head" data-tooltip="{{#if armorHardHead}}Hard Head{{else}}Head{{/if}}" aria-label="{{#if armorHardHead}}Hard Head{{else}}Head{{/if}}" {{#if editable}}role="button" tabindex="0"{{/if}}>H</span>
+                      <span class="halt-letter {{#if armorHardArms}}hard{{/if}}" data-pc-armor-hard-location="Arms" data-loc="Arms" data-tooltip="{{#if armorHardArms}}Hard Arms{{else}}Arms{{/if}}" aria-label="{{#if armorHardArms}}Hard Arms{{else}}Arms{{/if}}" {{#if editable}}role="button" tabindex="0"{{/if}}>A</span>
+                      <span class="halt-letter {{#if armorHardLegs}}hard{{/if}}" data-pc-armor-hard-location="Legs" data-loc="Legs" data-tooltip="{{#if armorHardLegs}}Hard Legs{{else}}Legs{{/if}}" aria-label="{{#if armorHardLegs}}Hard Legs{{else}}Legs{{/if}}" {{#if editable}}role="button" tabindex="0"{{/if}}>L</span>
+                      <span class="halt-letter {{#if armorHardTorso}}hard{{/if}}" data-pc-armor-hard-location="Torso" data-loc="Torso" data-tooltip="{{#if armorHardTorso}}Hard Torso{{else}}Torso{{/if}}" aria-label="{{#if armorHardTorso}}Hard Torso{{else}}Torso{{/if}}" {{#if editable}}role="button" tabindex="0"{{/if}}>T</span>
+                    </span>
+                    <input type="text" data-field="system.armor.haltValues" value="{{armorHaltInput}}" class="pc-input halt-input pc-item-equipment-armor-halt-input" aria-label="Armor HALT" {{#unless editable}}disabled{{/unless}}>
+                  </label>
+                  <label class="pc-item-equipment-armor-field">
+                    <span>Run Stamina Modifier</span>
+                    <input type="number" name="system.armor.runStaminaModifier" value="{{armorRunStaminaModifierInput}}" class="pc-input pc-item-equipment-armor-input" step="1" inputmode="numeric" aria-label="Armor Run Stamina Modifier" {{#unless editable}}disabled{{/unless}}>
+                  </label>
+                  <label class="pc-item-equipment-armor-field">
+                    <span>Movement Profile</span>
+                    <input type="text" name="system.armor.movementProfile" value="{{armorMovementProfileInput}}" class="pc-input pc-item-equipment-armor-input" aria-label="Armor Movement Profile" {{#unless editable}}disabled{{/unless}}>
+                  </label>
+                  <label class="pc-item-equipment-armor-field">
+                    <span data-tooltip="The Area of Effect Save Modifier represents a change in target to any Reflex Save that the wearing Character might make against Area Damage which can be applied through skills that target multiple individuals. Exceptionally heavy armor may have a 'CS' rating, indicating that they are not able to make any Save against Area Damage and automatically fail them.">AoE Save modifier</span>
+                    <input type="text" name="system.armor.aoeSaveModifier" value="{{armorAoeSaveModifierInput}}" class="pc-input pc-item-equipment-armor-input" inputmode="text" spellcheck="false" aria-label="Armor AoE Save modifier" {{#unless editable}}disabled{{/unless}}>
+                  </label>
+                </div>
+              </div>
+            {{/if}}
           </div>
         </fieldset>
       {{/if}}
@@ -144,7 +172,7 @@
     {{#if availableItemTabs.effects}}
       <section class="pc-item-tab-panel {{#if activeTabs.effects}}active{{/if}}" data-pc-item-tab-panel="effects" role="tabpanel" aria-hidden="{{#if activeTabs.effects}}false{{else}}true{{/if}}" {{#unless activeTabs.effects}}hidden{{/unless}}>
         <fieldset class="pc-foundry-section pc-item-section">
-          <legend>Effects</legend>
+          <legend class="control"><span>Effects</span>{{#if editable}}<button type="button" class="add-effect-btn icon fa-regular fa-square-plus inline-control" data-pc-item-add-effect data-tooltip aria-label="Add Effect"></button>{{/if}}</legend>
           <section class="pc-inventory-browser pc-item-effects-browser" aria-label="Active Effects" data-pc-item-effects-browser data-pc-item-effects-grouped="{{#if effectsGroupedByType}}true{{else}}false{{/if}}">
             <div class="pc-inventory-toolbar pc-item-effects-toolbar">
               <div class="pc-inventory-search pc-item-effects-search" role="search" aria-label="Search Active Effects">
@@ -245,10 +273,6 @@
               {{/unless}}
               <div class="pc-inventory-empty-state pc-item-effects-search-empty" hidden>No matching effects.</div>
             </section>
-
-            {{#if editable}}
-              <button type="button" class="add-effect-btn" data-pc-item-add-effect> + Add Effect </button>
-            {{/if}}
           </section>
         </fieldset>
       </section>

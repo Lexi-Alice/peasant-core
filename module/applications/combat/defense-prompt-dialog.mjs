@@ -1,4 +1,10 @@
 import { getCombatDefenseResponseKey, normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
+import {
+  getMageBlockBarrierEffect,
+  getMageBlockDefenseIdentity,
+  getMageBlockDuressEffect
+} from "../../data/active-effect/mage-block-effects.mjs";
+import { formatSpellEffectSubtitle } from "../../data/active-effect/spell-effect-lifecycle.mjs";
 import { getNotableCombatRollPreview } from "../../data/actor/combat-roll-preview.mjs";
 import {
   createPrimalEvasionDefenseResult,
@@ -95,25 +101,21 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     reflexSaveOption: hasReflexSaveOption
   });
   const previewByIndex = new Map(
-    matchingDefenses.map(({ combat, index }) => [String(index), getNotableCombatRollPreview(defenderActor, combat)])
+    matchingDefenses.map(({ combat, index }) => [String(index), getNotableCombatRollPreview(defenderActor, combat, { defenseRoll: true })])
   );
   const favoriteKey = getDefenseFavoriteKey(targetingType);
   const favorite = favoriteKey ? getDefenseFavorites(defenderActor)?.[favoriteKey] : null;
   const preferredDefenseMatch = getPreferredDefenseMatch(defenderActor, targetingType, matchingDefenses);
   const preferredDefenseValue = preferredDefenseMatch ? String(preferredDefenseMatch.index) : "";
   const defaultDefenseValue = preferredDefenseValue || (hasReflexSaveOption ? "__reflex_save__" : "__none__");
-  const isShieldBlockDefenseMatch = (defenseMatch) => {
-    const defense = normalizeCombatDefense(defenseMatch?.defense);
-    return !!(defense.block && defense.blockType === "Shield");
-  };
-  if (preferredDefenseMatch && shouldAutoUseDefenseFavorite(defenderActor, favorite)) {
+  if (preferredDefenseMatch
+    && normalizeCombatDefense(preferredDefenseMatch.defense).blockType !== "Mage"
+    && shouldAutoUseDefenseFavorite(defenderActor, favorite)) {
     const automaticResult = await rollAutomaticFavoriteDefense({
       defenderActor,
       targetingType,
       attackerName,
       defenseMatch: preferredDefenseMatch,
-      isOverkillAttack,
-      isShieldBlockDefenseMatch,
       edgeChainContext: payload.edgeChainContext || null,
       edgeExplodeReroll: payload.edgeExplodeReroll || null,
       rollNotableCombat
@@ -140,11 +142,12 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
           ${optionsHtml}
         </select>
       </div>
-      <div class="form-group pc-defense-brace" style="display:none;">
-        <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; color:#b0b0b0;">
-          <span>Brace?</span>
-          <input type="checkbox" name="shieldBlockBrace">
-        </label>
+      <div class="form-group pc-mage-barrier-effect-group" style="display:none; margin-bottom:8px;">
+        <div class="pc-mage-barrier-summary"></div>
+      </div>
+      <div class="form-group pc-mage-barrier-action" style="display:none;">
+        <label style="display:block; margin-bottom:5px; color:#b0b0b0;">Barrier Action:</label>
+        <select class="pc-select pc-dialog-field-full" name="mageBarrierAction"></select>
       </div>
       <div class="form-group pc-defense-preview" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
         <label style="display:block; color:#b0b0b0;">
@@ -177,13 +180,13 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         handled: true,
         selection: "none",
         selectedCombatIndex: null,
+        selectedCombatId: null,
         selectedDefense: null,
         defenseRoll: null,
         appliedAccuracyPenalty: 0,
         appliedToHitPenalty: 0,
         activeDefense: false,
         primalEvasionPenalty: 0,
-        shieldBlockBraced: false,
         ...result
       });
       return result;
@@ -193,6 +196,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
       const finalized = finalize({
         selection: "close",
         selectedCombatIndex: null,
+        selectedCombatId: null,
         defenseRoll: null,
         appliedAccuracyPenalty: 0,
         appliedToHitPenalty: 0,
@@ -254,6 +258,25 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               return false;
             }
 
+            const selectedDefense = normalizeCombatDefense(selectedDefenseMatch.defense);
+            const isMageBlock = !!(selectedDefense.block && selectedDefense.blockType === "Mage");
+            const mageIdentity = isMageBlock
+              ? getMageBlockDefenseIdentity("notableCombats", selectedDefenseMatch.combat?.id, "base")
+              : "";
+            const mageBlockInitialized = isMageBlock
+              && !!getMageBlockBarrierEffect(defenderActor, mageIdentity)
+              && !!getMageBlockDuressEffect(defenderActor, mageIdentity);
+            const mageBarrierAction = isMageBlock
+              ? String(html.find('[name="mageBarrierAction"]').val() || "").trim().toLowerCase()
+              : null;
+            if (isMageBlock && (
+              (!mageBlockInitialized && mageBarrierAction !== "create")
+              || (mageBlockInitialized && !["use", "refresh"].includes(mageBarrierAction))
+            )) {
+              ui.notifications?.warn?.("Choose a valid Mage barrier action.");
+              return false;
+            }
+
             const toHitRaw = String(html.find('[name="defensePreviewToHit"]').val() || "").trim();
             const accuracyRaw = String(html.find('[name="defensePreviewAccuracy"]').val() || "").trim();
             const overrideToHit = Number.parseInt(toHitRaw, 10);
@@ -268,9 +291,6 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               return false;
             }
 
-            const shieldBlockBraced = isShieldBlockDefenseMatch(selectedDefenseMatch)
-              && (isOverkillAttack || !!html.find('[name="shieldBlockBrace"]').prop("checked"));
-
             if (typeof rollNotableCombat !== "function") {
               ui.notifications?.warn?.("Defense roll workflow is unavailable.");
               return false;
@@ -282,6 +302,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               promptForTargets: false,
               targetLabel: attackerName,
               cardClass: "pc-defense-roll-card",
+              mageBarrierAction,
               rollOverrides: {
                 toHit: overrideToHit,
                 accuracy: overrideAccuracy
@@ -293,6 +314,8 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               finalize({
                 selection: "close",
                 selectedCombatIndex: selectedIndex,
+                selectedCombatId: selectedDefenseMatch.combat?.id || null,
+                mageBarrierAction,
                 selectedDefense: normalizeCombatDefense(selectedDefenseMatch.defense),
                 defenseRoll,
                 appliedAccuracyPenalty: 0,
@@ -315,13 +338,14 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
             finalize({
               selection: "defense",
               selectedCombatIndex: selectedIndex,
-              selectedDefense: normalizeCombatDefense(selectedDefenseMatch.defense),
+              selectedCombatId: selectedDefenseMatch.combat?.id || null,
+              selectedDefense,
+              mageBarrierAction,
               defenseRoll,
               appliedAccuracyPenalty,
               appliedToHitPenalty,
               activeDefense: true,
-              primalEvasionPenalty: 0,
-              shieldBlockBraced
+              primalEvasionPenalty: 0
             });
             return true;
           }
@@ -346,6 +370,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
             finalize({
               selection: "close",
               selectedCombatIndex: null,
+              selectedCombatId: null,
               selectedDefense: null,
               defenseRoll: null,
               appliedAccuracyPenalty: 0,
@@ -372,44 +397,68 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         }
 
         const $select = html.find('[name="defenseCombatIndex"]');
-        const $brace = html.find('[name="shieldBlockBrace"]');
-        const $braceRow = html.find(".pc-defense-brace");
         const $toHit = html.find('[name="defensePreviewToHit"]');
         const $accuracy = html.find('[name="defensePreviewAccuracy"]');
         const $roll = html.find('[data-action="roll"], [data-button="roll"]');
         const $preview = html.find(".pc-defense-preview");
+        const $mageBarrierEffectGroup = html.find(".pc-mage-barrier-effect-group");
+        const $mageBarrierActionGroup = html.find(".pc-mage-barrier-action");
+        const $mageBarrierSummary = html.find(".pc-mage-barrier-summary");
+        const $mageBarrierAction = html.find('[name="mageBarrierAction"]');
 
         const updatePreview = () => {
           const selectedValue = String($select.val() || "");
+          const selectedDefenseMatch = matchingDefenses.find(({ index }) => String(index) === selectedValue) || null;
+          const selectedDefense = normalizeCombatDefense(selectedDefenseMatch?.defense);
+          const isMageBlock = !!(selectedDefense.block && selectedDefense.blockType === "Mage");
+          if (isMageBlock) {
+            const identity = getMageBlockDefenseIdentity("notableCombats", selectedDefenseMatch?.combat?.id, "base");
+            const barrier = getMageBlockBarrierEffect(defenderActor, identity);
+            const duressExists = !!getMageBlockDuressEffect(defenderActor, identity);
+            $mageBarrierSummary.html(barrier ? `<div class="pc-inventory-item pc-passive-effect pc-mage-barrier-effect">
+              <div class="pc-inventory-item-row pc-passive-effect-row pc-mage-barrier-effect-row">
+                <div class="pc-inventory-item-summary pc-passive-effect-summary pc-mage-barrier-effect-summary" data-tooltip="${escapeHtml(barrier.name || "Mage Block Barrier")}">
+                  <img class="pc-inventory-item-image pc-passive-effect-icon" src="${escapeHtml(barrier.img || "icons/svg/aura.svg")}" alt="">
+                  <span class="pc-inventory-item-name-stack pc-passive-effect-name-stack">
+                    <span class="pc-inventory-item-name pc-passive-effect-name">${escapeHtml(barrier.name || "Mage Block Barrier")}</span>
+                    <span class="pc-inventory-item-subtitle pc-passive-effect-subtitle">${escapeHtml(formatSpellEffectSubtitle(barrier))}</span>
+                  </span>
+                </div>
+              </div>
+            </div>` : "");
+            barrier ? $mageBarrierEffectGroup.show() : $mageBarrierEffectGroup.hide();
+            const actions = barrier && duressExists
+              ? [["use", "Use Current Barrier"], ["refresh", "Refresh Barrier"]]
+              : [["create", "Create Barrier"]];
+            actions.length > 1 ? $mageBarrierActionGroup.show() : $mageBarrierActionGroup.hide();
+            const currentAction = String($mageBarrierAction.val() || "");
+            $mageBarrierAction.empty();
+            for (const [value, label] of actions) {
+              $mageBarrierAction.append(`<option value="${value}">${escapeHtml(label)}</option>`);
+            }
+            $mageBarrierAction.val(actions.some(([value]) => value === currentAction) ? currentAction : actions[0][0]);
+          } else {
+            $mageBarrierEffectGroup.hide();
+            $mageBarrierActionGroup.hide();
+            $mageBarrierAction.empty();
+          }
           if (selectedValue === "__none__" || selectedValue === "__reflex_save__") {
             $toHit.val("");
             $accuracy.val("");
-            $brace.prop("checked", false);
-            $brace.prop("disabled", false);
-            $braceRow.hide();
             $preview.hide();
             $roll.prop("disabled", false);
             return;
           }
 
           const preview = previewByIndex.get(selectedValue);
-          const selectedDefenseMatch = matchingDefenses.find(({ index }) => String(index) === selectedValue) || null;
-          const isShieldBlock = isShieldBlockDefenseMatch(selectedDefenseMatch);
           if (!preview) {
             $toHit.val("");
             $accuracy.val("");
-            $brace.prop("disabled", isOverkillAttack && isShieldBlock);
-            $brace.prop("checked", isOverkillAttack && isShieldBlock);
-            $braceRow.toggle(isShieldBlock);
             $preview.show();
             $roll.prop("disabled", true);
             return;
           }
 
-          $braceRow.toggle(isShieldBlock);
-          $brace.prop("disabled", isOverkillAttack && isShieldBlock);
-          if (isOverkillAttack && isShieldBlock) $brace.prop("checked", true);
-          else if (!isShieldBlock) $brace.prop("checked", false);
           $preview.show();
           $toHit.val(preview.hasToHit ? `${preview.modifiedTohit}` : "");
           $accuracy.val(preview.hasAccuracy ? `${preview.accuracyNum}` : "0");
@@ -430,15 +479,13 @@ async function rollAutomaticFavoriteDefense({
   targetingType,
   attackerName,
   defenseMatch,
-  isOverkillAttack,
-  isShieldBlockDefenseMatch,
   edgeChainContext = null,
   edgeExplodeReroll = null,
   rollNotableCombat
 } = {}) {
   if (typeof rollNotableCombat !== "function" || !defenderActor || !defenseMatch) return null;
 
-  const preview = getNotableCombatRollPreview(defenderActor, defenseMatch.combat);
+  const preview = getNotableCombatRollPreview(defenderActor, defenseMatch.combat, { defenseRoll: true });
   const overrideToHit = Number.parseInt(preview?.modifiedTohit, 10);
   const rollOverrides = Number.isFinite(overrideToHit)
     ? {
@@ -465,13 +512,13 @@ async function rollAutomaticFavoriteDefense({
       handled: true,
       selection: "close",
       selectedCombatIndex: defenseMatch.index,
+      selectedCombatId: defenseMatch.combat?.id || null,
       selectedDefense,
       defenseRoll,
       appliedAccuracyPenalty: 0,
       appliedToHitPenalty: 0,
       activeDefense: false,
       primalEvasionPenalty: 0,
-      shieldBlockBraced: false,
       chainCancelled: true,
       automaticDefenseFavorite: true
     };
@@ -481,6 +528,7 @@ async function rollAutomaticFavoriteDefense({
     handled: true,
     selection: "defense",
     selectedCombatIndex: defenseMatch.index,
+    selectedCombatId: defenseMatch.combat?.id || null,
     selectedDefense,
     defenseRoll,
     appliedAccuracyPenalty: getAccuracyPenaltyFromDefenseRoll(
@@ -494,7 +542,6 @@ async function rollAutomaticFavoriteDefense({
     ),
     activeDefense: true,
     primalEvasionPenalty: 0,
-    shieldBlockBraced: isShieldBlockDefenseMatch?.(defenseMatch) && isOverkillAttack,
     automaticDefenseFavorite: true
   };
 }

@@ -1,17 +1,31 @@
 <hr class="section-divider pc-tab-detached-divider">
 <div class="pc-tab-panel pc-notable-tab-panel tab{{#if (eq activeSheetTab "notable-combats")}} active{{/if}}" data-pc-tab-panel="notable-combats" data-group="primary" data-tab="notable-combats">
   <fieldset class="pc-foundry-section pc-notable-foundry-section">
-    <legend>Notable Combats</legend>
+    <legend class="control"><span>Notable Combats</span>{{#if @root.editable}}<button type="button" class="add-combat-btn icon fa-regular fa-square-plus inline-control" data-tooltip aria-label="Add Combat"></button>{{/if}}</legend>
     <div class="notable-combats-container">
+    <section class="pc-notable-combat-browser">
+      <header class="pc-inventory-section-header pc-notable-combat-section-header">
+        <h3 class="pc-inventory-section-title">
+          <i class="fa-solid fa-swords" aria-hidden="true"></i>
+          <span>Combats</span>
+        </h3>
+      </header>
     {{#if @root.editable}}
-      <div class="notable-combats-list notable-combats-list-view" style="padding: 10px; border-radius: 4px;">
-        <ul style="padding-left: 20px; margin: 0; list-style-type: disc;">
+      <div class="notable-combats-list notable-combats-list-view pc-notable-combat-list">
+        <ul class="pc-notable-combat-items">
         {{#each notableCombats as |combat index|}}
-          <li class="combat-item combat-view-item" data-combat-index="{{index}}" data-indent="{{combat.indent}}" style="--indent-level: {{combat.indent}}; margin-left: {{multiply combat.indent 20}}px; margin-bottom: 4px; color: #e0e0e0;" draggable="true">
+          <li class="combat-item combat-view-item{{#if combat.treeHasChildren}} pc-notable-combat-has-children{{/if}}" data-combat-index="{{index}}" data-combat-id="{{combat.id}}" data-indent="{{combat.indent}}" style="--indent-level: {{combat.treeDepth}}; --indent-offset: {{multiply combat.treeDepth 28}}px;" draggable="true">
             <div class="combat-view-line">
+              <span class="pc-notable-combat-tree" aria-hidden="true">
+                {{#each combat.treeLanes as |lane|}}
+                  <span class="pc-notable-combat-tree-lane pc-notable-combat-tree-lane--{{lane}}"></span>
+                {{/each}}
+              </span>
+              <img class="pc-inventory-item-image pc-notable-combat-image" src="{{combat.imageSrc}}" alt="">
+              <div class="pc-notable-combat-content">
               <span class="combat-edit-heading">
-                {{#if combat.isStandard}}
-                  <span class="combat-class-rank">{{combat.classRankDisplay}}:</span>{{#if combat.sig}}<span class="combat-sig-label">SIG</span>{{/if}}
+                {{#if combat.isSkillType}}
+                  <span class="combat-class-rank">{{combat.classRankDisplay}}:</span>{{#if combat.isSignature}}<span class="combat-sig-label">SIG</span>{{/if}}
                 {{else}}
                   <span class="combat-class-rank">{{combat.specialTypeDisplay}}:</span>
                 {{/if}}
@@ -25,18 +39,11 @@
                 {{/if}}
 
                 {{#if combat.allowToHitAcc}}
-                  <span class="combat-roll-clickable" data-action="rollCombat" data-index="{{index}}" role="button" tabindex="0" data-tooltip="Roll {{combat.name}}" aria-label="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
+                  <span class="combat-roll-clickable" data-action="rollCombat" data-index="{{index}}" data-usage-id="{{combat.usageId}}" role="button" tabindex="0" data-tooltip="Roll {{combat.name}}" aria-label="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
                 {{/if}}
-
-                <span class="combat-actions">
-                  <button type="button" class="combat-desc-btn" data-tooltip="Edit" aria-label="Edit"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>
-                  <button type="button" class="combat-indent" data-tooltip="Indent" aria-label="Indent">&rarr;</button>
-                  <button type="button" class="combat-outdent" data-tooltip="Outdent" aria-label="Outdent">&larr;</button>
-                  <button type="button" class="combat-delete" data-tooltip="Delete" aria-label="Delete">&times;</button>
-                </span>
               </span>
 
-              {{#if combat.sig}}
+              {{#if combat.isSignature}}
                 <span class="combat-uses-display">
                   <span class="uses-label">Uses</span>
                   <div class="combat-uses-box">
@@ -79,21 +86,32 @@
                   {{/each}}
                 </span>
               {{/if}}
+              </div>
+              <div class="pc-inventory-row-controls pc-notable-combat-row-controls">
+                <button type="button" class="pc-inventory-menu-toggle pc-notable-combat-tags-toggle header-control icon fa-solid fa-compress" data-tooltip="Hide Notable Tags" aria-label="Hide Notable Tags" aria-expanded="true" data-pc-notable-combat-tags-toggle></button>
+                <button type="button" class="pc-inventory-menu-toggle pc-notable-combat-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Combat Options" aria-label="Combat Options" data-pc-notable-combat-menu></button>
+              </div>
             </div>
           </li>
         {{/each}}
         </ul>
       </div>
-      <button type="button" class="add-combat-btn"> + Add Combat </button>
     {{else}}
-      <div class="notable-combats-list-view" style="padding: 10px; border-radius: 4px;">
-        <ul style="padding-left: 20px; margin: 0; list-style-type: disc;">
+      <div class="notable-combats-list-view pc-notable-combat-list">
+        <ul class="pc-notable-combat-items">
           {{#each notableCombats as |combat index|}}
             {{#if combat.isDisplayable}}
-              <li class="combat-view-item pc-notable-combat-hotbar-drag" data-combat-index="{{index}}" data-combat-id="{{combat.id}}" draggable="true" data-tooltip="Drag to hotbar" style="margin-left: {{multiply combat.indent 20}}px; margin-bottom: 4px; color: #e0e0e0;">
+              <li class="combat-view-item{{#if combat.treeHasChildren}} pc-notable-combat-has-children{{/if}}" data-combat-index="{{index}}" data-combat-id="{{combat.id}}" data-indent="{{combat.indent}}" style="--indent-level: {{combat.treeDepth}}; --indent-offset: {{multiply combat.treeDepth 28}}px;">
                 <div class="combat-view-line">
-                  {{#if combat.isStandard}}
-                    <span class="combat-class-rank">{{combat.classRankDisplay}}:</span>{{#if combat.sig}}<span class="combat-sig-label">SIG</span>{{/if}}
+                  <span class="pc-notable-combat-tree" aria-hidden="true">
+                    {{#each combat.treeLanes as |lane|}}
+                      <span class="pc-notable-combat-tree-lane pc-notable-combat-tree-lane--{{lane}}"></span>
+                    {{/each}}
+                  </span>
+                  <img class="pc-inventory-item-image pc-notable-combat-image" src="{{combat.imageSrc}}" alt="">
+                  <div class="pc-notable-combat-content">
+                  {{#if combat.isSkillType}}
+                    <span class="combat-class-rank">{{combat.classRankDisplay}}:</span>{{#if combat.isSignature}}<span class="combat-sig-label">SIG</span>{{/if}}
                   {{else}}
                     <span class="combat-class-rank">{{combat.specialTypeDisplay}}:</span>
                   {{/if}}
@@ -107,10 +125,10 @@
                   {{/if}}
 
                   {{#if combat.allowToHitAcc}}
-                    <span class="combat-roll-clickable" data-action="rollCombat" data-index="{{index}}" role="button" tabindex="0" data-tooltip="Roll {{combat.name}}" aria-label="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
+                    <span class="combat-roll-clickable" data-action="rollCombat" data-index="{{index}}" data-usage-id="{{combat.usageId}}" role="button" tabindex="0" data-tooltip="Roll {{combat.name}}" aria-label="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
                   {{/if}}
 
-                  {{#if combat.sig}}
+                  {{#if combat.isSignature}}
                     <span class="combat-uses-display">
                       <span class="uses-label">Uses</span>
                       <div class="combat-uses-box">
@@ -153,6 +171,13 @@
                       {{/each}}
                     </span>
                   {{/if}}
+                  </div>
+                  {{#if @root.owner}}
+                    <div class="pc-inventory-row-controls pc-notable-combat-row-controls">
+                      <button type="button" class="pc-inventory-menu-toggle pc-notable-combat-tags-toggle header-control icon fa-solid fa-compress" data-tooltip="Hide Notable Tags" aria-label="Hide Notable Tags" aria-expanded="true" data-pc-notable-combat-tags-toggle></button>
+                      <button type="button" class="pc-inventory-menu-toggle pc-notable-combat-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Combat Options" aria-label="Combat Options" data-pc-notable-combat-menu></button>
+                    </div>
+                  {{/if}}
                 </div>
               </li>
             {{/if}}
@@ -160,6 +185,7 @@
         </ul>
       </div>
     {{/if}}
+    </section>
     </div>
   </fieldset>
 </div>

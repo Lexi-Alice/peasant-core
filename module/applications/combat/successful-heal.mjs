@@ -1,22 +1,44 @@
 import { normalizeAutomatedCombatHealType, rollAutomatedCombatHeal } from "./automated-heal-rolls.mjs";
 import { attachRollUndoToChatMessage } from "../chat-undo.mjs";
 import { requestIncomingHealApplicationForTarget } from "./incoming-hit.mjs";
+import { createEdgeIndividualValueRollKey, getEdgeIndividualDiceOverride } from "./edge-chain-rolls.mjs";
+import { isSkillTagAutoEligible } from "../../data/actor/skill-entry-conditions.mjs";
 
 export async function resolveSuccessfulHealForTarget({
   actor = null,
   attackerToken = null,
   combat = null,
   target = null,
-  attackRoll = null
+  attackRoll = null,
+  edgeIndividualDieReplay = null,
+  combatMods = null
 } = {}) {
   if (!actor || !combat?.heal || !target) return null;
   if (!attackRoll?.rollResult?.isSuccess) return null;
+  if (!isSkillTagAutoEligible(combat, "heal", { success: true, hit: false })) {
+    return { handled: false, reason: "manualCondition" };
+  }
 
   const targetActor = target.actor || null;
   if (!targetActor) return { handled: false, reason: "targetActorUnavailable" };
 
   const targetLabel = target?.targetName || targetActor?.name || "";
-  const healRoll = await rollAutomatedCombatHeal(actor, combat, { targetLabel, attackerToken });
+  const targetTokenDocument = target?.tokenDocument || target?.token?.document || target?.token || null;
+  const rollKey = createEdgeIndividualValueRollKey("heal", {
+    targetRef: {
+      tokenUuid: targetTokenDocument?.uuid || null,
+      tokenId: targetTokenDocument?.id || target?.tokenId || null,
+      actorUuid: targetActor?.uuid || null,
+      actorId: targetActor?.id || null
+    }
+  });
+  const healRoll = await rollAutomatedCombatHeal(actor, combat, {
+    targetLabel,
+    attackerToken,
+    diceOverride: getEdgeIndividualDiceOverride(edgeIndividualDieReplay, rollKey),
+    combatMods,
+    maximize: targetActor.system?.blessing?.type === "summer"
+  });
   if (!healRoll || !Number.isFinite(Number(healRoll.total)) || Number(healRoll.total) <= 0) {
     return { handled: false, reason: "noHealRolled", healRoll };
   }

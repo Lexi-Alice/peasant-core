@@ -1,4 +1,4 @@
-export function setupNotableCombatTagRemoveControls(sheet, $container, combatIndex, { onChanged } = {}) {
+export function setupNotableCombatTagRemoveControls(sheet, $container, combatIndex, { onChanged, removeTag } = {}) {
   const removeNotableCombatTag = async (buttonEl) => {
     setRemoveButtonChipDraggable(buttonEl, true);
 
@@ -7,9 +7,12 @@ export function setupNotableCombatTagRemoveControls(sheet, $container, combatInd
       const tagType = $button.data("tag-type");
       const rawCustomIndex = $button.data("custom-index");
       const customIndex = Number.isInteger(rawCustomIndex) ? rawCustomIndex : parseInt(rawCustomIndex, 10);
+      const customId = String($button.data("custom-id") ?? "").trim();
       if (!tagType) return;
 
-      const result = await sheet.actor.removePeasantNotableCombatTag?.(combatIndex, tagType, { customIndex });
+      const result = typeof removeTag === "function"
+        ? await removeTag(tagType, { customId, customIndex })
+        : await sheet.actor.removePeasantNotableCombatTag?.(combatIndex, tagType, { customIndex });
       if (result?.changed) onChanged?.();
     } catch (err) {
       console.error("Failed to remove notable combat tag:", err);
@@ -41,6 +44,8 @@ export function setupNotableCombatTagRemoveControls(sheet, $container, combatInd
     ev.stopPropagation();
     await removeNotableCombatTag(ev.currentTarget);
   });
+
+  return removeNotableCombatTag;
 }
 
 function setRemoveButtonChipDraggable(buttonEl, enabled) {

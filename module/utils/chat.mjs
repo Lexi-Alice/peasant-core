@@ -2,6 +2,11 @@ export function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, s => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[s]));
 }
 
+export function renderChatCardImage(imageSrc) {
+  const src = String(imageSrc || "").trim();
+  return src ? `<img class="pc-chat-card-image" src="${escapeHtml(src)}" alt="">` : "";
+}
+
 const MESSAGE_MODES = Object.freeze({
   roll: "public",
   public: "public",

@@ -1,96 +1,47 @@
 import { escapeHtml } from "../../../utils/chat.mjs";
 
-export function renderNotableCombatTagList($list, activeTags) {
+export function renderNotableCombatTagList($list, activeTags, { editable = true, provisionalTag = null } = {}) {
   $list.empty();
 
-  if (activeTags.length === 0) {
-    $list.html('<span style="color:#666;font-style:italic;font-size:12px;">No tags set</span>');
+  const rows = provisionalTag ? [...activeTags, provisionalTag] : activeTags;
+  if (rows.length === 0) {
+    $list.html('<div class="pc-skill-tag-empty">No details configured.</div>');
     return;
   }
 
-  activeTags.forEach((tag, idx) => {
-    const isDescription = tag.type === 'description';
-    const labelClass = isDescription ? 'current-tag-label edit-description-tag' : 'current-tag-label';
-    const customIndexAttr = Number.isInteger(tag.customIndex) ? ` data-custom-index="${tag.customIndex}"` : '';
-    const tagKey = tag.type === 'custom' && Number.isInteger(tag.customIndex) ? `custom:${tag.customIndex}` : tag.type;
-    const $tagItem = $(`
-      <div class="current-tag-item editor-tag-draggable combat-tag combat-tag-compact combat-tag-button" data-tag-type="${tag.type}" data-tag-key="${tagKey}" data-tag-index="${idx}"${customIndexAttr} draggable="true" role="button" tabindex="0" data-tooltip="Right-click to edit this tag" aria-label="Right-click to edit this tag" style="display:inline-flex !important; width:auto !important; max-width:max-content !important; flex:0 0 auto !important; margin:0 !important; align-self:flex-start !important; justify-content:flex-start !important;">
-        <span class="${labelClass}">${escapeHtml(tag.display)}</span>
-        <button type="button" class="remove-tag-btn" data-tag-type="${tag.type}" data-tag-key="${tagKey}"${customIndexAttr} data-tooltip="Remove tag" draggable="false" aria-label="Remove tag">&times;</button>
+  for (const [index, row] of rows.entries()) {
+    const provisional = row === provisionalTag;
+    const draggable = editable && !provisional;
+    const customIndexAttr = Number.isInteger(row.customIndex) ? ` data-custom-index="${row.customIndex}"` : "";
+    const customIdAttr = row.customId ? ` data-custom-id="${escapeHtml(row.customId)}"` : "";
+    const summary = row.summary
+      ? `<span class="pc-skill-tag-summary">${escapeHtml(row.summary)}</span>`
+      : "";
+    const condition = row.condition
+      ? `<span class="pc-skill-tag-condition">${escapeHtml(row.condition)}</span>`
+      : "";
+
+    const summaryContent = `
+      ${editable ? '<span class="pc-skill-tag-disclosure" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>' : ""}
+      <span class="pc-skill-tag-name-line"><span class="pc-skill-tag-name">${escapeHtml(row.label)}</span>${condition}</span>
+      ${summary}
+    `;
+    const summaryControl = editable
+      ? `<button type="button" class="pc-skill-tag-row-summary" data-pc-tag-edit data-tooltip="Edit ${escapeHtml(row.label)}" aria-label="Edit ${escapeHtml(row.label)}">${summaryContent}</button>`
+      : `<div class="pc-skill-tag-row-summary">${summaryContent}</div>`;
+    const rowControls = editable && !provisional ? `
+      <button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical"
+        data-pc-tag-menu data-tooltip="Detail Options" aria-label="Detail Options"></button>
+    ` : "";
+
+    $list.append($(`
+      <div class="current-tag-item${draggable ? " editor-tag-draggable" : ""} pc-skill-tag-row${editable ? "" : " pc-skill-tag-row-readonly"}${provisional ? " pc-skill-tag-row-provisional" : ""}"
+        data-tag-type="${escapeHtml(row.type)}"
+        data-tag-key="${escapeHtml(row.key || row.type)}"
+        data-tag-index="${index}"${customIndexAttr}${customIdAttr}${provisional ? " data-pc-tag-provisional" : ""}${draggable ? ' draggable="true"' : ""}>
+        ${summaryControl}
+        ${rowControls}
       </div>
-    `);
-    const chipEl = $tagItem[0];
-    const removeBtn = $tagItem.find('.remove-tag-btn')[0];
-    const setTagHoverState = (active) => {
-      chipEl.classList.toggle('tag-hover-active', !!active);
-
-      if (!active) {
-        chipEl.style.removeProperty('background');
-        chipEl.style.removeProperty('background-color');
-        chipEl.style.removeProperty('border-color');
-        chipEl.style.removeProperty('color');
-        return;
-      }
-
-      const hoverSource = removeBtn || chipEl;
-      const hoverStyles = getComputedStyle(hoverSource);
-      const hoverBg = hoverStyles.getPropertyValue('--button-hover-background-color').trim() || 'rgba(46, 38, 28, 0.75)';
-      const hoverBorder = hoverStyles.getPropertyValue('--button-hover-border-color').trim() || '#c9b183';
-      const hoverText = hoverStyles.getPropertyValue('--button-hover-text-color').trim() || '#f2dfbd';
-
-      chipEl.style.setProperty('background', hoverBg, 'important');
-      chipEl.style.setProperty('background-color', hoverBg, 'important');
-      chipEl.style.setProperty('border-color', hoverBorder, 'important');
-      chipEl.style.setProperty('color', hoverText, 'important');
-    };
-
-    const setRemoveHoverState = (active) => {
-      if (!removeBtn) return;
-      removeBtn.classList.toggle('tag-hover-active', !!active);
-    };
-
-    chipEl.addEventListener('mouseenter', () => setTagHoverState(true));
-    chipEl.addEventListener('mouseleave', () => setTagHoverState(false));
-    chipEl.addEventListener('focusin', (ev) => {
-      if (removeBtn && ev.target === removeBtn) return;
-      setTagHoverState(true);
-    });
-    chipEl.addEventListener('focusout', () => {
-      setTimeout(() => {
-        if (!chipEl.contains(chipEl.ownerDocument?.activeElement)) setTagHoverState(false);
-      }, 0);
-    });
-
-    if (removeBtn) {
-      removeBtn.addEventListener('mouseenter', () => {
-        setTagHoverState(false);
-        setRemoveHoverState(true);
-      });
-      removeBtn.addEventListener('mouseleave', () => {
-        setRemoveHoverState(false);
-        if (!chipEl.matches(':hover') && !chipEl.contains(chipEl.ownerDocument?.activeElement)) {
-          setTagHoverState(false);
-        } else {
-          setTagHoverState(true);
-        }
-      });
-      removeBtn.addEventListener('focusin', () => {
-        setTagHoverState(false);
-        setRemoveHoverState(true);
-      });
-      removeBtn.addEventListener('focusout', () => {
-        setRemoveHoverState(false);
-        setTimeout(() => {
-          const activeElement = chipEl.ownerDocument?.activeElement;
-          if (!chipEl.contains(activeElement) && !chipEl.matches(':hover')) {
-            setTagHoverState(false);
-          } else if (chipEl.contains(activeElement) || chipEl.matches(':hover')) {
-            setTagHoverState(true);
-          }
-        }, 0);
-      });
-    }
-
-    $list.append($tagItem);
-  });
+    `));
+  }
 }

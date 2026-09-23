@@ -13,19 +13,17 @@ export function renderSpeedTagInputs(area, combatData) {
 
   const currentSpeed = combatData.speed || {};
   root.innerHTML = `
-    <div class="pc-tag-field-stack">
-      <div class="pc-tag-field-row">
-        <label class="pc-tag-field-label">Speed:</label>
-        <select class="tag-speed-type ${PC_TAG_SELECT_CLASS}">
-          <option value="">-- Select --</option>
-          <option value="Full Round" ${currentSpeed.type === "Full Round" ? "selected" : ""}>Full Round</option>
-          <option value="Standard" ${currentSpeed.type === "Standard" ? "selected" : ""}>Standard</option>
-          <option value="Movement" ${currentSpeed.type === "Movement" ? "selected" : ""}>Movement</option>
-          <option value="Reflex" ${currentSpeed.type === "Reflex" ? "selected" : ""}>Reflex</option>
-          <option value="Instant" ${currentSpeed.type === "Instant" ? "selected" : ""}>Instant</option>
-          <option value="Split Second" ${currentSpeed.type === "Split Second" ? "selected" : ""}>Split Second</option>
-        </select>
-      </div>
+    <div class="pc-tag-field-row pc-tag-field-row--compact">
+      <label class="pc-tag-field-label">Speed:</label>
+      <select class="tag-speed-type ${PC_TAG_SELECT_CLASS} pc-tag-select-compact">
+        <option value="">-- Select --</option>
+        <option value="Full Round" ${currentSpeed.type === "Full Round" ? "selected" : ""}>Full Round</option>
+        <option value="Standard" ${currentSpeed.type === "Standard" ? "selected" : ""}>Standard</option>
+        <option value="Movement" ${currentSpeed.type === "Movement" ? "selected" : ""}>Movement</option>
+        <option value="Reflex" ${currentSpeed.type === "Reflex" ? "selected" : ""}>Reflex</option>
+        <option value="Instant" ${currentSpeed.type === "Instant" ? "selected" : ""}>Instant</option>
+        <option value="Split Second" ${currentSpeed.type === "Split Second" ? "selected" : ""}>Split Second</option>
+      </select>
       <div class="split-second-uses" style="display:${currentSpeed.type === "Split Second" ? "flex" : "none"};align-items:center;gap:8px;">
         <label class="pc-tag-field-label">Max Uses:</label>
         <input type="number" class="tag-speed-max ${PC_TAG_INPUT_CLASS}" value="${currentSpeed.splitSecondMax || ""}" min="1" placeholder="#" ${PC_TAG_INTEGER_ATTRS}>

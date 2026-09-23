@@ -1,5 +1,5 @@
 import { getCombatDefenseResponseKey, normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
-import { getCombatCostModifiers } from "../../data/actor/combat-modifiers.mjs";
+import { getCombatCostModifiers, getEffectiveSkillCombatModifiers } from "../../data/actor/combat-modifiers.mjs";
 import { applyDefensePenaltiesToRollResult, forceRollResultFailureDueToDefense } from "../../data/actor/defense-penalties.mjs";
 import {
   doesSuccessfulAreaDefenseDefendAttack,
@@ -7,12 +7,13 @@ import {
   getAccuracyPenaltyFromDefenseRoll,
   getFailureLabelFromDefensePromptResult,
   getToHitPenaltyFromDefenseRoll,
+  getWeaponMasteryMagnetismGrade,
   isMageDefenseDamageRedirect,
   isNarrowSuccessAttack,
   isShieldDefenseDamageBlock,
   isWeaponDefenseDamageBlock
 } from "../../data/actor/defense-results.mjs";
-import { getCombatMagnetismGrade, getCombatTargetingType, hasRangeRateValue } from "../../data/actor/combat-tags.mjs";
+import { getCombatTargetingType, hasRangeRateValue } from "../../data/actor/combat-tags.mjs";
 import { normalizeAppliedDamageType } from "../../data/actor/targeted-damage.mjs";
 import { hasCombatDice } from "../../dice/combat-dice.mjs";
 import { pcLog } from "../../utils/logging.mjs";
@@ -21,18 +22,26 @@ import { attachRollUndoToChatMessage, captureActorRollUndo, collectRollUndoRecor
 import {
   attachEdgeChainToChatMessages,
   attachEdgeExplodeToChatMessage,
+  attachEdgeIndividualDieToChatMessage,
+  createEdgeIndividualValueRollKey,
   createNotableCombatEdgeChainContext,
   ensureNotableCombatEdgeChainIdentity,
   getCriticalEdgeBlockFromRollResult
 } from "./edge-chain-rolls.mjs";
 import { getActiveNotableCombatTargets, getPreferredActorToken } from "./actor-targets.mjs";
 import { emitDefensePromptRequestsForAttack } from "./defense-prompt-requests.mjs";
+import { buildManifestSpellCastPreflight } from "./manifest-spell-effects.mjs";
+import { offerSkillEntryEffects } from "./skill-entry-effects.mjs";
+import { confirmManifestSpellReplacements, rollManualCombatTag } from "./manual-combat-tag-rolls.mjs";
 import { consumeNotableCombatRollUse, executeResolvedNotableCombatRoll } from "./notable-combat-rolls.mjs";
 import { isChainCancelledResult, showFlexibleDamageTypePrompt } from "./prompt-dialogs.mjs";
 import { showRangeRatePrompt } from "./range-rate-dialog.mjs";
 import { updateSkillRollChatCardFromResult } from "./roll-chat-updates.mjs";
 import { resolveSuccessfulAttackDamageForTarget } from "./successful-attack-damage.mjs";
 import { resolveSuccessfulHealForTarget } from "./successful-heal.mjs";
+import { isSkillTagAutoEligible } from "../../data/actor/skill-entry-conditions.mjs";
+
+const MANIFEST_SPELL_ROLL_TYPES = Object.freeze(["manifestDome", "manifestResistance"]);
 
 function cloneData(value) {
   if (value === undefined) return undefined;
@@ -43,21 +52,36 @@ function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function rejectDamageWithoutTargeting(combat) {
+  if (!hasCombatDice(combat?.damage) || getCombatTargetingType(combat)) return null;
+  const error = `${combat?.name || "Notable"} has Damage but no Targeting type. Add Targeting before using it.`;
+  globalThis.ui?.notifications?.warn?.(error);
+  return { rolled: false, error };
+}
+
 function getRollOutcomeChatMessage(rollOutcome) {
   return rollOutcome?.sharedAttackRoll?.rollResult?.chatMessage
     || rollOutcome?.rollResult?.chatMessage
     || null;
 }
 
-function addChatMessage(messages, candidate) {
-  const message = candidate?.setFlag
+function getChatMessageDocument(candidate) {
+  return candidate?.setFlag
     ? candidate
     : (candidate?.id ? game.messages?.get(candidate.id) || null : null);
+}
+
+function addChatMessage(messages, candidate) {
+  const message = getChatMessageDocument(candidate);
   if (message?.id && !messages.some((entry) => entry?.id === message.id)) messages.push(message);
 }
 
 function addIncomingResolutionChatMessages(messages, resolution) {
+  addChatMessage(messages, resolution?.reflexSaveResult?.rollResult?.chatMessage);
   addChatMessage(messages, resolution?.damageRoll?.chatMessage);
+  for (const barrierMessage of resolution?.damageRoll?.barrierMessages || []) {
+    addChatMessage(messages, barrierMessage);
+  }
   addChatMessage(messages, resolution?.healRoll?.chatMessage);
   addChatMessage(messages, resolution?.application?.applyResult?.chatMessage);
   addChatMessage(messages, resolution?.application?.armApplyResult?.chatMessage);
@@ -69,6 +93,7 @@ function collectRollOutcomeChatMessages(rollOutcome) {
   addChatMessage(messages, getRollOutcomeChatMessage(rollOutcome));
 
   for (const promptEntry of rollOutcome?.defensePromptSummary?.promptResults || []) {
+    addChatMessage(messages, promptEntry?.result?.reflexSaveResult?.rollResult?.chatMessage);
     addChatMessage(messages, promptEntry?.result?.defenseRoll?.sharedAttackRoll?.rollResult?.chatMessage);
     addChatMessage(messages, promptEntry?.result?.defenseRoll?.rollResult?.chatMessage);
   }
@@ -78,6 +103,9 @@ function collectRollOutcomeChatMessages(rollOutcome) {
   for (const targetRoll of rollOutcome?.targetRolls || []) {
     addIncomingResolutionChatMessages(messages, targetRoll?.incomingHitResolution);
     addIncomingResolutionChatMessages(messages, targetRoll?.incomingHealResolution);
+  }
+  for (const manifestRoll of rollOutcome?.manifestRolls || []) {
+    addChatMessage(messages, manifestRoll?.chatMessage);
   }
 
   return messages;
@@ -111,7 +139,10 @@ function collectRollOutcomePostRollUndoRecords(rollOutcome, ...baseRecords) {
     rollOutcome?.forcePassResult,
     rollOutcome?.sharedAttackRoll?.forcePassResult,
     collectIncomingApplicationUndoRecords(rollOutcome?.incomingHitResolution),
-    collectIncomingApplicationUndoRecords(rollOutcome?.incomingHealResolution)
+    collectIncomingApplicationUndoRecords(rollOutcome?.incomingHealResolution),
+    ...(rollOutcome?.manifestRolls || []).flatMap((manifestRoll) => (
+      collectRollUndoRecords(...(manifestRoll?.recipients || []))
+    ))
   );
 
   for (const targetRoll of rollOutcome?.targetRolls || []) {
@@ -120,6 +151,84 @@ function collectRollOutcomePostRollUndoRecords(rollOutcome, ...baseRecords) {
   }
 
   return records;
+}
+
+function getManifestSpellRollTypes(combat) {
+  return MANIFEST_SPELL_ROLL_TYPES.filter((rollType) => hasCombatDice(combat?.[rollType]));
+}
+
+function getActorKey(actorLike) {
+  return String(
+    actorLike?.actor?.uuid
+    || actorLike?.actorUuid
+    || actorLike?.uuid
+    || actorLike?.targetRef?.actorUuid
+    || actorLike?.targetActorId
+    || actorLike?.actorId
+    || actorLike?.id
+    || ""
+  ).trim();
+}
+
+function getSuccessfulManifestActorKeys(activeTargets, rollOutcome) {
+  if (!activeTargets.length) {
+    return rollOutcome?.rollResult?.isSuccess ? null : new Set();
+  }
+  if (!rollOutcome?.multiTarget) {
+    return rollOutcome?.rollResult?.isSuccess
+      ? new Set(activeTargets.map(getActorKey).filter(Boolean))
+      : new Set();
+  }
+  return new Set(
+    (rollOutcome?.targetRolls || [])
+      .filter((targetRoll) => targetRoll?.rollResult?.isSuccess)
+      .map(getActorKey)
+      .filter(Boolean)
+  );
+}
+
+function filterManifestPreflight(preflight, successfulActorKeys) {
+  if (successfulActorKeys === null) return preflight;
+  return {
+    ...preflight,
+    recipients: (preflight?.recipients || [])
+      .filter((recipient) => successfulActorKeys.has(getActorKey(recipient)))
+  };
+}
+
+async function rollManifestSpellsForOutcome({
+  actor,
+  combat,
+  combatIndex,
+  manifestRollTypes,
+  manifestPreflights,
+  activeTargets,
+  rollOutcome,
+  edgeChainContext = null,
+  edgeIndividualDieReplay = null,
+  usageContext = null
+}) {
+  const successfulActorKeys = getSuccessfulManifestActorKeys(activeTargets, rollOutcome);
+  const manifestRolls = [];
+  for (let index = 0; index < manifestRollTypes.length; index += 1) {
+    if (!isSkillTagAutoEligible(combat, manifestRollTypes[index], { success: true, hit: true })) continue;
+    const approvedManifestPreflight = filterManifestPreflight(
+      manifestPreflights[index],
+      successfulActorKeys
+    );
+    if (!approvedManifestPreflight?.recipients?.length) continue;
+    const manifestRoll = await rollManualCombatTag({
+      actor,
+      combatIndex,
+      rollType: manifestRollTypes[index],
+      approvedManifestPreflight,
+      edgeChainContext,
+      edgeIndividualDieReplay,
+      usageContext
+    });
+    if (manifestRoll) manifestRolls.push(manifestRoll);
+  }
+  return manifestRolls;
 }
 
 function serializeRollResult(rollResult) {
@@ -150,12 +259,14 @@ function serializeDefensePromptResult(promptResult) {
     handled: !!promptResult.handled,
     selection: String(promptResult.selection || "").trim(),
     selectedCombatIndex: promptResult.selectedCombatIndex ?? null,
+    selectedCombatId: promptResult.selectedCombatId || null,
+    mageBarrierAction: promptResult.mageBarrierAction || null,
+    skipResourceCosts: !!promptResult.skipResourceCosts,
     selectedDefense: cloneData(promptResult.selectedDefense || null),
     appliedAccuracyPenalty: Number(promptResult.appliedAccuracyPenalty) || 0,
     appliedToHitPenalty: Number(promptResult.appliedToHitPenalty) || 0,
     activeDefense: !!promptResult.activeDefense,
     primalEvasionPenalty: Number(promptResult.primalEvasionPenalty) || 0,
-    shieldBlockBraced: !!promptResult.shieldBlockBraced,
     defenseRoll: promptResult.defenseRoll ? {
       rolled: !!promptResult.defenseRoll.rolled,
       actorId: promptResult.defenseRoll.actorId || null,
@@ -166,11 +277,27 @@ function serializeDefensePromptResult(promptResult) {
         || promptResult.defenseRoll?.rollResult
       )
     } : null,
-    reflexSaveResult: promptResult.reflexSaveResult ? {
-      isSuccess: !!promptResult.reflexSaveResult.isSuccess,
-      totalMoS: Number.isFinite(Number(promptResult.reflexSaveResult.totalMoS)) ? Number(promptResult.reflexSaveResult.totalMoS) : null,
-      resultText: String(promptResult.reflexSaveResult.resultText || "").trim()
+    reflexSaveResult: serializeReflexSaveResult(promptResult.reflexSaveResult)
+  };
+}
+
+function serializeReflexSaveResult(result) {
+  if (!result) return null;
+  return {
+    toHit: result.toHit,
+    passed: !!result.passed,
+    rollResult: result.rollResult ? {
+      ...serializeRollResult(result.rollResult),
+      forcePassResult: cloneData(result.rollResult.forcePassResult)
     } : null
+  };
+}
+
+function hydrateReflexSaveResult(result) {
+  if (!result) return null;
+  return {
+    ...cloneData(result),
+    rollResult: hydrateRollResult(result.rollResult, game.messages?.get(result.rollResult?.messageId) || null)
   };
 }
 
@@ -180,6 +307,7 @@ function hydrateDefensePromptResult(promptResult) {
   if (hydrated?.defenseRoll?.rollResult) {
     hydrated.defenseRoll.rollResult = hydrateRollResult(hydrated.defenseRoll.rollResult);
   }
+  if (hydrated.reflexSaveResult) hydrated.reflexSaveResult = hydrateReflexSaveResult(hydrated.reflexSaveResult);
   return hydrated;
 }
 
@@ -210,11 +338,53 @@ function createTargetRef(target) {
   const tokenRef = createTokenRef(target.token || target.tokenDocument || null);
   return {
     ...tokenRef,
+    tokenId: target.tokenId || tokenRef.tokenId,
+    tokenUuid: target.tokenUuid || tokenRef.tokenUuid,
     actorId: target.actor?.id || target.actorId || tokenRef.actorId || null,
     actorUuid: target.actor?.uuid || tokenRef.actorUuid || null,
     actorName: target.actor?.name || tokenRef.actorName || null,
     targetName: String(target.targetName || target.token?.name || target.tokenDocument?.name || target.actor?.name || "").trim() || "Target"
   };
+}
+
+function serializeLocationRoll(locationRoll) {
+  if (!locationRoll || typeof locationRoll !== "object") return null;
+  const keys = [
+    "rawText", "location", "locationDisplay", "isAP", "bySkill", "byMagnetism",
+    "magnetismGrade", "domeMagnetismGrade", "byAoe", "byWeaponBlock", "byShieldBlock", "byMageBlock"
+  ];
+  const serialized = Object.fromEntries(keys
+    .filter((key) => Object.hasOwn(locationRoll, key))
+    .map((key) => [key, cloneData(locationRoll[key])]));
+  const locationMessageId = String(locationRoll.locationMessageId || locationRoll.chatMessage?.id || "").trim();
+  if (locationMessageId) serialized.locationMessageId = locationMessageId;
+  return serialized;
+}
+
+function hydrateLocationRoll(locationRoll) {
+  if (!locationRoll || typeof locationRoll !== "object") return null;
+  const hydrated = cloneData(locationRoll);
+  const messageId = String(hydrated.locationMessageId || "").trim();
+  if (messageId) hydrated.chatMessage = game.messages?.get(messageId) || null;
+  return hydrated;
+}
+
+function serializeArmorChargeResolution(resolution) {
+  if (!resolution || typeof resolution !== "object") return null;
+  return {
+    handled: !!resolution.handled,
+    useArmorCharge: !!resolution.useArmorCharge,
+    appliedDamageType: resolution.appliedDamageType || null,
+    armorGrade: String(resolution.armorGrade || "").trim(),
+    preventByLuckPenetration: !!resolution.preventByLuckPenetration,
+    bySkillPenetrationMosAdjustment: Math.max(0, Number(resolution.bySkillPenetrationMosAdjustment) || 0),
+    armorChargeUnavailable: !!resolution.armorChargeUnavailable
+  };
+}
+
+function serializeShieldBlockReplayChoice(application) {
+  if (application?.shieldBlock !== true || typeof application.braced !== "boolean") return {};
+  return { shieldBlockReplayChoice: application.braced ? "braced" : "normal" };
 }
 
 function createTargetCheckpointEntries(rollOutcome) {
@@ -226,6 +396,10 @@ function createTargetCheckpointEntries(rollOutcome) {
         actorId: targetRoll?.targetActorId || null
       }),
       targetLabel: targetRoll?.targetName || targetRoll?.targetLabel || "",
+      locationRoll: serializeLocationRoll(targetRoll?.locationRoll || targetRoll?.incomingHitResolution?.locationRoll),
+      armorChargeResolution: serializeArmorChargeResolution(targetRoll?.incomingHitResolution?.resolution),
+      ...serializeShieldBlockReplayChoice(targetRoll?.incomingHitResolution?.application),
+      reflexSaveResult: serializeReflexSaveResult(targetRoll?.incomingHitResolution?.reflexSaveResult || targetRoll?.defensePromptResult?.reflexSaveResult),
       defensePromptResult: serializeDefensePromptResult(targetRoll?.defensePromptResult || null)
     })).filter((entry) => entry.targetRef);
   }
@@ -233,7 +407,11 @@ function createTargetCheckpointEntries(rollOutcome) {
   return rollOutcome?.targetRef ? [{
     targetRef: cloneData(rollOutcome.targetRef),
     targetLabel: rollOutcome?.targetName || rollOutcome?.targetLabel || "",
-    defensePromptResult: serializeDefensePromptResult(rollOutcome?.defensePromptSummary?.promptResults?.[0]?.result || null)
+    locationRoll: serializeLocationRoll(rollOutcome?.locationRoll || rollOutcome?.incomingHitResolution?.locationRoll),
+    armorChargeResolution: serializeArmorChargeResolution(rollOutcome?.resolution || rollOutcome?.incomingHitResolution?.resolution),
+    ...serializeShieldBlockReplayChoice(rollOutcome?.incomingHitResolution?.application),
+    reflexSaveResult: serializeReflexSaveResult(rollOutcome?.incomingHitResolution?.reflexSaveResult || rollOutcome?.defensePromptResult?.reflexSaveResult || rollOutcome?.defensePromptSummary?.promptResults?.[0]?.result?.reflexSaveResult),
+    defensePromptResult: serializeDefensePromptResult(rollOutcome?.defensePromptResult || rollOutcome?.defensePromptSummary?.promptResults?.[0]?.result || null)
   }] : [];
 }
 
@@ -245,6 +423,7 @@ function createNotableCombatPostRollCheckpoint({
   attackerToken = null,
   targetingType = "",
   isHealRoll = false,
+  manifestRollTypes = [],
   resolvedDamageType = null,
   rollOutcome = null,
   defenseTargetRef = null
@@ -263,7 +442,9 @@ function createNotableCombatPostRollCheckpoint({
     attackerToken: createTokenRef(attackerToken),
     targetingType: String(targetingType || "").trim(),
     isHealRoll: !!isHealRoll,
+    manifestRollTypes: Array.from(manifestRollTypes || []),
     resolvedDamageType: resolvedDamageType || null,
+    ...(rollOutcome?.usageContext?.version === 1 ? { usageContext: cloneData(rollOutcome.usageContext) } : {}),
     attackMessageId: attackRollResult?.chatMessage?.id || null,
     attackRollResult: serializeRollResult(attackRollResult),
     multiTarget: !!rollOutcome?.multiTarget,
@@ -278,12 +459,20 @@ function isTrainedRollResult(rollResult) {
   return !(Array.isArray(rollResult?.allDice) && rollResult.allDice.length >= 3);
 }
 
+function getDefensePromptTargetRef(promptEntry) {
+  return promptEntry?.targetRef || {
+    targetName: promptEntry?.targetName || null,
+    tokenId: promptEntry?.targetTokenId || null,
+    actorId: promptEntry?.targetActorId || null
+  };
+}
+
 async function attachEdgeExplodeCheckpointToRollResult(rollResult, {
   checkpoint = null,
   preRollRecords = [],
   postRollRecords = []
 } = {}) {
-  const message = rollResult?.chatMessage || null;
+  const message = getChatMessageDocument(rollResult?.chatMessage);
   if (!message?.setFlag || !checkpoint) return;
   await attachEdgeExplodeToChatMessage(message, rollResult, {
     trained: isTrainedRollResult(rollResult),
@@ -301,6 +490,7 @@ async function attachNotableCombatEdgeExplodeCheckpoints(rollOutcome, {
   attackerToken = null,
   targetingType = "",
   isHealRoll = false,
+  manifestRollTypes = [],
   resolvedDamageType = null,
   preRollRecords = [],
   postRollRecords = []
@@ -313,6 +503,7 @@ async function attachNotableCombatEdgeExplodeCheckpoints(rollOutcome, {
     attackerToken,
     targetingType,
     isHealRoll,
+    manifestRollTypes,
     resolvedDamageType,
     rollOutcome
   });
@@ -331,18 +522,161 @@ async function attachNotableCombatEdgeExplodeCheckpoints(rollOutcome, {
       attackerToken,
       targetingType,
       isHealRoll,
+      manifestRollTypes,
       resolvedDamageType,
       rollOutcome,
-      defenseTargetRef: promptEntry?.targetRef || {
-        targetName: promptEntry?.targetName || null,
-        tokenId: promptEntry?.targetTokenId || null,
-        actorId: promptEntry?.targetActorId || null
-      }
+      defenseTargetRef: getDefensePromptTargetRef(promptEntry)
     });
     await attachEdgeExplodeCheckpointToRollResult(
       defenseRoll?.sharedAttackRoll?.rollResult || defenseRoll?.rollResult,
       { checkpoint: defenseCheckpoint, preRollRecords, postRollRecords }
     );
+  }
+}
+
+async function updateEdgeIndividualCheckpoint(candidate, checkpoint, { rollKey = "", chainId = "" } = {}) {
+  const message = getChatMessageDocument(candidate);
+  const flag = message?.getFlag?.("peasant-core", "edgeIndividualDie");
+  if (!flag || !message?.setFlag) return null;
+  const nextFlag = {
+    ...flag,
+    chainId: String(chainId || flag.chainId || checkpoint?.chainId || "").trim(),
+    checkpoint: cloneData(checkpoint),
+    rollKey: String(rollKey || flag.rollKey || "").trim()
+  };
+  await message.setFlag("peasant-core", "edgeIndividualDie", nextFlag);
+  return nextFlag;
+}
+
+export async function attachNotableCombatEdgeIndividualDieCheckpoints(rollOutcome, {
+  actor = null,
+  combat = null,
+  combatIndex = null,
+  attackerToken = null,
+  targetingType = "",
+  isHealRoll = false,
+  manifestRollTypes = [],
+  resolvedDamageType = null,
+  preRollRecords = [],
+  postRollRecords = [],
+  edgeChainContext = null,
+  replayCheckpoint = null
+} = {}) {
+  const chainId = String(
+    edgeChainContext?.chainId
+    || rollOutcome?.rollResult?.chatMessage?.getFlag?.("peasant-core", "edgeIndividualDie")?.chainId
+    || ""
+  ).trim();
+  const baseCheckpoint = createNotableCombatPostRollCheckpoint({
+    stage: "attack",
+    actor,
+    combat,
+    combatIndex,
+    attackerToken,
+    targetingType,
+    isHealRoll,
+    manifestRollTypes,
+    resolvedDamageType,
+    rollOutcome
+  });
+  baseCheckpoint.chainId = chainId;
+  if (replayCheckpoint?.stage === "save") {
+    baseCheckpoint.targets = replayCheckpoint.targets.map(entry => (
+      baseCheckpoint.targets.find(updated => matchesSaveTarget(entry.targetRef, updated.targetRef)) || cloneData(entry)
+    ));
+  }
+  await updateEdgeIndividualCheckpoint(
+    rollOutcome?.sharedAttackRoll?.rollResult?.chatMessage
+      || rollOutcome?.preDefenseRollResult?.chatMessage
+      || rollOutcome?.rollResult?.chatMessage,
+    baseCheckpoint,
+    { chainId }
+  );
+
+  for (const promptEntry of rollOutcome?.defensePromptSummary?.promptResults || []) {
+    const defenseRoll = promptEntry?.result?.defenseRoll || null;
+    const defenseCheckpoint = createNotableCombatPostRollCheckpoint({
+      stage: "defense",
+      actor,
+      combat,
+      combatIndex,
+      attackerToken,
+      targetingType,
+      isHealRoll,
+      manifestRollTypes,
+      resolvedDamageType,
+      rollOutcome,
+      defenseTargetRef: getDefensePromptTargetRef(promptEntry)
+    });
+    defenseCheckpoint.chainId = chainId;
+    await updateEdgeIndividualCheckpoint(
+      defenseRoll?.sharedAttackRoll?.rollResult?.chatMessage || defenseRoll?.rollResult?.chatMessage,
+      defenseCheckpoint,
+      { chainId }
+    );
+  }
+
+  const targetEntries = rollOutcome?.multiTarget ? (rollOutcome.targetRolls || []) : [rollOutcome];
+  for (const entry of targetEntries) {
+    const targetRef = cloneData(entry?.targetRef || null);
+    const save = entry?.incomingHitResolution?.reflexSaveResult
+      || entry?.defensePromptResult?.reflexSaveResult
+      || entry?.defensePromptSummary?.promptResults?.[0]?.result?.reflexSaveResult;
+    if (save?.rollResult?.chatMessage) {
+      const postMessages = [];
+      addIncomingResolutionChatMessages(postMessages, entry?.incomingHitResolution);
+      await updateEdgeIndividualCheckpoint(save.rollResult.chatMessage, {
+        ...cloneData(baseCheckpoint),
+        stage: "save",
+        saveTargetRef: targetRef,
+        savePostMessageIds: postMessages.filter(message => message.id !== save.rollResult.chatMessage.id).map(message => message.id),
+        savePostRollRecords: collectRollUndoRecords(entry?.incomingHitResolution?.application?.undoRecords)
+      }, { chainId });
+    }
+    for (const [kind, valueRoll] of [
+      ["damage", entry?.incomingHitResolution?.damageRoll],
+      ["heal", entry?.incomingHealResolution?.healRoll]
+    ]) {
+      if (!valueRoll?.chatMessage || !valueRoll?.allDice?.length) continue;
+      const rollKey = createEdgeIndividualValueRollKey(kind, { targetRef });
+      const checkpoint = {
+        ...cloneData(baseCheckpoint),
+        stage: "value",
+        valueKind: kind,
+        valueTargetRef: targetRef,
+        rollKey
+      };
+      await attachEdgeIndividualDieToChatMessage(valueRoll.chatMessage, valueRoll, {
+        kind,
+        label: combat?.name || rollOutcome?.combatName || "Combat",
+        diceFaces: valueRoll.diceValue,
+        naturalDiceCount: valueRoll.diceCount,
+        useStability: valueRoll.allDice.length > valueRoll.diceCount,
+        useStrengthen: valueRoll.allDice.length > valueRoll.diceCount && !!combat?.strengthen,
+        flat: valueRoll.flat,
+        checkpoint,
+        rollKey,
+        chainId
+      });
+    }
+  }
+
+  for (const manifestRoll of rollOutcome?.manifestRolls || []) {
+    if (!manifestRoll?.chatMessage || !manifestRoll?.allDice?.length) continue;
+    const rollType = String(manifestRoll.rollType || "manifest").trim() || "manifest";
+    const rollKey = createEdgeIndividualValueRollKey("manifest", {
+      rollType,
+      actorRef: createActorRef(actor),
+      combatIndex
+    });
+    const checkpoint = {
+      ...cloneData(baseCheckpoint),
+      stage: "value",
+      valueKind: "manifest",
+      valueRollType: rollType,
+      rollKey
+    };
+    await updateEdgeIndividualCheckpoint(manifestRoll.chatMessage, checkpoint, { rollKey, chainId });
   }
 }
 
@@ -400,6 +734,7 @@ async function resolveTargetRef(ref) {
     tokenDocument,
     actor,
     tokenId: tokenDocument?.id || ref?.tokenId || null,
+    tokenUuid: tokenDocument?.uuid || ref?.tokenUuid || null,
     actorId: actor.id || ref?.actorId || null,
     targetName: String(ref?.targetName || token?.name || tokenDocument?.name || actor.name || "").trim() || "Target"
   };
@@ -409,17 +744,19 @@ function refsMatch(left, right) {
   if (!left || !right) return false;
   const leftTokenUuid = String(left.tokenUuid || "").trim();
   const rightTokenUuid = String(right.tokenUuid || "").trim();
-  if (leftTokenUuid && rightTokenUuid && leftTokenUuid === rightTokenUuid) return true;
+  if (leftTokenUuid && rightTokenUuid) return leftTokenUuid === rightTokenUuid;
 
   const leftTokenId = String(left.tokenId || "").trim();
   const rightTokenId = String(right.tokenId || "").trim();
   const leftSceneId = String(left.sceneId || "").trim();
   const rightSceneId = String(right.sceneId || "").trim();
-  if (leftTokenId && rightTokenId && leftTokenId === rightTokenId && (!leftSceneId || !rightSceneId || leftSceneId === rightSceneId)) return true;
+  if (leftTokenId && rightTokenId) {
+    return leftTokenId === rightTokenId && (!leftSceneId || !rightSceneId || leftSceneId === rightSceneId);
+  }
 
   const leftActorUuid = String(left.actorUuid || "").trim();
   const rightActorUuid = String(right.actorUuid || "").trim();
-  if (leftActorUuid && rightActorUuid && leftActorUuid === rightActorUuid) return true;
+  if (leftActorUuid && rightActorUuid) return leftActorUuid === rightActorUuid;
 
   const leftActorId = String(left.actorId || "").trim();
   const rightActorId = String(right.actorId || "").trim();
@@ -435,6 +772,21 @@ function hydrateRollResult(serializedRollResult, chatMessage = null) {
 }
 
 function getReplayCombat(actor, checkpoint) {
+  if (checkpoint?.usageContext?.version === 1) {
+    const collection = String(checkpoint.usageContext.ref?.collection || "").trim();
+    const entries = ["skills", "notableCombats"].includes(collection) && Array.isArray(actor?.system?.[collection])
+      ? actor.system[collection]
+      : [];
+    const entryId = String(checkpoint.usageContext.ref?.entryId || "").trim();
+    const combatIndex = entries.findIndex((entry) => String(entry?.id || "").trim() === entryId);
+    if (combatIndex < 0) return { combat: null, combatIndex: -1 };
+    const usageId = String(checkpoint.usageContext.ref?.usageId || "base").trim() || "base";
+    const usageExists = usageId === "base"
+      || entries[combatIndex]?.usages?.some((usage) => String(usage?.id || "").trim() === usageId);
+    return usageExists
+      ? { combat: cloneData(checkpoint.usageContext.data), combatIndex }
+      : { combat: null, combatIndex: -1 };
+  }
   const combats = Array.isArray(actor?.system?.notableCombats) ? actor.system.notableCombats : [];
   const index = Number.parseInt(checkpoint?.combatIndex, 10);
   if (Number.isFinite(index) && combats[index]) return { combat: combats[index], combatIndex: index };
@@ -448,8 +800,21 @@ function getReplayCombat(actor, checkpoint) {
   return { combat: null, combatIndex: -1 };
 }
 
+function matchesSaveTarget(left, right) {
+  return !!left && !!right
+    && createEdgeIndividualValueRollKey("save", { targetRef: left }) === createEdgeIndividualValueRollKey("save", { targetRef: right });
+}
+
 function updateReplayDefensePromptResult(entry, checkpoint, replacementDefenseRollResult) {
   const promptResult = hydrateDefensePromptResult(entry?.defensePromptResult || null);
+  if (promptResult && checkpoint?.stage === "save" && matchesSaveTarget(entry?.targetRef, checkpoint?.saveTargetRef)) {
+    promptResult.reflexSaveResult = {
+      toHit: replacementDefenseRollResult.toHit,
+      passed: !!replacementDefenseRollResult.isSuccess,
+      rollResult: replacementDefenseRollResult
+    };
+    return promptResult;
+  }
   if (!promptResult || checkpoint?.stage !== "defense") return promptResult;
   if (!refsMatch(entry?.targetRef, checkpoint?.defenseTargetRef)) return promptResult;
 
@@ -515,35 +880,56 @@ async function buildReplayAttackRollForTarget({
   };
 }
 
-function getReplayWeaponMasteryMagnetismGrade(combat, defensePromptResult, { requireMelee = false } = {}) {
-  const baseGrade = getCombatMagnetismGrade(combat);
-  const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
-  const isMelee = getCombatDefenseResponseKey(getCombatTargetingType(combat)) === "melee";
-  const defensePassed = !!defensePromptResult?.defenseRoll?.rollResult?.isSuccess;
-  const masteryApplies = !!(
-    defensePromptResult?.selection === "defense"
-    && defense.block
-    && defense.blockType === "Weapon"
-    && defense.masteryBonus
-    && defensePassed
-    && (!requireMelee || isMelee)
-  );
-  return masteryApplies ? Math.max(baseGrade, 1) : baseGrade;
-}
-
-function getLocationChoiceSignature(mos, { magnetismGrade = 0 } = {}) {
-  return getLocationBySkillOptions(mos, { magnetismGrade })
+function getLocationChoiceSignature(mos, armorChargeResolution = null) {
+  const armorCharge = armorChargeResolution?.useArmorCharge
+    ? { grade: armorChargeResolution.armorGrade }
+    : null;
+  return getLocationBySkillOptions(mos, { armorCharge })
     .map((option) => String(option?.key || "").trim())
-    .filter(Boolean)
-    .join("|");
+    .filter(Boolean);
 }
 
-function getAttackDownstreamSignature(combat, attackRoll, defensePromptResult, { isHealRoll = false } = {}) {
+function getLocationModeSignature(locationRoll, {
+  mos = 0,
+  armorChargeResolution = null,
+  magnetismGrade = 0,
+  useStoredMode = false
+} = {}) {
+  if (!locationRoll) return "missing";
+  if (locationRoll.bySkill) {
+    const rawText = String(locationRoll.rawText || "").trim();
+    const location = String(locationRoll.location || "").trim();
+    const isAP = !!locationRoll.isAP || /(?:armor\s*pen|head\s*pen)/i.test(rawText);
+    const armorCharge = armorChargeResolution?.useArmorCharge
+      ? { grade: armorChargeResolution.armorGrade }
+      : null;
+    const selectedKey = getLocationBySkillOptions(6, { armorCharge })
+      .find((option) => option.location === location && !!option.isAP === isAP)?.key || "unknown";
+    const availableChoices = new Set(getLocationChoiceSignature(mos, armorChargeResolution));
+    return `by-skill:${selectedKey}:${availableChoices.has(selectedKey) ? "available" : "unavailable"}`;
+  }
+  if (locationRoll.byAoe || locationRoll.byWeaponBlock || locationRoll.byShieldBlock || locationRoll.byMageBlock) {
+    return "non-location";
+  }
+  const magnetized = useStoredMode
+    ? locationRoll.byMagnetism === true
+    : Number(magnetismGrade) > 0 || Number(locationRoll.domeMagnetismGrade) > 0;
+  return `by-luck:${magnetized ? "torso" : "table"}`;
+}
+
+function getAttackDownstreamSignature(combat, attackRoll, defensePromptResult, {
+  isHealRoll = false,
+  manifestRollTypes = [],
+  locationRoll = null,
+  armorChargeResolution = null,
+  useStoredLocationMode = false
+} = {}) {
   const rollResult = attackRoll?.rollResult || null;
   if (isHealRoll) return `heal:${rollResult?.isSuccess ? "success" : "failure"}`;
+  if (manifestRollTypes.length) return `manifest:${rollResult?.isSuccess ? "success" : "failure"}`;
 
   const targetingKey = getCombatDefenseResponseKey(getCombatTargetingType(combat));
-  const mageBlockFailure = isMageDefenseDamageRedirect(attackRoll, defensePromptResult);
+  const mageBlockRedirect = isMageDefenseDamageRedirect(defensePromptResult);
   const shieldBlockFailure = isShieldDefenseDamageBlock(attackRoll, defensePromptResult);
   const weaponBlockFailure = isWeaponDefenseDamageBlock(attackRoll, defensePromptResult);
   const narrowSuccessWithoutDefense = isNarrowSuccessAttack(attackRoll)
@@ -551,29 +937,32 @@ function getAttackDownstreamSignature(combat, attackRoll, defensePromptResult, {
   const canApplyDamage = !!(
     rollResult?.isSuccess
     || narrowSuccessWithoutDefense
-    || mageBlockFailure
+    || mageBlockRedirect
     || shieldBlockFailure
     || weaponBlockFailure
   );
   if (!canApplyDamage) return "damage:none";
 
   if (shieldBlockFailure) return "damage:shield-block";
-  if (mageBlockFailure) return "damage:mage-block";
+  if (mageBlockRedirect) return "damage:mage-block";
   if (["aoe", "areaBlast", "tileBlast"].includes(targetingKey)) {
     return `damage:${targetingKey}:success:${rollResult?.isSuccess ? "1" : "0"}`;
   }
 
-  const magnetismGrade = getReplayWeaponMasteryMagnetismGrade(combat, defensePromptResult, {
-    requireMelee: !weaponBlockFailure
+  const magnetismGrade = getWeaponMasteryMagnetismGrade(combat, defensePromptResult);
+  const locationMode = getLocationModeSignature(locationRoll, {
+    mos: Number(rollResult?.totalMoS) || 0,
+    armorChargeResolution,
+    magnetismGrade,
+    useStoredMode: useStoredLocationMode
   });
-  const locationChoices = getLocationChoiceSignature(Number(rollResult?.totalMoS) || 0, { magnetismGrade });
   const route = weaponBlockFailure ? "weapon-block" : "normal";
   return [
     "damage",
     route,
     rollResult?.isSuccess ? "success" : "failure",
     String(rollResult?.resultText || "").trim(),
-    locationChoices
+    locationMode
   ].join(":");
 }
 
@@ -602,6 +991,7 @@ export async function planNotableCombatEdgeExplodeReplay({
   const targetEntries = (checkpoint.targets || []).length
     ? checkpoint.targets
     : [{ targetLabel: checkpoint.targetLabel || "", defensePromptResult: null }];
+  const offerTargets = [];
   for (const entry of targetEntries) {
     const oldEntry = {
       ...cloneData(entry),
@@ -623,11 +1013,24 @@ export async function planNotableCombatEdgeExplodeReplay({
       targetingType: checkpoint.targetingType,
       preserveChatMessage: false
     });
+    const actorUuid = entry?.targetRef?.actorUuid || null;
+    offerTargets.push({
+      actorUuid,
+      success: newAttackRoll.rollResult?.isSuccess,
+      hit: checkpoint.isHealRoll !== true && newAttackRoll.rollResult?.isSuccess === true
+    });
     const oldSignature = getAttackDownstreamSignature(combat, oldAttackRoll, oldEntry.defensePromptResult, {
-      isHealRoll: checkpoint.isHealRoll
+      isHealRoll: checkpoint.isHealRoll,
+      manifestRollTypes: checkpoint.manifestRollTypes,
+      locationRoll: oldEntry.locationRoll,
+      armorChargeResolution: oldEntry.armorChargeResolution,
+      useStoredLocationMode: true
     });
     const newSignature = getAttackDownstreamSignature(combat, newAttackRoll, newEntry.defensePromptResult, {
-      isHealRoll: checkpoint.isHealRoll
+      isHealRoll: checkpoint.isHealRoll,
+      manifestRollTypes: checkpoint.manifestRollTypes,
+      locationRoll: newEntry.locationRoll,
+      armorChargeResolution: newEntry.armorChargeResolution
     });
     if (oldSignature !== newSignature) {
       return {
@@ -643,13 +1046,16 @@ export async function planNotableCombatEdgeExplodeReplay({
   return {
     ok: true,
     replayRequired: false,
-    reason: "same-downstream-options"
+    reason: "same-downstream-options",
+    offerTargets
   };
 }
 
 export async function replayNotableCombatPostRollEffects({
   checkpoint = null,
-  rollResult = null
+  rollResult = null,
+  edgeIndividualDieReplay = null,
+  onSaveReplayProgress = null
 } = {}) {
   if (!checkpoint || checkpoint.version !== 2 || checkpoint.type !== "notableCombatPostRoll") {
     return { ok: false, error: "Edge Explode checkpoint was unavailable." };
@@ -660,17 +1066,21 @@ export async function replayNotableCombatPostRollEffects({
 
   const { combat, combatIndex } = getReplayCombat(actor, checkpoint);
   if (!combat) return { ok: false, error: "The original combat entry was not found." };
+  const combatMods = checkpoint.usageContext?.version === 1
+    ? cloneData(checkpoint.usageContext.modifiers || {})
+    : null;
 
   const attackerTokenDocument = await resolveTokenRef(checkpoint.attackerToken);
   const attackerToken = attackerTokenDocument?.object || attackerTokenDocument || null;
   const attackMessage = checkpoint.attackMessageId ? game.messages?.get(checkpoint.attackMessageId) || null : null;
-  const baseAttackRollResult = checkpoint.stage === "defense"
-    ? hydrateRollResult(checkpoint.attackRollResult, attackMessage)
-    : rollResult;
+  const baseAttackRollResult = checkpoint.stage === "attack"
+    ? rollResult
+    : hydrateRollResult(checkpoint.attackRollResult, attackMessage);
   if (!baseAttackRollResult) return { ok: false, error: "The original attack roll checkpoint was incomplete." };
 
   const targetEntries = [];
   for (const entry of checkpoint.targets || []) {
+    if (checkpoint.stage === "save" && !matchesSaveTarget(entry.targetRef, checkpoint.saveTargetRef)) continue;
     const target = await resolveTargetRef(entry?.targetRef);
     if (!target) {
       return { ok: false, error: `Could not find ${entry?.targetRef?.targetName || entry?.targetLabel || "a target"}.` };
@@ -678,9 +1088,16 @@ export async function replayNotableCombatPostRollEffects({
     targetEntries.push({
       ...cloneData(entry),
       target,
+      locationRoll: hydrateLocationRoll(entry.locationRoll),
+      reflexSaveResult: checkpoint.stage === "save" && matchesSaveTarget(entry.targetRef, checkpoint.saveTargetRef)
+        ? { toHit: rollResult.toHit, passed: !!rollResult.isSuccess, rollResult }
+        : hydrateReflexSaveResult(entry.reflexSaveResult),
       defensePromptResult: updateReplayDefensePromptResult(entry, checkpoint, rollResult)
     });
   }
+  const manifestRollTypes = Array.from(checkpoint.manifestRollTypes || [])
+    .filter((rollType) => MANIFEST_SPELL_ROLL_TYPES.includes(rollType) && hasCombatDice(combat?.[rollType]));
+  const isManifestSpellRoll = manifestRollTypes.length > 0;
 
   const targetRolls = [];
   let incomingHitResolution = null;
@@ -699,17 +1116,27 @@ export async function replayNotableCombatPostRollEffects({
           attackerToken,
           combat,
           target: entry.target,
-          attackRoll: targetAttackRoll
+          attackRoll: targetAttackRoll,
+          edgeIndividualDieReplay,
+          combatMods
         });
-      } else {
+      } else if (!isManifestSpellRoll) {
         incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
           actor,
           attackerToken,
           combat,
           target: entry.target,
           attackRoll: targetAttackRoll,
+          preDefenseRollResult: baseAttackRollResult,
           defensePromptResult: entry.defensePromptResult,
-          appliedDamageType: checkpoint.resolvedDamageType || null
+          appliedDamageType: checkpoint.resolvedDamageType || null,
+          reflexSaveOverride: entry.reflexSaveResult,
+          onSaveReplayProgress,
+          edgeIndividualDieReplay,
+          combatMods,
+          replayArmorChargeResolution: entry.armorChargeResolution || null,
+          replayLocationRoll: entry.locationRoll || null,
+          replayShieldBlockChoice: entry.shieldBlockReplayChoice || null
         });
         if (isChainCancelledResult(incomingHitResolution)) {
           return { ok: false, error: "Edge Explode downstream damage replay was cancelled." };
@@ -740,17 +1167,27 @@ export async function replayNotableCombatPostRollEffects({
         attackerToken,
         combat,
         target: entry.target,
-        attackRoll: singleRoll
+        attackRoll: singleRoll,
+        edgeIndividualDieReplay,
+        combatMods
       });
-    } else {
+    } else if (!isManifestSpellRoll) {
       incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
         actor,
         attackerToken,
         combat,
         target: entry.target,
         attackRoll: singleRoll,
+        preDefenseRollResult: baseAttackRollResult,
         defensePromptResult: entry.defensePromptResult,
-        appliedDamageType: checkpoint.resolvedDamageType || null
+        appliedDamageType: checkpoint.resolvedDamageType || null,
+        reflexSaveOverride: entry.reflexSaveResult,
+        onSaveReplayProgress,
+        edgeIndividualDieReplay,
+        combatMods,
+        replayArmorChargeResolution: entry.armorChargeResolution || null,
+        replayLocationRoll: entry.locationRoll || null,
+        replayShieldBlockChoice: entry.shieldBlockReplayChoice || null
       });
       if (isChainCancelledResult(incomingHitResolution)) {
         return { ok: false, error: "Edge Explode downstream damage replay was cancelled." };
@@ -788,7 +1225,45 @@ export async function replayNotableCombatPostRollEffects({
       incomingHealResolution
     };
 
+  if (isManifestSpellRoll) {
+    const activeTargets = targetEntries.map((entry) => entry.target).filter(Boolean);
+    const successfulActorKeys = getSuccessfulManifestActorKeys(activeTargets, replayOutcome);
+    const manifestPreflights = manifestRollTypes.map((rollType) => (
+      isSkillTagAutoEligible(combat, rollType, { success: true, hit: true })
+        ? filterManifestPreflight(buildManifestSpellCastPreflight({ caster: actor, targets: activeTargets, rollType }), successfulActorKeys)
+        : { ok: true, recipients: [], replacements: [] }
+    ));
+    const successfulPreflights = manifestPreflights.filter((preflight) => preflight?.recipients?.length);
+    if (successfulPreflights.some((preflight) => !preflight?.ok)) {
+      return { ok: false, error: "Manifest spell replacement was unavailable." };
+    }
+    replayOutcome.manifestRolls = await rollManifestSpellsForOutcome({
+      actor,
+      combat,
+      combatIndex,
+      manifestRollTypes,
+      manifestPreflights,
+      activeTargets,
+      rollOutcome: replayOutcome,
+      edgeIndividualDieReplay,
+      usageContext: checkpoint.usageContext
+    });
+  }
+
   const postRollRecords = collectRollOutcomePostRollUndoRecords(replayOutcome);
+  await attachNotableCombatEdgeIndividualDieCheckpoints(replayOutcome, {
+    actor,
+    combat,
+    combatIndex,
+    attackerToken,
+    targetingType: checkpoint.targetingType,
+    isHealRoll: checkpoint.isHealRoll,
+    manifestRollTypes,
+    resolvedDamageType: checkpoint.resolvedDamageType,
+    postRollRecords,
+    edgeChainContext: { chainId: checkpoint.chainId },
+    replayCheckpoint: checkpoint
+  });
   return {
     ok: true,
     rollOutcome: replayOutcome,
@@ -842,6 +1317,99 @@ function withNotableCombatRerunAdjustments(edgeChainContext, { toHitAdj = 0, acc
   };
 }
 
+async function finalizeNotableCombatRollMetadata(rollOutcome, {
+  actor,
+  combat,
+  combatIndex,
+  sheet,
+  attackerToken,
+  targetingType,
+  isHealRoll,
+  manifestRollTypes,
+  resolvedDamageType,
+  resourceCostUndoRecords,
+  edgeChainContext,
+  usageContext = null
+} = {}) {
+  const rollUse = await captureActorRollUndo(
+    actor,
+    `${combat.name || "Combat"} Use`,
+    () => consumeNotableCombatRollUse(actor, combatIndex, sheet, usageContext),
+    { entryCounterRefs: usageContext?.version === 1 ? [usageContext.ref] : [] }
+  );
+  rollOutcome.rollUseResult = rollUse.result;
+  if (usageContext?.version === 1) rollOutcome.usageContext = cloneData(usageContext);
+
+  const preRollRecords = collectRollUndoRecords(
+    resourceCostUndoRecords,
+    collectDefensePromptUndoRecords(rollOutcome?.defensePromptSummary),
+    ...collectRollOutcomeChatMessages(rollOutcome)
+      .filter(message => message.getFlag?.("peasant-core", "edgeIndividualDie")?.kind === "save")
+      .map(message => message.getFlag?.("peasant-core", "rollUndo")?.records),
+    rollUse.undoRecords
+  );
+  const postRollRecords = collectRollOutcomePostRollUndoRecords(rollOutcome);
+  const undoRecords = collectRollUndoRecords(preRollRecords, postRollRecords);
+  rollOutcome.undoRecords = undoRecords;
+  rollOutcome.preRollRecords = preRollRecords;
+  rollOutcome.postRollRecords = postRollRecords;
+  await attachRollUndoToChatMessage(getRollOutcomeChatMessage(rollOutcome), undoRecords, {
+    label: `Undo ${combat.name || "Combat"} Roll Effects`
+  });
+  await attachNotableCombatEdgeExplodeCheckpoints(rollOutcome, {
+    actor,
+    combat,
+    combatIndex,
+    attackerToken,
+    targetingType,
+    isHealRoll,
+    manifestRollTypes,
+    resolvedDamageType,
+    preRollRecords,
+    postRollRecords
+  });
+  await attachNotableCombatEdgeIndividualDieCheckpoints(rollOutcome, {
+    actor,
+    combat,
+    combatIndex,
+    attackerToken,
+    targetingType,
+    isHealRoll,
+    manifestRollTypes,
+    resolvedDamageType,
+    preRollRecords,
+    postRollRecords,
+    edgeChainContext
+  });
+  await attachEdgeChainToChatMessages(
+    collectRollOutcomeChatMessages(rollOutcome),
+    edgeChainContext,
+    undoRecords,
+    {
+      ...getRollOutcomeCriticalEdgeBlock(rollOutcome),
+      preRollRecords,
+      postRollRecords
+    }
+  );
+  if (usageContext?.version === 1 && rollOutcome.rolled && !rollOutcome.chainCancelled) {
+    const message = getRollOutcomeChatMessage(rollOutcome);
+    const rolls = rollOutcome.multiTarget ? rollOutcome.targetRolls || [] : [rollOutcome];
+    const targets = rolls.map(roll => ({
+      actorUuid: roll.targetRef?.actorUuid || null,
+      success: roll.rollResult?.isSuccess,
+      hit: !isHealRoll && roll.rollResult?.isSuccess === true
+    }));
+    if (message) {
+      try {
+        await offerSkillEntryEffects({ actor, usageContext, message, targets });
+      } catch (error) {
+        pcLog.debug("Peasant Core | Could not attach Notable effect offers", error);
+      }
+    }
+  }
+  return rollOutcome;
+}
+
 export async function performNotableCombatRoll({
   actor,
   combatIndex,
@@ -855,15 +1423,22 @@ export async function performNotableCombatRoll({
   cardClass = "",
   rollMode = "",
   edgeChainContext = null,
-  edgeExplodeReroll = null
+  edgeExplodeReroll = null,
+  usageContext = null,
+  skipResourceCosts = false,
+  mageBarrierAction = null
 } = {}) {
   try {
     if (!actor) return false;
 
     const combats = Array.isArray(actor.system?.notableCombats) ? actor.system.notableCombats : [];
-    const combat = combats[combatIndex] || null;
+    const combat = usageContext?.version === 1 ? cloneData(usageContext.data) : combats[combatIndex] || null;
     if (!combat) return false;
-    if (!edgeChainContext) await ensureNotableCombatEdgeChainIdentity(actor, combatIndex);
+    const targetingError = rejectDamageWithoutTargeting(combat);
+    if (targetingError) return targetingError;
+    const combatDefense = normalizeCombatDefense(combat.defense);
+    const isMageBlockRoll = !!(combatDefense.block && combatDefense.blockType === "Mage");
+    if (!edgeChainContext && usageContext?.version !== 1) await ensureNotableCombatEdgeChainIdentity(actor, combatIndex);
     const baseEdgeChainContext = edgeChainContext || createNotableCombatEdgeChainContext({
       actor,
       combatIndex,
@@ -874,7 +1449,8 @@ export async function performNotableCombatRoll({
       targetLabel,
       selectedDamageType,
       cardClass,
-      rollMode
+      rollMode,
+      usageContext
     });
     const resolvedEdgeChainContext = withNotableCombatRerunAdjustments(baseEdgeChainContext, { toHitAdj, accuracyAdj });
     pcLog.debug("Peasant Core | performNotableCombatRoll", {
@@ -891,9 +1467,32 @@ export async function performNotableCombatRoll({
     const hasHealRoll = hasCombatDice(combat?.heal);
     const hasDamageRoll = hasCombatDice(combat?.damage);
     const requestedHealRoll = String(rollMode || "").trim().toLowerCase() === "heal";
-    const isHealRoll = hasHealRoll && (requestedHealRoll || !hasDamageRoll);
+    const manifestRollTypes = requestedHealRoll ? [] : getManifestSpellRollTypes(combat);
+    const isManifestSpellRoll = manifestRollTypes.length > 0;
+    const isHealRoll = !isManifestSpellRoll && hasHealRoll && (requestedHealRoll || !hasDamageRoll);
+    const manifestPreflights = manifestRollTypes.map((rollType) => (
+      isSkillTagAutoEligible(combat, rollType, { success: true, hit: true })
+        ? buildManifestSpellCastPreflight({ caster: actor, targets: activeTargets, rollType })
+        : { ok: true, recipients: [], replacements: [] }
+    ));
+    if (
+      isManifestSpellRoll
+      && (
+        manifestPreflights.some((preflight) => !preflight?.ok)
+        || !(await confirmManifestSpellReplacements(...manifestPreflights))
+      )
+    ) {
+      return {
+        rolled: false,
+        actorId: actor.id,
+        combatIndex,
+        combatName: combat.name || "Combat",
+        chainCancelled: true,
+        manifestPreflightCancelled: true
+      };
+    }
     let resolvedDamageType = normalizeAppliedDamageType(selectedDamageType, "");
-    if (!isHealRoll && !resolvedDamageType) {
+    if (!isHealRoll && !isManifestSpellRoll && !resolvedDamageType) {
       const combatDamageType = normalizeAppliedDamageType(combat?.damage?.type, "");
       if (combatDamageType === "flexible" && activeTargets.length > 0) {
         const damageTypePrompt = await showFlexibleDamageTypePrompt({
@@ -935,11 +1534,16 @@ export async function performNotableCombatRoll({
       };
     }
 
-    const combatMods = actor.system?.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0, costMod: 0 };
+    const combatMods = usageContext?.version === 1
+      ? cloneData(usageContext.modifiers || {})
+      : getEffectiveSkillCombatModifiers(actor);
+    const usageCombatMods = usageContext?.version === 1 ? combatMods : null;
     const costModifiersByType = getCombatCostModifiers(combatMods);
     let resourceCostUndoRecords = [];
+    const paysMageBlockResourceCost = !isMageBlockRoll
+      || ["create", "refresh"].includes(String(mageBarrierAction || "").trim().toLowerCase());
 
-    if (typeof actor.applyPeasantCombatResourceCosts === "function") {
+    if (!skipResourceCosts && paysMageBlockResourceCost && typeof actor.applyPeasantCombatResourceCosts === "function") {
       const resourceCosts = await captureActorRollUndo(
         actor,
         `${combat.name || "Combat"} Resource Costs`,
@@ -963,21 +1567,48 @@ export async function performNotableCombatRoll({
         targetLabel: "Multiple Targets",
         cardClass,
         edgeChainContext: resolvedEdgeChainContext,
-        edgeExplodeReroll
+        edgeExplodeReroll,
+        combatMods
       });
       if (isChainCancelledResult(sharedAttackRoll)) {
-        await consumeNotableCombatRollUse(actor, combatIndex, sheet);
-        return {
+        const promptResultByTokenId = new Map(
+          (defensePromptSummary?.promptResults || [])
+            .map((entry) => [String(entry?.targetTokenId || ""), entry])
+            .filter(([tokenId]) => !!tokenId)
+        );
+        const cancelledOutcome = {
           rolled: false,
           actorId: actor.id,
           combatIndex,
           combatName: combat.name || "Combat",
           multiTarget: true,
-          targetRolls: [],
+          targetRolls: activeTargets.map(target => ({
+            ...sharedAttackRoll,
+            targetTokenId: target.tokenId,
+            targetActorId: target.actorId,
+            targetName: target.targetName,
+            targetRef: createTargetRef(target),
+            defensePromptResult: promptResultByTokenId.get(String(target.tokenId || ""))?.result || null
+          })),
           sharedAttackRoll,
           chainCancelled: true,
           defensePromptSummary
         };
+        await finalizeNotableCombatRollMetadata(cancelledOutcome, {
+          actor,
+          combat,
+          combatIndex,
+          sheet,
+          attackerToken,
+          targetingType,
+          isHealRoll,
+          manifestRollTypes,
+          resolvedDamageType,
+          resourceCostUndoRecords,
+          edgeChainContext: resolvedEdgeChainContext,
+          usageContext
+        });
+        return cancelledOutcome;
       }
 
       const promptResultByTokenId = new Map(
@@ -1017,7 +1648,7 @@ export async function performNotableCombatRoll({
           }
         }
         if (isChainCancelledResult(targetRoll)) {
-          await consumeNotableCombatRollUse(actor, combatIndex, sheet);
+          await consumeNotableCombatRollUse(actor, combatIndex, sheet, usageContext);
           return {
             rolled: false,
             actorId: actor.id,
@@ -1037,20 +1668,23 @@ export async function performNotableCombatRoll({
             attackerToken,
             combat,
             target,
-            attackRoll: targetRoll
+            attackRoll: targetRoll,
+            combatMods: usageCombatMods
           });
-        } else {
+        } else if (!isManifestSpellRoll) {
           incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
             actor,
             attackerToken,
             combat,
             target,
             attackRoll: targetRoll,
+            preDefenseRollResult: sharedAttackRoll?.rollResult || null,
             defensePromptResult: promptEntry?.result || null,
-            appliedDamageType: resolvedDamageType || null
+            appliedDamageType: resolvedDamageType || null,
+            combatMods: usageCombatMods
           });
           if (isChainCancelledResult(incomingHitResolution)) {
-            await consumeNotableCombatRollUse(actor, combatIndex, sheet);
+            await consumeNotableCombatRollUse(actor, combatIndex, sheet, usageContext);
             return {
               rolled: true,
               actorId: actor.id,
@@ -1107,19 +1741,57 @@ export async function performNotableCombatRoll({
         targetLabel: resolvedTargetLabel,
         cardClass,
         edgeChainContext: resolvedEdgeChainContext,
-        edgeExplodeReroll
+        edgeExplodeReroll,
+        combatMods
       });
       if (isChainCancelledResult(singleRoll)) {
-        await consumeNotableCombatRollUse(actor, combatIndex, sheet);
-        return {
+        const cancelledOutcome = {
           ...singleRoll,
           multiTarget: false,
           defensePromptSummary,
           targetTokenId: target?.tokenId || null,
           targetActorId: target?.actorId || null,
           targetName: target?.targetName || null,
+          targetRef: createTargetRef(target),
+          defensePromptResult,
           chainCancelled: true
         };
+        await finalizeNotableCombatRollMetadata(cancelledOutcome, {
+          actor,
+          combat,
+          combatIndex,
+          sheet,
+          attackerToken,
+          targetingType,
+          isHealRoll,
+          manifestRollTypes,
+          resolvedDamageType,
+          resourceCostUndoRecords,
+          edgeChainContext: resolvedEdgeChainContext,
+          usageContext
+        });
+        return cancelledOutcome;
+      }
+      if (mageBarrierAction && isMageBlockRoll && typeof actor.applyPeasantMageBlockBarrierAction === "function") {
+        const barrierAction = await captureActorRollUndo(
+          actor,
+          `${combat.name || "Mage Block"} Barrier`,
+          () => actor.applyPeasantMageBlockBarrierAction({
+            action: mageBarrierAction,
+            selectedCombatId: combat.id || null,
+            selectedCombatIndex: combatIndex
+          }),
+          { includeSpellEffects: true }
+        );
+        if (!barrierAction.result?.ok) {
+          return {
+            ...singleRoll,
+            rolled: false,
+            chainCancelled: true,
+            mageBarrierActionResult: barrierAction.result
+          };
+        }
+        resourceCostUndoRecords = collectRollUndoRecords(resourceCostUndoRecords, barrierAction.undoRecords);
       }
       const preDefenseRollResult = singleRoll?.rollResult || null;
       if (singleRoll?.rollResult && (Math.abs(defenseAccuracyPenalty) > 0 || Math.abs(defenseToHitPenalty) > 0)) {
@@ -1170,20 +1842,23 @@ export async function performNotableCombatRoll({
           attackerToken,
           combat,
           target,
-          attackRoll: singleRoll
+          attackRoll: singleRoll,
+          combatMods: usageCombatMods
         });
-      } else {
+      } else if (!isManifestSpellRoll) {
         incomingHitResolution = await resolveSuccessfulAttackDamageForTarget({
           actor,
           attackerToken,
           combat,
           target,
           attackRoll: singleRoll,
+          preDefenseRollResult,
           defensePromptResult,
-          appliedDamageType: resolvedDamageType || null
+          appliedDamageType: resolvedDamageType || null,
+          combatMods: usageCombatMods
         });
         if (isChainCancelledResult(incomingHitResolution)) {
-          await consumeNotableCombatRollUse(actor, combatIndex, sheet);
+          await consumeNotableCombatRollUse(actor, combatIndex, sheet, usageContext);
           return {
             ...singleRoll,
             preDefenseRollResult,
@@ -1212,48 +1887,34 @@ export async function performNotableCombatRoll({
       };
     }
 
-    const rollUse = await captureActorRollUndo(
-      actor,
-      `${combat.name || "Combat"} Use`,
-      () => consumeNotableCombatRollUse(actor, combatIndex, sheet)
-    );
-    rollOutcome.rollUseResult = rollUse.result;
+    if (isManifestSpellRoll) {
+      rollOutcome.manifestRolls = await rollManifestSpellsForOutcome({
+        actor,
+        combat,
+        combatIndex,
+        manifestRollTypes,
+        manifestPreflights,
+        activeTargets,
+        rollOutcome,
+        edgeChainContext: resolvedEdgeChainContext,
+        usageContext
+      });
+    }
 
-    const preRollRecords = collectRollUndoRecords(
-      resourceCostUndoRecords,
-      collectDefensePromptUndoRecords(rollOutcome?.defensePromptSummary),
-      rollUse.undoRecords
-    );
-    const postRollRecords = collectRollOutcomePostRollUndoRecords(rollOutcome);
-    const undoRecords = collectRollUndoRecords(preRollRecords, postRollRecords);
-    rollOutcome.undoRecords = undoRecords;
-    rollOutcome.preRollRecords = preRollRecords;
-    rollOutcome.postRollRecords = postRollRecords;
-    const undoMessage = getRollOutcomeChatMessage(rollOutcome);
-    await attachRollUndoToChatMessage(undoMessage, undoRecords, {
-      label: `Undo ${combat.name || "Combat"} Roll Effects`
-    });
-    await attachNotableCombatEdgeExplodeCheckpoints(rollOutcome, {
+    await finalizeNotableCombatRollMetadata(rollOutcome, {
       actor,
       combat,
       combatIndex,
+      sheet,
       attackerToken,
       targetingType,
       isHealRoll,
+      manifestRollTypes,
       resolvedDamageType,
-      preRollRecords,
-      postRollRecords
+      resourceCostUndoRecords,
+      edgeChainContext: resolvedEdgeChainContext,
+      usageContext
     });
-    await attachEdgeChainToChatMessages(
-      collectRollOutcomeChatMessages(rollOutcome),
-      resolvedEdgeChainContext,
-      undoRecords,
-      {
-        ...getRollOutcomeCriticalEdgeBlock(rollOutcome),
-        preRollRecords,
-        postRollRecords
-      }
-    );
 
     return rollOutcome;
   } catch (e) {
@@ -1273,14 +1934,19 @@ export async function startNotableCombatRoll({
   cardClass = "",
   rollMode = "",
   edgeChainContext = null,
-  edgeExplodeReroll = null
+  edgeExplodeReroll = null,
+  usageContext = null,
+  skipResourceCosts = false,
+  mageBarrierAction = null
 } = {}) {
   if (!actor) return false;
 
   const combats = Array.isArray(actor.system?.notableCombats) ? actor.system.notableCombats : [];
-  const combat = combats[combatIndex] || null;
+  const combat = usageContext?.version === 1 ? cloneData(usageContext.data) : combats[combatIndex] || null;
   if (!combat) return false;
-  if (!edgeChainContext) await ensureNotableCombatEdgeChainIdentity(actor, combatIndex);
+  const targetingError = rejectDamageWithoutTargeting(combat);
+  if (targetingError) return targetingError;
+  if (!edgeChainContext && usageContext?.version !== 1) await ensureNotableCombatEdgeChainIdentity(actor, combatIndex);
   const resolvedEdgeChainContext = edgeChainContext || createNotableCombatEdgeChainContext({
     actor,
     combatIndex,
@@ -1289,12 +1955,13 @@ export async function startNotableCombatRoll({
     targetLabel,
     selectedDamageType,
     cardClass,
-    rollMode
+    rollMode,
+    usageContext
   });
 
   const hasRangeRate = hasRangeRateValue(combat.rangeRate);
   if (!hasRangeRate) {
-    return await performNotableCombatRoll({ actor, combatIndex, sheet, promptForTargets, rollOverrides, targetLabel, selectedDamageType, cardClass, rollMode, edgeChainContext: resolvedEdgeChainContext, edgeExplodeReroll });
+    return await performNotableCombatRoll({ actor, combatIndex, sheet, promptForTargets, rollOverrides, targetLabel, selectedDamageType, cardClass, rollMode, edgeChainContext: resolvedEdgeChainContext, edgeExplodeReroll, usageContext, skipResourceCosts, mageBarrierAction });
   }
 
   return showRangeRatePrompt({
@@ -1310,6 +1977,9 @@ export async function startNotableCombatRoll({
     rollMode,
     edgeChainContext: resolvedEdgeChainContext,
     edgeExplodeReroll,
+    usageContext,
+    skipResourceCosts,
+    mageBarrierAction,
     rollNotableCombat: performNotableCombatRoll
   });
 }

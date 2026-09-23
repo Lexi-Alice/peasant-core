@@ -1,18 +1,23 @@
 ﻿// Peasant Core System Initialization
 import { configurePeasantCombat } from "./documents/_module.mjs";
-import { PEASANT_ACTIVE_EFFECT_DATA_MODELS } from "./data/active-effect/_module.mjs";
+import { configurePeasantActiveEffects } from "./data/active-effect/_module.mjs";
 import { configurePeasantActiveEffectStateOperations } from "./data/active-effect/state-operations.mjs";
+import { configurePeasantSpellEffectSlotGuards } from "./data/active-effect/spell-effects.mjs";
+import { configurePeasantSpellEffectLifecycle } from "./data/active-effect/spell-effect-lifecycle.mjs";
 import { configurePeasantActiveEffectSheetEnhancements } from "./applications/active-effect/active-effect-config.mjs";
 import { configureChatListeners } from "./applications/chat-listeners.mjs";
 import { configureCombatTracker } from "./applications/combat-tracker.mjs";
 import { drawLocationTableLikeMacro } from "./applications/actor/location-table.mjs";
 import { registerPeasantCombatApi } from "./applications/combat/api.mjs";
+import { applyManifestDomeAbsorption, applyManifestSpellEffect } from "./applications/combat/manifest-spell-effects.mjs";
 import { PC_INVENTORY_MIGRATION_STATE_SETTING, exportCurrentWorldInventoryBackup, migrateWorldLegacyInventoryData } from "./migration/inventory.mjs";
 import { PC_WORLD_MIGRATION_VERSION_SETTING, migrateWorldNotableCombatData } from "./migration/world.mjs";
 import { registerPeasantCoreSettingsMenus } from "./settings.mjs";
 import { initializePeasantSockets, registerPeasantSocketHandler } from "./socket/remote-prompts.mjs";
 import { registerPeasantCoreApi } from "./utils/api.mjs";
 import { registerDebugLoggingSetting } from "./utils/logging.mjs";
+import { registerNotableCombatClientSettings } from "./applications/actor/notable-combat/notable-combat-controls.mjs";
+import { registerPeasantUsageEnricher } from "./applications/skill-usage-links.mjs";
 
 initializePeasantSockets();
 
@@ -21,16 +26,15 @@ Hooks.once('init', () => {
   console.log('Peasant Core | System initialized');
   configurePeasantCombat();
   configurePeasantActiveEffectStateOperations();
+  configurePeasantSpellEffectSlotGuards();
+  configurePeasantSpellEffectLifecycle();
   configureChatListeners();
   configureCombatTracker();
-  Object.assign(CONFIG.ActiveEffect.dataModels, PEASANT_ACTIVE_EFFECT_DATA_MODELS);
-  CONFIG.ActiveEffect.typeLabels = {
-    ...CONFIG.ActiveEffect.typeLabels,
-    enchantment: "TYPES.ActiveEffect.enchantment",
-    skill: "TYPES.ActiveEffect.skill"
-  };
+  configurePeasantActiveEffects();
   configurePeasantActiveEffectSheetEnhancements();
+  registerPeasantUsageEnricher();
   registerDebugLoggingSetting();
+  registerNotableCombatClientSettings();
   registerPeasantCoreSettingsMenus();
 
   game.settings.register("peasant-core", PC_WORLD_MIGRATION_VERSION_SETTING, {
@@ -57,6 +61,8 @@ Hooks.once('ready', () => {
   console.log('Peasant Core | Setting up combat system');
   initializePeasantSockets();
   registerPeasantCoreApi({
+    absorbManifestDome: applyManifestDomeAbsorption,
+    applyManifestSpellEffect,
     drawLocationTable: drawLocationTableLikeMacro,
     exportCurrentWorldInventory: exportCurrentWorldInventoryBackup
   });

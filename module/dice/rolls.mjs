@@ -3,15 +3,30 @@
 
 import { registerPeasantCoreApi } from "../utils/api.mjs";
 import { rollPeasantCriticalExplosion } from "./exploding.mjs";
-import { applyMessageMode, escapeHtml } from "../utils/chat.mjs";
+import { applyMessageMode, escapeHtml, renderChatCardImage } from "../utils/chat.mjs";
 import { pcLog } from "../utils/logging.mjs";
 import {
   attachEdgeExplodeToChatMessage,
+  attachEdgeIndividualDieToChatMessage,
   attachEdgeChainToChatMessage,
   createSkillEdgeChainContext,
+  finishSaveCheckRoll,
   getCriticalEdgeBlockFromRollResult,
   getMatchingEdgeExplodeReroll
 } from "../applications/combat/edge-chain-rolls.mjs";
+
+function getEdgeIndividualSkillLabel(skillName, edgeChainContext, cardClass = "") {
+  if (String(cardClass).split(/\s+/).includes("pc-defense-roll-card")) {
+    return String(skillName || "Defense").replace(/\s+(?:Untrained )?Roll(?: vs .*)?$/i, "").trim() || "Defense";
+  }
+  if (edgeChainContext?.rerun?.type !== "actorSkillRoll") {
+    return edgeChainContext?.label || skillName;
+  }
+  return String(skillName || "Skill")
+    .replace(/\s+Untrained Skill Roll$/i, "")
+    .replace(/\s+Skill Roll$/i, "")
+    .trim() || "Skill";
+}
 
 function getRollCardClassAttribute(...extraClasses) {
   const safeClass = extraClasses
@@ -27,30 +42,34 @@ export async function performConsciousnessCheck({
   asSave = false,
   skillName = 'Consciousness Check',
   speaker = ChatMessage.getSpeaker(),
-  style = CONST.CHAT_MESSAGE_STYLES.OTHER
+  style = CONST.CHAT_MESSAGE_STYLES.OTHER,
+  actor = null,
+  diceOverride = null,
+  chatMessage = null,
+  onRollResult = null
 } = {}) {
   pcLog.debug('Peasant Core: performConsciousnessCheck called', { tn, asSave, skillName });
 
   let total = 0;
   let diceValues = "";
   let detailLines = "";
+  const allDice = diceOverride
+    ? diceOverride.slice()
+    : (await new Roll(asSave ? '3d6' : '2d6').evaluate()).dice[0].results.map(r => r.result);
+  let keptDice = allDice.slice();
 
   if (asSave) {
-    const roll = await new Roll('3d6').evaluate();
-    const allDice = roll.dice[0].results.map(r => r.result);
     const minValue = Math.min(...allDice);
     const minIndex = allDice.indexOf(minValue);
-    const keptDice = allDice.filter((_, index) => index !== minIndex);
+    keptDice = allDice.filter((_, index) => index !== minIndex);
     total = keptDice[0] + keptDice[1];
     const allDiceDisplay = allDice
       .map((die, index) => index === minIndex ? `<span style="color: #888;">${die}</span>` : die)
       .join(', ');
     detailLines = `<div>Dice: [${allDiceDisplay}] = ${total}</div>`;
   } else {
-    const roll = await new Roll('2d6').evaluate();
-    const initialDice = roll.dice[0].results.map(r => r.result);
-    total = roll.total;
-    diceValues = initialDice.join(', ');
+    total = allDice.reduce((sum, die) => sum + die, 0);
+    diceValues = allDice.join(', ');
     detailLines = `<div>Dice: [${diceValues}] = ${total}</div>`;
   }
 
@@ -78,15 +97,27 @@ export async function performConsciousnessCheck({
       </div>
     </div>
   </fieldset>`;
-  await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content, style }));
+  if (chatMessage) await chatMessage.update({ content });
+  else chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content, style }));
+  return finishSaveCheckRoll({
+    chatMessage,
+    allDice,
+    keptDice,
+    toHit: tn,
+    total,
+    baseMoS: totalMoS,
+    totalMoS,
+    isSuccess
+  }, { kind: "check", actor, asSave, skillName, speaker, style, onRollResult });
 }
 
-export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "", edgeChainContext = null, edgeExplodeReroll = null } = {}) {
+export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "", imageSrc = "", edgeChainContext = null, edgeExplodeReroll = null } = {}) {
   pcLog.debug('Peasant Core: performSkillRoll called', { toHit, accuracy, skillName });
   const edgeExplodeRoll = getMatchingEdgeExplodeReroll(edgeExplodeReroll, { trained: true, skillName, cardClass, speaker });
+  const roll = edgeExplodeRoll?.initialDice?.length >= 2 ? null : await new Roll('2d6').evaluate();
   const initialDice = edgeExplodeRoll?.initialDice?.length >= 2
     ? edgeExplodeRoll.initialDice.slice(0, 2)
-    : (await new Roll('2d6').evaluate()).dice[0].results.map(r => r.result);
+    : roll.dice[0].results.map(r => r.result);
   const diceValues = initialDice.join(', ');
 
   const critical = await rollPeasantCriticalExplosion(initialDice);
@@ -129,16 +160,19 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
       ${escapeHtml(skillName)}
     </legend>
     <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div style="display: flex; gap: 6px;">
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
-          <span style="color: #ffffff; font-weight: bold; font-size: 11px;">To-Hit:</span>
-          <span style="color: #e0e0e0; font-size: 13px; font-weight: bold;">${toHit}+</span>
-        </div>
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
-          <span style="color: #ffffff; font-weight: bold; font-size: 11px;">MoS:</span>
-          <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: ${mosColor}; border: ${mosBorder};">
-            ${mosDisplay}
-          </button>
+      <div class="pc-chat-card-primary-row" style="display: flex; gap: 6px;">
+        ${renderChatCardImage(imageSrc)}
+        <div class="pc-chat-card-primary-content" style="display: flex; gap: 6px;">
+          <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
+            <span style="color: #ffffff; font-weight: bold; font-size: 11px;">To-Hit:</span>
+            <span style="color: #e0e0e0; font-size: 13px; font-weight: bold;">${toHit}+</span>
+          </div>
+          <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
+            <span style="color: #ffffff; font-weight: bold; font-size: 11px;">MoS:</span>
+            <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: ${mosColor}; border: ${mosBorder};">
+              ${mosDisplay}
+            </button>
+          </div>
         </div>
       </div>
       <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
@@ -154,7 +188,14 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
     </div>
   </fieldset>`;
 
-  const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
+  const chatMessage = await ChatMessage.create(applyMessageMode({
+    user: game.user.id,
+    speaker,
+    content: chatContent,
+    style,
+    rolls: roll ? [roll] : undefined,
+    sound: globalThis.CONFIG?.sounds?.dice ?? null
+  }));
   const rollResult = {
     chatMessage,
     toHit,
@@ -180,21 +221,30 @@ export async function performSkillRoll({ toHit = 7, accuracy = undefined, skillN
       skillName,
       speaker,
       style,
-      cardClass
+      cardClass,
+      imageSrc
     }),
     [],
     getCriticalEdgeBlockFromRollResult(rollResult)
   );
   await attachEdgeExplodeToChatMessage(chatMessage, rollResult, { trained: true, skillName, cardClass, speaker });
+  await attachEdgeIndividualDieToChatMessage(chatMessage, rollResult, {
+    kind: "skill",
+    label: getEdgeIndividualSkillLabel(skillName, edgeChainContext, cardClass),
+    diceFaces: 6,
+    trained: true,
+    chainId: edgeChainContext?.chainId
+  });
   return rollResult;
 }
 
-export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Untrained Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "", edgeChainContext = null, edgeExplodeReroll = null } = {}) {
+export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefined, skillName = 'Untrained Skill Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, cardClass = "", imageSrc = "", edgeChainContext = null, edgeExplodeReroll = null } = {}) {
   pcLog.debug('Peasant Core: performUntrainedSkillRoll called', { toHit, accuracy, skillName });
   const edgeExplodeRoll = getMatchingEdgeExplodeReroll(edgeExplodeReroll, { trained: false, skillName, cardClass, speaker });
+  const roll = edgeExplodeRoll?.allDice?.length >= 3 ? null : await new Roll('3d6').evaluate();
   const allDice = edgeExplodeRoll?.allDice?.length >= 3
     ? edgeExplodeRoll.allDice.slice(0, 3)
-    : (await new Roll('3d6').evaluate()).dice[0].results.map(r => r.result);
+    : roll.dice[0].results.map(r => r.result);
   const maxValue = Math.max(...allDice);
   const maxIndex = allDice.indexOf(maxValue);
   const keptDice = allDice.filter((_, index) => index !== maxIndex);
@@ -234,16 +284,19 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
       ${escapeHtml(skillName)}
     </legend>
     <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div style="display: flex; gap: 6px;">
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
-          <span style="color: #ffffff; font-weight: bold; font-size: 11px;">To-Hit:</span>
-          <span style="color: #e0e0e0; font-size: 13px; font-weight: bold;">${toHit}+</span>
-        </div>
-        <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
-          <span style="color: #ffffff; font-weight: bold; font-size: 11px;">MoS:</span>
-          <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: ${mosColor}; border: ${mosBorder};">
-            ${mosDisplay}
-          </button>
+      <div class="pc-chat-card-primary-row" style="display: flex; gap: 6px;">
+        ${renderChatCardImage(imageSrc)}
+        <div class="pc-chat-card-primary-content" style="display: flex; gap: 6px;">
+          <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
+            <span style="color: #ffffff; font-weight: bold; font-size: 11px;">To-Hit:</span>
+            <span style="color: #e0e0e0; font-size: 13px; font-weight: bold;">${toHit}+</span>
+          </div>
+          <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 6px; background: transparent; border-radius: 3px; border-left: 3px solid #555;">
+            <span style="color: #ffffff; font-weight: bold; font-size: 11px;">MoS:</span>
+            <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: ${mosColor}; border: ${mosBorder};">
+              ${mosDisplay}
+            </button>
+          </div>
         </div>
       </div>
       <div class="roll-details" data-roll-id="${rollId}" style="display: none; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 10px; line-height: 1.5;">
@@ -259,7 +312,14 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
     </div>
   </fieldset>`;
 
-  const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
+  const chatMessage = await ChatMessage.create(applyMessageMode({
+    user: game.user.id,
+    speaker,
+    content: chatContent,
+    style,
+    rolls: roll ? [roll] : undefined,
+    sound: globalThis.CONFIG?.sounds?.dice ?? null
+  }));
   const rollResult = {
     chatMessage,
     toHit,
@@ -286,19 +346,28 @@ export async function performUntrainedSkillRoll({ toHit = 7, accuracy = undefine
       skillName,
       speaker,
       style,
-      cardClass
+      cardClass,
+      imageSrc
     }),
     [],
     getCriticalEdgeBlockFromRollResult(rollResult)
   );
   await attachEdgeExplodeToChatMessage(chatMessage, rollResult, { trained: false, skillName, cardClass, speaker });
+  await attachEdgeIndividualDieToChatMessage(chatMessage, rollResult, {
+    kind: "skill",
+    label: getEdgeIndividualSkillLabel(skillName, edgeChainContext, cardClass),
+    diceFaces: 6,
+    trained: false,
+    chainId: edgeChainContext?.chainId
+  });
   return rollResult;
 }
 
-export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER } = {}) {
+export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', speaker = ChatMessage.getSpeaker(), style = CONST.CHAT_MESSAGE_STYLES.OTHER, actor = null, diceOverride = null, chatMessage = null, onRollResult = null, allowPostRollActions = true } = {}) {
   pcLog.debug('Peasant Core: performSavingRoll called', { toHit, skillName });
-  const roll = await new Roll('3d6').evaluate();
-  const allDice = roll.dice[0].results.map(r => r.result);
+  const allDice = diceOverride
+    ? diceOverride.slice()
+    : (await new Roll('3d6').evaluate()).dice[0].results.map(r => r.result);
   const minValue = Math.min(...allDice);
   const minIndex = allDice.indexOf(minValue);
   const keptDice = allDice.filter((_, index) => index !== minIndex);
@@ -345,16 +414,18 @@ export async function performSavingRoll({ toHit = 7, skillName = 'Saving Roll', 
     </div>
   </fieldset>`;
 
-  const chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
-  return {
+  if (chatMessage) await chatMessage.update({ content: chatContent });
+  else chatMessage = await ChatMessage.create(applyMessageMode({ user: game.user.id, speaker, content: chatContent, style }));
+  return finishSaveCheckRoll({
     chatMessage,
     toHit,
     allDice,
     keptDice,
     total: diceResult,
+    baseMoS: totalMoS,
     totalMoS,
     isSuccess
-  };
+  }, { kind: "save", actor, asSave: true, skillName, speaker, style, onRollResult, allowPostRollActions });
 }
 
 registerPeasantCoreApi({

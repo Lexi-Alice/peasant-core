@@ -59,24 +59,18 @@ const LOCATION_RESULT_TEXT_ALIASES = Object.freeze({
   "armor pen head": ["armor pen head", "head pen"]
 });
 
-function normalizeMagnetismGrade(rawGrade) {
-  const grade = Number.parseInt(rawGrade, 10);
-  return Number.isFinite(grade) ? Math.max(0, grade) : 0;
-}
-
-export function getLocationBySkillOptions(maxMoS, { magnetismGrade = 0 } = {}) {
+export function getLocationBySkillOptions(maxMoS, { armorCharge = null } = {}) {
   const mos = Number(maxMoS) || 0;
-  const grade = normalizeMagnetismGrade(magnetismGrade);
-  const thresholdBump = Math.max(0, grade - 1);
-  if (mos < 1) return grade > 0 ? [] : [LOCATION_BY_SKILL_OPTION_MAP.table];
+  const armorPenBump = armorCharge?.grade === "medium" ? 1 : 0;
+  if (mos < 1) return [LOCATION_BY_SKILL_OPTION_MAP.table];
 
   const orderedKeys = [];
-  if (mos >= 5 + thresholdBump) orderedKeys.push("headPen");
-  if (mos >= 4 + thresholdBump) orderedKeys.push("head");
-  if (mos >= 3 + thresholdBump) orderedKeys.push("apTorso", "apRightArm", "apLeftArm", "apRightLeg", "apLeftLeg");
-  if (mos >= 2 + thresholdBump) orderedKeys.push("rightArm", "leftArm", "rightLeg", "leftLeg");
-  if (mos >= 1 + thresholdBump) orderedKeys.push("torso");
-  if (grade <= 0) orderedKeys.push("table");
+  if (mos >= 5 + armorPenBump) orderedKeys.push("headPen");
+  if (mos >= 4) orderedKeys.push("head");
+  if (mos >= 3 + armorPenBump) orderedKeys.push("apTorso", "apRightArm", "apLeftArm", "apRightLeg", "apLeftLeg");
+  if (mos >= 2) orderedKeys.push("rightArm", "leftArm", "rightLeg", "leftLeg");
+  if (mos >= 1) orderedKeys.push("torso");
+  orderedKeys.push("table");
 
   return orderedKeys
     .map((key) => LOCATION_BY_SKILL_OPTION_MAP[key])
@@ -98,12 +92,16 @@ export async function showLocationBySkillPrompt({
   maxMoS = 0,
   attackerName = "Attacker",
   targetLabel = "",
-  magnetismGrade = 0
+  armorCharge = null
 } = {}) {
-  const options = getLocationBySkillOptions(maxMoS, { magnetismGrade });
-  if (!options.length) return { option: null, selection: "magnetism" };
-
+  const options = getLocationBySkillOptions(maxMoS, { armorCharge });
   const tableOption = options.find((option) => option.mode === "table") || null;
+  if (options.length <= 1) {
+    return tableOption
+      ? { option: tableOption, selection: "table", cancelled: false }
+      : { option: null, selection: "close", cancelled: true, chainCancelled: true };
+  }
+
   const optionsHtml = options.map((option) => (
     `<option value="${escapeHtml(option.key)}">${escapeHtml(option.label)}</option>`
   )).join("");
@@ -125,7 +123,7 @@ export async function showLocationBySkillPrompt({
     let renderedWindow = null;
     let closeWatcher = null;
 
-    const fallbackSelection = tableOption ? "table" : "magnetism";
+    const fallbackSelection = tableOption ? "table" : "close";
     const finalize = (result = { option: tableOption, selection: fallbackSelection, cancelled: true, chainCancelled: false }) => {
       if (settled) return result;
       settled = true;
@@ -255,7 +253,9 @@ export async function createChosenLocationTableMessage(locationRoll) {
   try {
     return await table.toMessage([result], {
       messageData: {
-        flavor: `Chooses a result from the ${foundry.utils.escapeHTML(table.name)} table`,
+        flavor: `<span class="pc-chosen-location-flavor">${locationRoll.byMagnetism
+          ? "Magnetized to:"
+          : `Chooses a result from the ${foundry.utils.escapeHTML(table.name)} table:`}</span>`,
         speaker: ChatMessage.getSpeaker()
       },
       messageOptions: {
@@ -333,6 +333,11 @@ export async function drawLocationTableLikeMacro({
     const messageResult = await table.toMessage(draw.results, {
       roll: draw.roll,
       messageData: {
+        flavor: `<span class="pc-chosen-location-flavor">${game.i18n.format(
+          `TABLE.DrawFlavor${draw.results.length > 1 ? "Plural" : ""}`,
+          { number: draw.results.length, name: foundry.utils.escapeHTML(table.name) }
+        )}</span>`,
+        sound: null,
         flags: {
           "peasant-core": {
             [PC_LOCATION_ROLL_FLAG]: locationRollFlag

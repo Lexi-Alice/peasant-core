@@ -1,8 +1,5 @@
-import {
-  getArmorChargeValue,
-  getTargetedDamageLocationDisplay,
-  normalizeAppliedDamageType
-} from "../../data/actor/targeted-damage.mjs";
+import { getActiveArmorTraining, canSpendActiveArmorCharge } from "../../data/actor/active-armor.mjs";
+import { getTargetedDamageLocationDisplay, normalizeAppliedDamageType } from "../../data/actor/targeted-damage.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { renderDialogV2 } from "../dialogs.mjs";
 import { resolveDefensePromptActor } from "./actor-targets.mjs";
@@ -22,21 +19,25 @@ export async function showIncomingHitPrompt(payload = {}) {
   const promptId = String(payload.promptId || "").trim();
 
   const attackerName = String(payload.attackerTokenName || payload.attackerActorName || "Attacker").trim() || "Attacker";
-  const location = String(payload.location || "Torso").trim() || "Torso";
-  const locationDisplay = String(payload.locationDisplay || getTargetedDamageLocationDisplay(location)).trim() || getTargetedDamageLocationDisplay(location);
+  const location = String(payload.location || "").trim();
+  const locationDisplay = location
+    ? String(payload.locationDisplay || getTargetedDamageLocationDisplay(location)).trim() || getTargetedDamageLocationDisplay(location)
+    : "";
   const locationText = String(payload.locationResultText || locationDisplay).trim() || locationDisplay;
-  const isAP = !!payload.isAP;
   const normalizedDamageType = normalizeAppliedDamageType(payload.damageType);
-  const title = `${attackerName} hits you in the ${locationText}!`;
-  if (getArmorChargeValue(defenderActor) <= 0) {
+  const title = locationText ? `${attackerName} hits you in the ${locationText}!` : `Incoming hit from ${attackerName}`;
+  const armorTraining = getActiveArmorTraining(defenderActor);
+  if (!canSpendActiveArmorCharge(defenderActor)) {
     let appliedType = normalizedDamageType;
     if (appliedType === "flexible") appliedType = "blunt";
     return {
       handled: true,
       useArmorCharge: false,
       appliedDamageType: appliedType,
-      location,
-      isAP,
+      armorGrade: armorTraining.grade,
+      preventByLuckPenetration: false,
+      bySkillPenetrationMosAdjustment: 0,
+      ...(location ? { location, isAP: !!payload.isAP } : {}),
       chainCancelled: false,
       armorChargeUnavailable: true
     };
@@ -45,7 +46,7 @@ export async function showIncomingHitPrompt(payload = {}) {
   const content = `
     <form class="pc-incoming-hit-form">
       <div class="form-group" style="margin-bottom: 10px;">
-        <div class="pc-incoming-hit-message">Use armor charge before damage is rolled and applied?</div>
+        <div class="pc-incoming-hit-message">Use one Armor Charge on this incoming hit?</div>
       </div>
     </form>
   `;
@@ -68,12 +69,16 @@ export async function showIncomingHitPrompt(payload = {}) {
       let appliedType = normalizedDamageType;
       if (appliedType === "flexible") appliedType = "blunt";
 
+      const currentArmorTraining = getActiveArmorTraining(defenderActor);
+      const useCharge = !!useArmorCharge && canSpendActiveArmorCharge(defenderActor);
       const result = {
         handled: true,
-        useArmorCharge: !!useArmorCharge,
+        useArmorCharge: useCharge,
         appliedDamageType: appliedType,
-        location,
-        isAP,
+        armorGrade: currentArmorTraining.grade,
+        preventByLuckPenetration: useCharge && currentArmorTraining.grade === "light",
+        bySkillPenetrationMosAdjustment: useCharge && currentArmorTraining.grade === "medium" ? 1 : 0,
+        ...(location ? { location, isAP: !!payload.isAP } : {}),
         chainCancelled: !!chainCancelled
       };
       resolve(result);

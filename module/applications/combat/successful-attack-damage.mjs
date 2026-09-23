@@ -1,12 +1,21 @@
 import { getCombatDefenseResponseKey, normalizeCombatDefense } from "../../data/actor/combat-defense.mjs";
 import { getAutomatedCombatDamagePreview, getAutomatedCombatDamageTypeLabel } from "../../data/actor/combat-damage.mjs";
-import { getCombatMagnetismGrade, getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
+import { getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
+import { hasCombatDice } from "../../dice/combat-dice.mjs";
+import { isSkillTagAutoEligible } from "../../data/actor/skill-entry-conditions.mjs";
+import { getManifestSpellEffectState } from "../../data/active-effect/spell-effect-change-keys.mjs";
+import { findActiveSpellEffectInCategory } from "../../data/active-effect/spell-effects.mjs";
 import {
+  doesAttackReachManifestDome,
   doesPromptResultCountAsActiveDefense,
+  getPostDomeMagnetismGrade,
+  getWeaponMasteryMagnetismGrade,
+  isConfirmedManifestDomeResult,
   isMageDefenseDamageRedirect,
   isNarrowSuccessAttack,
   isShieldDefenseDamageBlock,
-  isWeaponDefenseDamageBlock
+  isWeaponDefenseDamageBlock,
+  shouldContinueAfterManifestDome
 } from "../../data/actor/defense-results.mjs";
 import {
   getHighestHaltDamageLocation,
@@ -14,29 +23,20 @@ import {
   getTargetedDamageLocationDisplay,
   normalizeAppliedDamageType
 } from "../../data/actor/targeted-damage.mjs";
-import { attachRollUndoToChatMessage } from "../chat-undo.mjs";
+import { attachRollUndoToChatMessage, collectRollUndoRecords } from "../chat-undo.mjs";
+import { getLocationBySkillOptions } from "../actor/location-table.mjs";
 import { rollAoeReflexSaveForTarget } from "./aoe-reflex-save.mjs";
 import { resolveAttackLocationForTarget } from "./attack-locations.mjs";
-import { rollAutomatedCombatDamage } from "./automated-damage-rolls.mjs";
+import {
+  createAutomatedDamageBarrierMessages,
+  publishAutomatedCombatDamageRoll,
+  rollAutomatedCombatDamage
+} from "./automated-damage-rolls.mjs";
 import { attachLocationRollWorkflowData } from "./edge-location-rolls.mjs";
 import { requestIncomingHitApplicationForTarget, requestIncomingHitResolutionForTarget } from "./incoming-hit.mjs";
+import { requestManifestDomeAbsorptionForTarget } from "./manifest-spell-effects.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
-
-function getWeaponMasteryMagnetismGrade(combat, defensePromptResult, { requireMelee = false } = {}) {
-  const baseGrade = getCombatMagnetismGrade(combat);
-  const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
-  const isMelee = getCombatDefenseResponseKey(getCombatTargetingType(combat)) === "melee";
-  const defensePassed = !!defensePromptResult?.defenseRoll?.rollResult?.isSuccess;
-  const masteryApplies = !!(
-    defensePromptResult?.selection === "defense"
-    && defense.block
-    && defense.blockType === "Weapon"
-    && defense.masteryBonus
-    && defensePassed
-    && (!requireMelee || isMelee)
-  );
-  return masteryApplies ? Math.max(baseGrade, 1) : baseGrade;
-}
+import { createEdgeIndividualValueRollKey, getEdgeIndividualDiceOverride } from "./edge-chain-rolls.mjs";
 
 function createWeaponBlockLocationRoll() {
   return {
@@ -100,14 +100,189 @@ async function attachDamageRollUndo(damageRoll, application) {
   });
 }
 
-export async function resolveSuccessfulAttackDamageForTarget({
+function targetHasActiveManifestDome(target) {
+  const effect = findActiveSpellEffectInCategory(target?.actor, "aura");
+  return getManifestSpellEffectState(effect).manifestType === "dome";
+}
+
+async function resolveManifestDomeStage({
+  target = null,
+  damageRoll = null,
+  damageType = "",
+  attackRoll = null,
+  defensePromptResult = null
+} = {}) {
+  const damageAmount = getAppliedDamageRollTotal(damageRoll);
+  if (!damageRoll || damageAmount <= 0) {
+    return {
+      active: true,
+      confirmed: true,
+      domeResult: { handled: true, applied: false, reason: "noDamageRolled", penetration: 0 },
+      penetration: 0,
+      continueAttack: false
+    };
+  }
+
+  const domeResult = await requestManifestDomeAbsorptionForTarget({
+    target,
+    damage: damageAmount,
+    damageType
+  });
+  const confirmed = isConfirmedManifestDomeResult(domeResult);
+  return {
+    active: true,
+    confirmed,
+    domeResult,
+    penetration: confirmed ? Math.max(0, Number(domeResult.penetration)) : 0,
+    continueAttack: shouldContinueAfterManifestDome({ attackRoll, defensePromptResult, domeResult })
+  };
+}
+
+async function publishDomeDamageRoll(damageRoll, domeStage) {
+  await publishAutomatedCombatDamageRoll(damageRoll);
+  await attachDamageRollUndo(damageRoll, domeStage?.domeResult);
+}
+
+async function finalizeDamageApplication(damageRoll, domeStage, application) {
+  await publishAutomatedCombatDamageRoll(damageRoll);
+  await attachDamageRollUndo(damageRoll, application);
+  await createAutomatedDamageBarrierMessages(damageRoll, {
+    dome: domeStage?.domeResult || null,
+    resistance: application?.resistance || application?.applyResult?.resistance || null
+  });
+  if (!application || !domeStage?.active) return application;
+  return {
+    ...application,
+    undoRecords: collectRollUndoRecords(domeStage.domeResult?.undoRecords, application.undoRecords)
+  };
+}
+
+export function applyArmorChargeLocationEffects(locationRoll, resolution) {
+  if (!locationRoll) return locationRoll;
+  if (
+    resolution?.useArmorCharge
+    && resolution?.preventByLuckPenetration
+    && !locationRoll.bySkill
+    && locationRoll.isAP
+  ) {
+    return { ...locationRoll, isAP: false };
+  }
+  return locationRoll;
+}
+
+function canReuseReplayLocationRoll(locationRoll, { attackRoll, magnetismGrade = 0, armorCharge = null } = {}) {
+  if (!locationRoll?.location || locationRoll.byMageBlock || locationRoll.byShieldBlock
+    || locationRoll.byWeaponBlock || locationRoll.byAoe) return false;
+  if (locationRoll.bySkill) {
+    const mos = Number(attackRoll?.rollResult?.totalMoS) || 0;
+    return getLocationBySkillOptions(mos, { armorCharge }).some((option) => (
+      option.location === locationRoll.location
+      && !!option.isAP === !!locationRoll.isAP
+    ));
+  }
+  return (locationRoll.byMagnetism === true) === (Number(magnetismGrade) > 0);
+}
+
+function preserveDomeMagnetismGrade(locationRoll, domeMagnetismGrade) {
+  const grade = Number(domeMagnetismGrade);
+  if (!locationRoll || !(grade > 0) || Number(locationRoll.domeMagnetismGrade) > 0) return locationRoll;
+  return { ...locationRoll, domeMagnetismGrade: grade };
+}
+
+export async function resolveArmorChargeAndLocationForTarget({
   actor = null,
   attackerToken = null,
   combat = null,
   target = null,
   attackRoll = null,
   defensePromptResult = null,
-  appliedDamageType = null
+  magnetismGrade = 0,
+  domeMagnetismGrade = 0,
+  damagePreview = "",
+  damageType = "",
+  damageTypeLabel = "",
+  armorChargeResolution = null,
+  replayLocationRoll = null,
+  requestArmorCharge = requestIncomingHitResolutionForTarget,
+  resolveLocation = resolveAttackLocationForTarget
+} = {}) {
+  const resolution = armorChargeResolution || await requestArmorCharge({
+    target,
+    attackerActor: actor,
+    attackerToken,
+    combat,
+    attackRoll,
+    defensePromptResult,
+    damagePreview,
+    damageType,
+    damageTypeLabel
+  });
+  if (isChainCancelledResult(resolution)) return { chainCancelled: true, stage: "armorCharge", resolution };
+
+  const armorCharge = resolution?.useArmorCharge
+    ? {
+        grade: resolution.armorGrade,
+        bySkillPenetrationMosAdjustment: resolution.bySkillPenetrationMosAdjustment
+      }
+    : null;
+  const locationRoll = canReuseReplayLocationRoll(replayLocationRoll, { attackRoll, magnetismGrade, armorCharge })
+    ? replayLocationRoll
+    : await resolveLocation({
+        actor,
+        attackerToken,
+        combat,
+        target,
+        attackRoll,
+        defensePromptResult,
+        magnetismGrade,
+        armorCharge
+      });
+  if (isChainCancelledResult(locationRoll)) return { chainCancelled: true, stage: "location", locationRoll };
+  const resolvedLocationRoll = preserveDomeMagnetismGrade(locationRoll, domeMagnetismGrade);
+  return {
+    resolution,
+    locationRoll: applyArmorChargeLocationEffects(resolvedLocationRoll, resolution)
+  };
+}
+
+async function createDomeStoppedResolution(domeStage, damageRoll, extras = {}) {
+  await publishDomeDamageRoll(damageRoll, domeStage);
+  await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage?.domeResult || null });
+  const unavailable = domeStage?.confirmed === false;
+  return {
+    handled: !unavailable,
+    reason: unavailable ? "manifestDomeResolutionUnavailable" : undefined,
+    damageRoll,
+    dome: domeStage?.domeResult || null,
+    application: {
+      handled: !unavailable,
+      applied: false,
+      reason: unavailable
+        ? (domeStage?.domeResult?.reason || "Manifest Dome resolution was unavailable")
+        : (domeStage?.penetration > 0 ? "attackStoppedAfterDome" : "domeAbsorbedAllDamage"),
+      undoRecords: collectRollUndoRecords(domeStage?.domeResult?.undoRecords)
+    },
+    ...extras
+  };
+}
+
+export async function resolveSuccessfulAttackDamageForTarget({
+  actor = null,
+  attackerToken = null,
+  combat = null,
+  target = null,
+  attackRoll = null,
+  preDefenseRollResult = null,
+  defensePromptResult = null,
+  appliedDamageType = null,
+  reflexSaveOverride = null,
+  onSaveReplayProgress = null,
+  edgeIndividualDieReplay = null,
+  combatMods = null,
+  replayArmorChargeResolution = null,
+  replayLocationRoll = null,
+  replayShieldBlockChoice = null,
+  workflowDependencies = {}
 } = {}) {
   if (!actor || !combat || !target) {
     return null;
@@ -115,9 +290,19 @@ export async function resolveSuccessfulAttackDamageForTarget({
 
   const targetingType = getCombatTargetingType(combat);
   const targetingKey = getCombatDefenseResponseKey(targetingType);
-  if (!combat?.damage) return null;
+  if (!hasCombatDice(combat?.damage)) return null;
 
-  const mageBlockFailure = isMageDefenseDamageRedirect(attackRoll, defensePromptResult);
+  const isSmiteAttack = targetingKey === "smite";
+  const activeDome = !isSmiteAttack && targetHasActiveManifestDome(target);
+  const domeAlreadyResolved = activeDome || isSmiteAttack;
+  const attackReachesDome = activeDome && doesAttackReachManifestDome({
+    attackRoll,
+    preDefenseRollResult,
+    defensePromptResult
+  });
+  if (activeDome && !attackReachesDome) return null;
+
+  const mageBlockRedirect = isMageDefenseDamageRedirect(defensePromptResult);
   const shieldBlockFailure = isShieldDefenseDamageBlock(attackRoll, defensePromptResult);
   const weaponBlockFailure = isWeaponDefenseDamageBlock(attackRoll, defensePromptResult);
   const narrowSuccessWithoutDefense = isNarrowSuccessAttack(attackRoll)
@@ -126,14 +311,30 @@ export async function resolveSuccessfulAttackDamageForTarget({
   if (
     !attackRoll?.rollResult?.isSuccess
     && !narrowSuccessWithoutDefense
-    && !mageBlockFailure
+    && !mageBlockRedirect
     && !shieldBlockFailure
     && !weaponBlockFailure
+    && !attackReachesDome
   ) {
     return null;
   }
+  if (!isSkillTagAutoEligible(combat, "damage", {
+    success: attackRoll?.rollResult?.isSuccess === true,
+    hit: attackRoll?.rollResult?.isSuccess === true
+  })) return { handled: false, reason: "manualCondition" };
 
   const targetLabel = target?.targetName || target?.actor?.name || "";
+  const targetActor = target?.actor || null;
+  const targetTokenDocument = target?.tokenDocument || target?.token?.document || target?.token || null;
+  const damageRollKey = createEdgeIndividualValueRollKey("damage", {
+    targetRef: {
+      tokenUuid: targetTokenDocument?.uuid || null,
+      tokenId: targetTokenDocument?.id || target?.tokenId || null,
+      actorUuid: targetActor?.uuid || null,
+      actorId: targetActor?.id || null
+    }
+  });
+  const individualDamageDice = getEdgeIndividualDiceOverride(edgeIndividualDieReplay, damageRollKey);
   if (shieldBlockFailure) {
     const shieldDefense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
     const locationRoll = {
@@ -149,14 +350,35 @@ export async function resolveSuccessfulAttackDamageForTarget({
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
-      halveDamageForGlance
+      halveDamageForGlance,
+      deferChatMessage: activeDome,
+      diceOverride: individualDamageDice,
+      combatMods
     });
     const damageAmount = getAppliedDamageRollTotal(damageRoll);
     if (!damageRoll || damageAmount <= 0) {
+      await publishAutomatedCombatDamageRoll(damageRoll);
       return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, shieldBlockFailure: true };
     }
 
-    const application = await requestIncomingHitApplicationForTarget({
+    let domeStage = null;
+    let resolvedDamageAmount = damageAmount;
+    if (activeDome) {
+      domeStage = await resolveManifestDomeStage({
+        target,
+        damageRoll,
+        damageType: resolvedDamageType,
+        attackRoll,
+        defensePromptResult
+      });
+      if (!domeStage.continueAttack) {
+        return createDomeStoppedResolution(domeStage, damageRoll, { locationRoll, shieldBlockFailure: true });
+      }
+      resolvedDamageAmount = domeStage.penetration;
+      await publishDomeDamageRoll(damageRoll, domeStage);
+    }
+
+    let application = await requestIncomingHitApplicationForTarget({
       target,
       attackerActor: actor,
       attackerToken,
@@ -167,22 +389,26 @@ export async function resolveSuccessfulAttackDamageForTarget({
         useArmorCharge: false,
         appliedDamageType: resolvedDamageType
       },
-      damageAmountOverride: damageAmount,
+      damageAmountOverride: resolvedDamageAmount,
       ignoreHaltReduction: true,
+      domeAlreadyResolved,
       shieldBlock: {
+        selectedCombatId: defensePromptResult?.selectedCombatId || null,
         selectedCombatIndex: defensePromptResult?.selectedCombatIndex,
-        selectedDefense: shieldDefense,
-        braced: !!defensePromptResult?.shieldBlockBraced
+        ...(replayShieldBlockChoice === "normal" || replayShieldBlockChoice === "braced"
+          ? { replayBraceChoice: replayShieldBlockChoice }
+          : {})
       }
     });
-    await attachDamageRollUndo(damageRoll, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application);
 
     return {
-      handled: true,
+      handled: !application?.chainCancelled,
+      chainCancelled: !!application?.chainCancelled,
       shieldBlockFailure: true,
-      braced: !!defensePromptResult?.shieldBlockBraced,
       locationRoll,
       damageRoll,
+      dome: domeStage?.domeResult || null,
       application
     };
   }
@@ -195,35 +421,70 @@ export async function resolveSuccessfulAttackDamageForTarget({
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
-      halveDamageForGlance
+      halveDamageForGlance,
+      deferChatMessage: activeDome,
+      diceOverride: individualDamageDice,
+      combatMods
     });
     const damageAmount = getAppliedDamageRollTotal(damageRoll);
     if (!damageRoll || damageAmount <= 0) {
+      await publishAutomatedCombatDamageRoll(damageRoll);
       return { handled: false, reason: "noDamageRolled", damageRoll, weaponBlockFailure: true };
     }
 
-    const originalDamageAmount = damageAmount;
+    let domeStage = null;
+    let originalDamageAmount = damageAmount;
+    if (activeDome) {
+      domeStage = await resolveManifestDomeStage({
+        target,
+        damageRoll,
+        damageType: resolvedDamageType,
+        attackRoll,
+        defensePromptResult
+      });
+      if (!domeStage.continueAttack) {
+        return createDomeStoppedResolution(domeStage, damageRoll, { weaponBlockFailure: true });
+      }
+      originalDamageAmount = domeStage.penetration;
+    }
     const weaponHardness = Math.max(0, Number.parseInt(weaponDefense.hardness, 10) || 0);
     const weaponOverflowDamage = Math.max(0, originalDamageAmount - weaponHardness);
+    const weaponMagnetismGrade = getWeaponMasteryMagnetismGrade(combat, defensePromptResult);
+    const magnetismGrade = getPostDomeMagnetismGrade(
+      weaponMagnetismGrade,
+      domeStage?.domeResult
+    );
+    const domeMagnetismGrade = magnetismGrade - weaponMagnetismGrade;
     let locationRoll = createWeaponBlockLocationRoll();
 
     if (weaponOverflowDamage > 0) {
-      locationRoll = await resolveAttackLocationForTarget({
-        actor,
-        attackerToken,
-        combat,
-        target,
-        attackRoll,
-        defensePromptResult,
-        magnetismGrade: getWeaponMasteryMagnetismGrade(combat, defensePromptResult)
-      });
+      locationRoll = canReuseReplayLocationRoll(replayLocationRoll, { attackRoll, magnetismGrade })
+        ? replayLocationRoll
+        : await resolveAttackLocationForTarget({
+            actor,
+            attackerToken,
+            combat,
+            target,
+            attackRoll,
+            defensePromptResult,
+            magnetismGrade
+          });
       if (isChainCancelledResult(locationRoll)) {
+        await publishDomeDamageRoll(damageRoll, domeStage);
+        await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage?.domeResult || null });
         return { handled: false, chainCancelled: true, reason: "locationPromptClosed", damageRoll };
       }
-      if (!locationRoll) return { handled: false, reason: "locationUnavailable", damageRoll };
+      if (!locationRoll) {
+        await publishDomeDamageRoll(damageRoll, domeStage);
+        await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage?.domeResult || null });
+        return { handled: false, reason: "locationUnavailable", damageRoll };
+      }
+      locationRoll = preserveDomeMagnetismGrade(locationRoll, domeMagnetismGrade);
     }
 
-    const application = await requestIncomingHitApplicationForTarget({
+    if (activeDome) await publishDomeDamageRoll(damageRoll, domeStage);
+
+    let application = await requestIncomingHitApplicationForTarget({
       target,
       attackerActor: actor,
       attackerToken,
@@ -235,15 +496,17 @@ export async function resolveSuccessfulAttackDamageForTarget({
         appliedDamageType: resolvedDamageType
       },
       damageAmountOverride: weaponOverflowDamage,
+      domeAlreadyResolved,
       weaponBlock: {
+        selectedCombatId: defensePromptResult?.selectedCombatId || null,
         selectedCombatIndex: defensePromptResult?.selectedCombatIndex,
         selectedDefense: weaponDefense,
         originalDamageAmount,
         masteryBonus: !!weaponDefense.masteryBonus,
-        magnetismGrade: getWeaponMasteryMagnetismGrade(combat, defensePromptResult)
+        magnetismGrade
       }
     });
-    await attachDamageRollUndo(damageRoll, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application);
     await attachLocationRollWorkflowData(locationRoll, {
       application,
       target,
@@ -258,6 +521,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       weaponBlockFailure: true,
       damageRoll,
       locationRoll,
+      dome: domeStage?.domeResult || null,
       originalDamageAmount,
       weaponHardness,
       weaponOverflowDamage,
@@ -265,8 +529,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
     };
   }
 
-  if (mageBlockFailure) {
-    const mageDefense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
+  if (mageBlockRedirect) {
     const locationRoll = {
       rawText: "Mage Block Overflow",
       location: "",
@@ -281,28 +544,54 @@ export async function resolveSuccessfulAttackDamageForTarget({
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
-      halveDamageForGlance
+      halveDamageForGlance,
+      deferChatMessage: activeDome,
+      diceOverride: individualDamageDice,
+      combatMods
     });
     const damageAmount = getAppliedDamageRollTotal(damageRoll);
     if (!damageRoll || damageAmount <= 0) {
+      await publishAutomatedCombatDamageRoll(damageRoll);
       return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, mageBlockFailure: true };
     }
 
-    const absorbedByMage = Math.max(0, Number(mageDefense.hp) || 0);
-    const redirectedDamage = Math.max(0, damageAmount - absorbedByMage);
-    if (redirectedDamage <= 0) {
+    let domeStage = null;
+    let resolvedDamageAmount = damageAmount;
+    if (activeDome) {
+      domeStage = await resolveManifestDomeStage({
+        target,
+        damageRoll,
+        damageType: resolvedDamageType,
+        attackRoll,
+        defensePromptResult
+      });
+      if (!domeStage.continueAttack) {
+        return createDomeStoppedResolution(domeStage, damageRoll, { locationRoll, mageBlockFailure: true });
+      }
+      resolvedDamageAmount = domeStage.penetration;
+      await publishDomeDamageRoll(damageRoll, domeStage);
+    }
+
+    if (resolvedDamageAmount <= 0) {
+      await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage?.domeResult || null });
       return {
         handled: true,
         mageBlockFailure: true,
         locationRoll,
         damageRoll,
-        absorbedByMage,
-        redirectedDamage,
-        application: { handled: true, applied: false, reason: "mageBlockAbsorbedAllDamage" }
+        dome: domeStage?.domeResult || null,
+        absorbedByMage: 0,
+        redirectedDamage: 0,
+        application: {
+          handled: true,
+          applied: false,
+          reason: "domeAbsorbedAllDamage",
+          undoRecords: collectRollUndoRecords(domeStage?.domeResult?.undoRecords)
+        }
       };
     }
 
-    const application = await requestIncomingHitApplicationForTarget({
+    let application = await requestIncomingHitApplicationForTarget({
       target,
       attackerActor: actor,
       attackerToken,
@@ -313,17 +602,26 @@ export async function resolveSuccessfulAttackDamageForTarget({
         useArmorCharge: false,
         appliedDamageType: resolvedDamageType
       },
-      damageAmountOverride: redirectedDamage,
+      damageAmountOverride: resolvedDamageAmount,
       ignoreHaltReduction: true,
-      locationlessDamage: true
+      mageBlock: {
+        selectedCombatId: defensePromptResult?.selectedCombatId || null,
+        selectedCombatIndex: defensePromptResult?.selectedCombatIndex ?? null,
+        mageBarrierAction: defensePromptResult?.mageBarrierAction || null
+      },
+      domeAlreadyResolved: true
     });
-    await attachDamageRollUndo(damageRoll, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application);
+    const mageBlockResult = application?.mageBlockResult || application || {};
+    const absorbedByMage = Math.max(0, Number(mageBlockResult.absorbed) || 0);
+    const redirectedDamage = Math.max(0, Number(mageBlockResult.overflow) || 0);
 
     return {
       handled: true,
       mageBlockFailure: true,
       locationRoll,
       damageRoll,
+      dome: domeStage?.domeResult || null,
       absorbedByMage,
       redirectedDamage,
       application
@@ -334,26 +632,32 @@ export async function resolveSuccessfulAttackDamageForTarget({
     const areaDamageLocation = getAreaDamageHaltLocation(target?.actor || null, targetingKey);
     const locationRoll = createAreaDamageLocationRoll(targetingType, areaDamageLocation);
     const resolvedDamageType = normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt");
-    const reflexSaveResult = targetingKey === "aoe"
+    const reflexSaveResult = reflexSaveOverride || (targetingKey === "aoe"
       ? (defensePromptResult?.selection === "reflexSave" ? defensePromptResult.reflexSaveResult : null)
-      : await rollAoeReflexSaveForTarget({ target, targetingType });
+      : await rollAoeReflexSaveForTarget({ target, targetingType }));
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
       aoeReflexSaveResult: reflexSaveResult,
-      halveDamageForGlance
+      halveDamageForGlance,
+      deferChatMessage: activeDome,
+      diceOverride: individualDamageDice,
+      combatMods
     });
+    onSaveReplayProgress?.({ damageRoll, reflexSaveResult });
     if (!damageRoll || !Number.isFinite(Number(damageRoll.total)) || Number(damageRoll.total) <= 0) {
+      await publishAutomatedCombatDamageRoll(damageRoll);
       return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, reflexSaveResult, aoe: true };
     }
 
     const baseDamageAmount = Number(damageRoll.total) || 0;
-    const resolvedDamageAmount = getAppliedDamageRollTotal(damageRoll);
+    let resolvedDamageAmount = getAppliedDamageRollTotal(damageRoll);
     if (resolvedDamageAmount <= 0) {
       const reducedDamageReason = reflexSaveResult?.passed
         ? "reflexSaveReducedDamageToZero"
         : (halveDamageForGlance ? "glanceReducedDamageToZero" : "damageReducedToZero");
+      await publishAutomatedCombatDamageRoll(damageRoll);
       return {
         handled: true,
         aoe: true,
@@ -366,7 +670,29 @@ export async function resolveSuccessfulAttackDamageForTarget({
       };
     }
 
-    const application = await requestIncomingHitApplicationForTarget({
+    let domeStage = null;
+    if (activeDome) {
+      domeStage = await resolveManifestDomeStage({
+        target,
+        damageRoll,
+        damageType: resolvedDamageType,
+        attackRoll,
+        defensePromptResult
+      });
+      if (!domeStage.continueAttack) {
+        return createDomeStoppedResolution(domeStage, damageRoll, {
+          locationRoll,
+          reflexSaveResult,
+          baseDamageAmount,
+          resolvedDamageAmount,
+          aoe: true
+        });
+      }
+      resolvedDamageAmount = domeStage.penetration;
+      await publishDomeDamageRoll(damageRoll, domeStage);
+    }
+
+    let application = await requestIncomingHitApplicationForTarget({
       target,
       attackerActor: actor,
       attackerToken,
@@ -381,15 +707,18 @@ export async function resolveSuccessfulAttackDamageForTarget({
       ignoreHaltReduction: false,
       locationlessDamage: false,
       woundLocation: "Torso",
-      suppressLocationBreaks: true
+      suppressLocationBreaks: true,
+      domeAlreadyResolved
     });
-    await attachDamageRollUndo(damageRoll, application);
+    onSaveReplayProgress?.({ damageRoll, reflexSaveResult, application });
+    application = await finalizeDamageApplication(damageRoll, domeStage, application);
 
     return {
       handled: true,
       aoe: true,
       locationRoll,
       damageRoll,
+      dome: domeStage?.domeResult || null,
       reflexSaveResult,
       baseDamageAmount,
       resolvedDamageAmount,
@@ -397,42 +726,158 @@ export async function resolveSuccessfulAttackDamageForTarget({
     };
   }
 
-  const locationRoll = await resolveAttackLocationForTarget({
+  if (activeDome) {
+    let resolvedDamageType = normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt");
+    if (resolvedDamageType === "flexible") resolvedDamageType = "blunt";
+    const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+      targetLabel,
+      attackerToken,
+      appliedDamageType: resolvedDamageType,
+      halveDamageForGlance,
+      deferChatMessage: true,
+      diceOverride: individualDamageDice,
+      combatMods
+    });
+    const damageAmount = getAppliedDamageRollTotal(damageRoll);
+    if (!damageRoll || damageAmount <= 0) {
+      await publishAutomatedCombatDamageRoll(damageRoll);
+      return { handled: false, reason: "noDamageRolled", damageRoll };
+    }
+
+    const domeStage = await resolveManifestDomeStage({
+      target,
+      damageRoll,
+      damageType: resolvedDamageType,
+      attackRoll,
+      defensePromptResult
+    });
+    if (!domeStage.continueAttack) return createDomeStoppedResolution(domeStage, damageRoll);
+
+    const weaponMagnetismGrade = getWeaponMasteryMagnetismGrade(combat, defensePromptResult);
+    const magnetismGrade = getPostDomeMagnetismGrade(
+      weaponMagnetismGrade,
+      domeStage.domeResult
+    );
+    const damagePreview = getAutomatedCombatDamagePreview(actor, combat, { appliedDamageType: resolvedDamageType, combatMods });
+    const overkill = !!combat?.overkill;
+    const armorChargeLocation = await resolveArmorChargeAndLocationForTarget({
+      actor,
+      attackerToken,
+      combat,
+      target,
+      attackRoll,
+      defensePromptResult,
+      magnetismGrade,
+      domeMagnetismGrade: magnetismGrade - weaponMagnetismGrade,
+      damagePreview,
+      damageType: resolvedDamageType,
+      damageTypeLabel: getAutomatedCombatDamageTypeLabel(resolvedDamageType),
+      armorChargeResolution: replayArmorChargeResolution || (overkill ? {
+        handled: true,
+        useArmorCharge: false,
+        appliedDamageType: resolvedDamageType,
+        armorGrade: "",
+        preventByLuckPenetration: false,
+        bySkillPenetrationMosAdjustment: 0
+      } : null),
+      replayLocationRoll,
+      requestArmorCharge: workflowDependencies.requestArmorCharge || requestIncomingHitResolutionForTarget,
+      resolveLocation: workflowDependencies.resolveLocation || resolveAttackLocationForTarget
+    });
+    const { locationRoll, resolution } = armorChargeLocation || {};
+    if (isChainCancelledResult(armorChargeLocation)) {
+      await publishDomeDamageRoll(damageRoll, domeStage);
+      await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage.domeResult });
+      return {
+        handled: false,
+        chainCancelled: true,
+        reason: armorChargeLocation.stage === "armorCharge" ? "incomingHitPromptClosed" : "locationPromptClosed",
+        damageRoll,
+        dome: domeStage.domeResult,
+        resolution: armorChargeLocation.resolution || null
+      };
+    }
+    if (isChainCancelledResult(locationRoll)) {
+      await publishDomeDamageRoll(damageRoll, domeStage);
+      await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage.domeResult });
+      return { handled: false, chainCancelled: true, reason: "locationPromptClosed", damageRoll, dome: domeStage.domeResult };
+    }
+    if (!locationRoll) {
+      await publishDomeDamageRoll(damageRoll, domeStage);
+      await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage.domeResult });
+      return { handled: false, reason: "locationUnavailable", damageRoll, dome: domeStage.domeResult };
+    }
+
+    await publishDomeDamageRoll(damageRoll, domeStage);
+
+    resolvedDamageType = normalizeAppliedDamageType(resolution?.appliedDamageType || resolvedDamageType, "blunt");
+    let application = await (workflowDependencies.requestIncomingHitApplication || requestIncomingHitApplicationForTarget)({
+      target,
+      attackerActor: actor,
+      attackerToken,
+      combat,
+      damageRoll,
+      locationRoll,
+      incomingHitResolution: resolution,
+      damageAmountOverride: domeStage.penetration,
+      ignoreHaltReduction: overkill,
+      domeAlreadyResolved: true
+    });
+    application = await finalizeDamageApplication(damageRoll, domeStage, application);
+    await attachLocationRollWorkflowData(locationRoll, {
+      application,
+      target,
+      attackerActor: actor,
+      attackerToken,
+      combat,
+      defendedByReflex: doesPromptResultCountAsActiveDefense(defensePromptResult)
+    });
+
+    return {
+      handled: true,
+      locationRoll,
+      damageRoll,
+      dome: domeStage.domeResult,
+      resolution,
+      application
+    };
+  }
+
+  const damagePreview = getAutomatedCombatDamagePreview(actor, combat, { appliedDamageType, combatMods });
+  const overkill = !!combat?.overkill;
+  const armorChargeLocation = await resolveArmorChargeAndLocationForTarget({
     actor,
     attackerToken,
     combat,
     target,
     attackRoll,
     defensePromptResult,
-    magnetismGrade: getWeaponMasteryMagnetismGrade(combat, defensePromptResult, { requireMelee: true })
+    magnetismGrade: getWeaponMasteryMagnetismGrade(combat, defensePromptResult),
+    damagePreview,
+    damageType: String(appliedDamageType || combat?.damage?.type || "").trim(),
+    damageTypeLabel: getAutomatedCombatDamageTypeLabel(appliedDamageType || combat?.damage?.type),
+    armorChargeResolution: replayArmorChargeResolution || (overkill ? {
+      handled: true,
+      useArmorCharge: false,
+      appliedDamageType: normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt"),
+      armorGrade: "",
+      preventByLuckPenetration: false,
+      bySkillPenetrationMosAdjustment: 0
+    } : null),
+    replayLocationRoll,
+    requestArmorCharge: workflowDependencies.requestArmorCharge || requestIncomingHitResolutionForTarget,
+    resolveLocation: workflowDependencies.resolveLocation || resolveAttackLocationForTarget
   });
-  if (isChainCancelledResult(locationRoll)) {
-    return { handled: false, chainCancelled: true, reason: "locationPromptClosed" };
+  if (isChainCancelledResult(armorChargeLocation)) {
+    return {
+      handled: false,
+      chainCancelled: true,
+      reason: armorChargeLocation.stage === "armorCharge" ? "incomingHitPromptClosed" : "locationPromptClosed",
+      resolution: armorChargeLocation.resolution || null
+    };
   }
+  const { locationRoll, resolution } = armorChargeLocation || {};
   if (!locationRoll) return { handled: false, reason: "locationUnavailable" };
-
-  const damagePreview = getAutomatedCombatDamagePreview(actor, combat, { appliedDamageType });
-  const overkill = !!combat?.overkill;
-  const resolution = overkill
-    ? {
-        handled: true,
-        useArmorCharge: false,
-        appliedDamageType: normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt"),
-        overkill: true
-      }
-    : await requestIncomingHitResolutionForTarget({
-        target,
-        attackerActor: actor,
-        attackerToken,
-        combat,
-        locationRoll,
-        damagePreview,
-        damageType: String(appliedDamageType || combat?.damage?.type || "").trim(),
-        damageTypeLabel: getAutomatedCombatDamageTypeLabel(appliedDamageType || combat?.damage?.type)
-      });
-  if (isChainCancelledResult(resolution)) {
-    return { handled: false, chainCancelled: true, reason: "incomingHitPromptClosed", locationRoll, resolution };
-  }
 
   const resolvedDamageType = normalizeAppliedDamageType(resolution?.appliedDamageType || appliedDamageType || combat?.damage?.type, "blunt");
 
@@ -440,14 +885,16 @@ export async function resolveSuccessfulAttackDamageForTarget({
     targetLabel,
     attackerToken,
     appliedDamageType: resolvedDamageType,
-    halveDamageForGlance
+    halveDamageForGlance,
+    diceOverride: individualDamageDice,
+    combatMods
   });
   const damageAmount = getAppliedDamageRollTotal(damageRoll);
   if (!damageRoll || damageAmount <= 0) {
     return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, resolution };
   }
 
-  const application = await requestIncomingHitApplicationForTarget({
+  let application = await (workflowDependencies.requestIncomingHitApplication || requestIncomingHitApplicationForTarget)({
     target,
     attackerActor: actor,
     attackerToken,
@@ -456,9 +903,10 @@ export async function resolveSuccessfulAttackDamageForTarget({
     locationRoll,
     incomingHitResolution: resolution,
     damageAmountOverride: damageAmount,
-    ignoreHaltReduction: overkill
+    ignoreHaltReduction: overkill,
+    domeAlreadyResolved
   });
-  await attachDamageRollUndo(damageRoll, application);
+  application = await finalizeDamageApplication(damageRoll, null, application);
   await attachLocationRollWorkflowData(locationRoll, {
     application,
     target,

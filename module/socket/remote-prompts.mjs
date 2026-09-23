@@ -20,15 +20,19 @@ export const PC_SOCKET_PROMPT_DEFENSE = "promptDefense";
 export const PC_SOCKET_PROMPT_INCOMING_HIT = "promptIncomingHit";
 const PC_SOCKET_APPLY_INCOMING_HIT = "applyIncomingHit";
 const PC_SOCKET_APPLY_INCOMING_HEAL = "applyIncomingHeal";
+const PC_SOCKET_APPLY_MANIFEST_SPELL_EFFECT = "applyManifestSpellEffect";
 const PC_SOCKET_CANCEL_REMOTE_PROMPT = "cancelRemotePrompt";
 const PC_SOCKETLIB_HANDLER_PROMPT_DEFENSE = "promptDefense";
 const PC_SOCKETLIB_HANDLER_PROMPT_INCOMING_HIT = "promptIncomingHit";
 const PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HIT = "applyIncomingHit";
 const PC_SOCKETLIB_HANDLER_APPLY_INCOMING_HEAL = "applyIncomingHeal";
+const PC_SOCKETLIB_HANDLER_APPLY_MANIFEST_SPELL_EFFECT = "applyManifestSpellEffect";
+const PC_SOCKETLIB_HANDLER_ABSORB_MANIFEST_DOME = "absorbManifestDome";
 const PC_SOCKETLIB_HANDLER_CANCEL_REMOTE_PROMPT = "cancelRemotePrompt";
 const PC_SOCKETLIB_HANDLER_REQUEST_SEIZE_TURN = "requestSeizeTurn";
 const PC_SOCKETLIB_HANDLER_REQUEST_END_TURN = "requestEndTurn";
 const PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL = "requestEdgeLocationRoll";
+const PC_SOCKETLIB_HANDLER_APPLY_SKILL_EFFECT_OFFER = "applySkillEffectOffer";
 const _pcPendingSeizeRequests = new Map();
 const _pcPendingEndTurnRequests = new Map();
 const _pcPendingEdgeLocationRollRequests = new Map();
@@ -98,6 +102,26 @@ function _initializePeasantSocketlib() {
         if (typeof handler === "function") return await handler(payload);
         return false;
       });
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_APPLY_MANIFEST_SPELL_EFFECT, async (payload = {}) => {
+        pcLog.debug("Peasant Core | socketlib Manifest Spell Effect apply received", {
+          recipient: game.user?.name,
+          target: payload.targetName || payload.targetActorId,
+          manifestType: payload.manifestType
+        });
+        const handler = _getPeasantCoreApiFunction("applyManifestSpellEffect");
+        if (typeof handler === "function") return await handler(payload);
+        return false;
+      });
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_ABSORB_MANIFEST_DOME, async (payload = {}) => {
+        pcLog.debug("Peasant Core | socketlib Manifest Dome absorption received", {
+          recipient: game.user?.name,
+          target: payload.targetName || payload.targetActorId,
+          damage: payload.damage
+        });
+        const handler = _getPeasantCoreApiFunction("absorbManifestDome");
+        if (typeof handler === "function") return await handler(payload);
+        return false;
+      });
       _pcSocketlib.register(PC_SOCKETLIB_HANDLER_CANCEL_REMOTE_PROMPT, async (payload = {}) => {
         pcLog.debug("Peasant Core | socketlib remote prompt cancel received", {
           recipient: game.user?.name,
@@ -137,6 +161,18 @@ function _initializePeasantSocketlib() {
           messageId: payload.messageId
         });
         return _handleEdgeLocationRollRequest(payload);
+      });
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_APPLY_SKILL_EFFECT_OFFER, async function (payload = {}) {
+        if (!game.user?.isGM) return { ok: false, error: "A GM must process this effect offer." };
+        const requesterUserId = this?.socketdata?.userId;
+        if (!requesterUserId) return { ok: false, error: "The effect-offer requester could not be verified." };
+        const message = game.messages?.get?.(payload.messageId);
+        const { applySkillEffectOffer } = await import("../applications/combat/skill-entry-effects.mjs");
+        return applySkillEffectOffer({
+          message,
+          operationId: payload.operationId,
+          requesterUserId
+        });
       });
       pcLog.debug("Peasant Core | socketlib defense prompt handler registered.");
     } catch (err) {
@@ -310,6 +346,71 @@ async function _applyIncomingHealForUser(userId, payload = {}) {
   return false;
 }
 
+async function _applyManifestSpellEffectForUser(userId, payload = {}) {
+  if (!userId) return false;
+
+  if (userId === game.user?.id) {
+    const handler = _getPeasantCoreApiFunction("applyManifestSpellEffect");
+    if (typeof handler === "function") return await handler(payload);
+    return false;
+  }
+
+  if (_pcSocketlib?.executeAsUser) {
+    try {
+      const result = await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_APPLY_MANIFEST_SPELL_EFFECT, userId, payload);
+      pcLog.debug("Peasant Core | socketlib Manifest Spell Effect apply sent", {
+        recipientUserId: userId,
+        target: payload.targetName || payload.targetActorId,
+        manifestType: payload.manifestType
+      });
+      return result;
+    } catch (err) {
+      console.warn("Peasant Core | socketlib Manifest Spell Effect apply failed, falling back to raw socket", err);
+    }
+  }
+
+  if (game?.socket) {
+    game.socket.emit(PC_SOCKET_NAMESPACE, {
+      ...payload,
+      type: PC_SOCKET_APPLY_MANIFEST_SPELL_EFFECT,
+      recipientUserId: userId
+    });
+    return { handled: false, deferred: true, applied: false };
+  }
+
+  return false;
+}
+
+async function _absorbManifestDomeForUser(userId, payload = {}) {
+  if (!userId) return false;
+
+  if (userId === game.user?.id) {
+    const handler = _getPeasantCoreApiFunction("absorbManifestDome");
+    if (typeof handler === "function") return await handler(payload);
+    return false;
+  }
+
+  if (_pcSocketlib?.executeAsUser) {
+    try {
+      const result = await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_ABSORB_MANIFEST_DOME, userId, payload);
+      pcLog.debug("Peasant Core | socketlib Manifest Dome absorption sent", {
+        recipientUserId: userId,
+        target: payload.targetName || payload.targetActorId,
+        damage: payload.damage
+      });
+      return result;
+    } catch (err) {
+      console.warn("Peasant Core | socketlib Manifest Dome absorption failed, falling back to raw socket", err);
+    }
+  }
+
+  return {
+    handled: false,
+    applied: false,
+    reason: "Correlated socket response unavailable"
+  };
+}
+
 async function _cancelRemotePromptForUser(userId, payload = {}) {
   if (!userId || !payload?.promptId) return false;
 
@@ -355,8 +456,12 @@ export function initializePeasantSockets() {
     requestIncomingHitForUser: _requestIncomingHitForUser,
     applyIncomingHitForUser: _applyIncomingHitForUser,
     applyIncomingHealForUser: _applyIncomingHealForUser,
+    applyManifestSpellEffectForUser: _applyManifestSpellEffectForUser,
+    absorbManifestDomeForUser: _absorbManifestDomeForUser,
     requestEndTurnFromGM,
     requestEdgeLocationRollFromGM,
+    requestEdgeSaveCheckRollFromGM,
+    requestStressRollFromGM,
     cancelPromptForUser: _cancelRemotePromptForUser
   });
 
@@ -616,8 +721,14 @@ async function _handleEndTurnRequest(payload = {}) {
 }
 
 async function _handleEdgeLocationRollRequest(payload = {}) {
+  const saveCheck = payload.edgeRollMode === "saveCheck";
+  const stress = payload.edgeRollMode === "stress";
+  const fallBlessing = payload.edgeRollMode === "fallBlessing";
+  const label = stress
+    ? _getStressRollLabel(payload)
+    : (saveCheck ? _getEdgeSaveCheckLabel(payload) : (fallBlessing ? "Blessing of Fall" : "Edge Location Roll"));
   if (!game.user?.isGM) {
-    return { ok: false, error: "Only an active GM can process Edge Location Roll requests." };
+    return { ok: false, error: `Only an active GM can process ${label} requests.` };
   }
 
   const requester = game.users?.get(payload.requesterUserId || payload.userId);
@@ -625,15 +736,96 @@ async function _handleEdgeLocationRollRequest(payload = {}) {
     return { ok: false, error: "Requesting user was not found." };
   }
 
-  const handler = _getPeasantCoreApiFunction("applyEdgeLocationRoll");
+  if (saveCheck) {
+    const flag = game.messages?.get(payload.messageId)?.getFlag?.("peasant-core", "edgeChain");
+    if (!["save", "check"].includes(flag?.kind) || typeof payload.individual !== "boolean") {
+      return { ok: false, error: `This roll cannot use ${label}.` };
+    }
+  }
+  if (stress) {
+    const message = game.messages?.get(payload.messageId);
+    const stressFlag = message?.getFlag?.("peasant-core", "stressRoll");
+    const checkpoint = message?.getFlag?.("peasant-core", "edgeIndividualDie")?.checkpoint;
+    if (
+      stressFlag?.status !== "available"
+      || !["save", "check"].includes(stressFlag?.kind)
+      || checkpoint?.version !== 2
+      || checkpoint?.type !== "notableCombatPostRoll"
+      || checkpoint?.stage !== "save"
+    ) {
+      return { ok: false, error: `This roll cannot use ${label}.` };
+    }
+  }
+  if (fallBlessing) {
+    const message = game.messages?.get(payload.messageId);
+    const chainFlag = message?.getFlag?.("peasant-core", "edgeChain");
+    const rollFlag = message?.getFlag?.("peasant-core", "edgeIndividualDie");
+    const rerun = chainFlag?.rerun || {};
+    const skillKinds = ["skill", "untrainedSkill"].includes(chainFlag?.kind)
+      && ["skillRoll", "untrainedSkillRoll", "actorSkillRoll", "actorAttributeSkillRoll", "peasantEntryUse"].includes(rerun.type);
+    const combatKinds = ["attack", "defense", "heal"].includes(chainFlag?.kind)
+      && (rerun.type === "notableCombat" || (rerun.type === "peasantEntryUse" && rerun.usageContext?.resolution === "targeted"));
+    const actorId = String(rerun.actorId || rerun.speaker?.actor || "").trim();
+    let actor = actorId ? game.actors?.get(actorId) || null : null;
+    if (!actor && rerun.actorUuid && typeof fromUuid === "function") {
+      try { actor = await fromUuid(rerun.actorUuid); } catch (_) {}
+    }
+    if (
+      !message
+      || chainFlag?.status !== "current"
+      || chainFlag?.processing
+      || chainFlag?.fallAccuracyApplied
+      || (!skillKinds && !combatKinds)
+      || rollFlag?.status !== "current"
+      || rollFlag?.processing
+      || rollFlag?.kind !== "skill"
+      || (rollFlag?.chainId && chainFlag?.chainId && rollFlag.chainId !== chainFlag.chainId)
+      || message.getFlag?.("peasant-core", "stressRoll")?.processing
+      || message.getFlag?.("peasant-core", "rollUndo")?.status === "undone"
+      || !actor
+      || String(actor.system?.blessing?.type || "").trim().toLowerCase() !== "fall"
+      || !Number.isSafeInteger(payload.usesSpent)
+      || payload.usesSpent < 1
+      || payload.usesSpent > Number(actor.system?.fallBlessingUses?.value || 0)
+      || (payload.actorId && payload.actorId !== actor.id)
+      || (payload.actorUuid && payload.actorUuid !== actor.uuid)
+    ) {
+      return { ok: false, error: `This roll cannot use ${label}.` };
+    }
+    if (!requester.isGM) {
+      try {
+        if (typeof actor.canUserModify !== "function" || !actor.canUserModify(requester, "update")) {
+          return { ok: false, error: `You do not own ${actor.name || "that actor"}.` };
+        }
+      } catch (_) {
+        return { ok: false, error: `You do not own ${actor.name || "that actor"}.` };
+      }
+    }
+  }
+  const handler = _getPeasantCoreApiFunction(stress
+    ? "applyStressRoll"
+    : (saveCheck
+      ? (payload.individual ? "applyEdgeIndividualDieRoll" : "applyEdgeChainRoll")
+      : (fallBlessing ? "applyFallBlessingAccuracy" : "applyEdgeLocationRoll")));
   if (typeof handler !== "function") {
-    return { ok: false, error: "Edge Location Roll workflow is unavailable." };
+    return { ok: false, error: `${label} workflow is unavailable.` };
   }
 
-  return await handler({
+  const result = await handler({
     ...payload,
     requesterUserId: requester.id
   });
+  if (!saveCheck && !stress && !fallBlessing) return result;
+  return {
+    ok: !!result?.ok,
+    error: result?.error ? String(result.error) : null,
+    messageId: result?.messageId || null,
+    summaryMessageId: result?.summaryMessageId || null,
+    ...(fallBlessing ? {
+      usesSpent: Number.isSafeInteger(result?.usesSpent) ? result.usesSpent : null,
+      accuracyBonus: Number.isSafeInteger(result?.accuracyBonus) ? result.accuracyBonus : null
+    } : {})
+  };
 }
 
 export async function requestSeizeTurnFromGM(combat, combatantId, phase) {
@@ -770,10 +962,55 @@ export async function requestEndTurnFromGM(combat) {
   });
 }
 
+function _getEdgeSaveCheckLabel(payload) {
+  if (payload.individual === true) return "Edge Individual Die";
+  const flag = game.messages?.get(payload.messageId)?.getFlag?.("peasant-core", "edgeChain");
+  return flag?.kind === "check" ? "Edge Entire Check" : "Edge Entire Save";
+}
+
+function _getStressRollLabel(payload) {
+  const flag = game.messages?.get(payload.messageId)?.getFlag?.("peasant-core", "stressRoll");
+  return flag?.kind === "check" ? "Stress Check" : "Stress Save";
+}
+
+export async function requestEdgeSaveCheckRollFromGM(payload = {}) {
+  return requestEdgeLocationRollFromGM({ ...payload, edgeRollMode: "saveCheck" });
+}
+
+export async function requestSkillEffectOfferApplication({ messageId, operationId } = {}) {
+  const message = game.messages?.get?.(messageId);
+  if (!message || !operationId) return { ok: false, error: "The effect offer is unavailable." };
+  const payload = { messageId, operationId };
+  if (!game.user?.isGM && _getPreferredActiveGM()) {
+    if (!_pcSocketlib?.executeAsGM) return { ok: false, error: "The GM effect-offer route is unavailable." };
+    try {
+      const result = await _pcSocketlib.executeAsGM(PC_SOCKETLIB_HANDLER_APPLY_SKILL_EFFECT_OFFER, payload);
+      return result && typeof result === "object" && "ok" in result
+        ? result
+        : { ok: false, error: "The GM did not return an effect-offer result." };
+    } catch (error) {
+      return { ok: false, error: error?.message || "The GM could not apply the effect offer." };
+    }
+  }
+  const { applySkillEffectOffer } = await import("../applications/combat/skill-entry-effects.mjs");
+  return applySkillEffectOffer({ message, operationId, requesterUserId: game.user?.id });
+}
+
+export async function requestStressRollFromGM(payload = {}) {
+  return requestEdgeLocationRollFromGM({ ...payload, edgeRollMode: "stress" });
+}
+
 export async function requestEdgeLocationRollFromGM(payload = {}) {
+  const saveCheck = payload.edgeRollMode === "saveCheck";
+  const stress = payload.edgeRollMode === "stress";
+  const fallBlessing = payload.edgeRollMode === "fallBlessing";
+  const extendedResult = saveCheck || stress || fallBlessing;
+  const label = stress
+    ? _getStressRollLabel(payload)
+    : (saveCheck ? _getEdgeSaveCheckLabel(payload) : (fallBlessing ? "Blessing of Fall" : "Edge Location Roll"));
   const gm = _getPreferredActiveGM();
   if (!gm) {
-    return { ok: false, error: "A GM must be online to process Edge Location Roll." };
+    return { ok: false, error: `A GM must be online to process ${label}.` };
   }
 
   const requestId = payload.requestId || foundry.utils.randomID();
@@ -791,9 +1028,12 @@ export async function requestEdgeLocationRollFromGM(payload = {}) {
         ? await _pcSocketlib.executeAsGM(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, requestPayload)
         : await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, gm.id, requestPayload);
       if (result && typeof result === "object" && "ok" in result) return result;
+      if (extendedResult) return { ok: false, error: `${label} did not return a result.` };
       if (result !== false && result != null) return { ok: true, result };
       console.warn("Peasant Core | socketlib Edge Location Roll request was not handled, falling back to raw socket");
     } catch (err) {
+      // The GM may already have spent Edge or Stress; never repeat an extended request after an uncertain response.
+      if (extendedResult) return { ok: false, error: err?.message || `${label} failed.` };
       console.warn("Peasant Core | socketlib Edge Location Roll request failed, falling back to raw socket", err);
     }
   }
@@ -801,15 +1041,15 @@ export async function requestEdgeLocationRollFromGM(payload = {}) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       _pcPendingEdgeLocationRollRequests.delete(requestId);
-      reject(new Error("Timed out waiting for GM Edge Location Roll response."));
-    }, 10000);
+      reject(new Error(`Timed out waiting for GM ${label} response.`));
+    }, extendedResult ? 300000 : 10000);
 
-    _pcPendingEdgeLocationRollRequests.set(requestId, { resolve, reject, timeout });
+    _pcPendingEdgeLocationRollRequests.set(requestId, { resolve, reject, timeout, saveCheck: extendedResult });
     pcLog.debug(`Peasant Core | Sending Edge Location Roll request ${requestId} for message ${requestPayload.messageId || ""}`);
     game.socket.emit(PC_SOCKET_NAMESPACE, requestPayload);
   }).catch(err => {
     console.warn("Peasant Core | Edge Location Roll request failed", err);
-    return { ok: false, error: err?.message || "Failed to process Edge Location Roll." };
+    return { ok: false, error: err?.message || `Failed to process ${label}.` };
   });
 }
 
@@ -953,6 +1193,36 @@ export function registerPeasantSocketHandler() {
         return;
       }
 
+      if (payload.type === PC_SOCKET_APPLY_MANIFEST_SPELL_EFFECT) {
+        if (payload.recipientUserId && payload.recipientUserId !== game.user?.id) return;
+
+        const { tokenDocument, actor } = await _resolveDefensePromptTarget(payload);
+        if (!actor) return;
+
+        const recipient = payload.recipientUserId
+          ? game.users?.get(payload.recipientUserId) || null
+          : _getPreferredDefensePromptRecipient(actor, tokenDocument);
+        if (!recipient || recipient.id !== game.user?.id) return;
+
+        pcLog.debug("Peasant Core | Received Manifest Spell Effect apply", {
+          recipient: game.user?.name,
+          target: tokenDocument?.name || actor?.name,
+          manifestType: payload.manifestType
+        });
+
+        const handler = _getPeasantCoreApiFunction("applyManifestSpellEffect");
+        if (typeof handler === "function") {
+          await handler({
+            ...payload,
+            targetActorId: actor.id,
+            targetActorUuid: actor.uuid,
+            targetTokenUuid: tokenDocument?.uuid || payload.targetTokenUuid || null,
+            targetName: tokenDocument?.name || payload.targetName || actor.name || "Target"
+          });
+        }
+        return;
+      }
+
       if (payload.type === PC_SOCKET_CANCEL_REMOTE_PROMPT) {
         if (payload.recipientUserId && payload.recipientUserId !== game.user?.id) return;
 
@@ -1027,7 +1297,9 @@ export function registerPeasantSocketHandler() {
           ok: !!payload.ok,
           error: payload.error || null,
           messageId: payload.messageId || null,
-          replacementMessageId: payload.replacementMessageId || null
+          ...(pending.saveCheck
+            ? { summaryMessageId: payload.summaryMessageId || null }
+            : { replacementMessageId: payload.replacementMessageId || null })
         });
         return;
       }
@@ -1080,7 +1352,7 @@ export function registerPeasantSocketHandler() {
           error: err?.message || (payload.type === PC_SOCKET_REQUEST_END_TURN
             ? "GM failed to process end-turn request."
             : (payload.type === PC_SOCKET_REQUEST_EDGE_LOCATION_ROLL
-              ? "GM failed to process Edge Location Roll request."
+              ? `GM failed to process ${payload.edgeRollMode === "stress" ? _getStressRollLabel(payload) : (payload.edgeRollMode === "saveCheck" ? _getEdgeSaveCheckLabel(payload) : "Edge Location Roll")} request.`
               : "GM failed to process seize request."))
         });
       }

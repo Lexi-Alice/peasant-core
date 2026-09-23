@@ -11,6 +11,8 @@ export const COMBAT_VIEW_TAG_TYPES = Object.freeze([
   "magnetism",
   "heal",
   "manifest",
+  "manifestDome",
+  "manifestResistance",
   "tagUses",
   "sections",
   "targetingType",
@@ -34,6 +36,8 @@ export const COMBAT_EDITOR_TAG_TYPES = Object.freeze([
   "magnetism",
   "heal",
   "manifest",
+  "manifestDome",
+  "manifestResistance",
   "tagUses",
   "sections",
   "targetingType",
@@ -59,6 +63,8 @@ export const COMBAT_FULL_TAG_ORDER = Object.freeze([
   "magnetism",
   "heal",
   "manifest",
+  "manifestDome",
+  "manifestResistance",
   "tagUses",
   "sections",
   "targetingType",
@@ -134,9 +140,10 @@ export function getCombatMagnetismGrade(combatData) {
 }
 
 export function normalizeCustomTagEntry(entry) {
+  const id = String(entry?.id ?? "").trim();
   const name = String(entry?.name ?? "").trim();
   const value = String(entry?.value ?? "").trim();
-  return { name, value };
+  return id ? { id, name, value } : { name, value };
 }
 
 export function getCombatCustomTags(combatData) {

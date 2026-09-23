@@ -930,29 +930,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.pc-settings-add-tag {
-    --button-size: 22px;
-    width: var(--button-size) !important;
-    min-width: var(--button-size) !important;
-    height: var(--button-size) !important;
-    min-height: var(--button-size) !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    align-self: flex-end !important;
-    flex: 0 0 auto !important;
-    font-size: var(--font-size-14) !important;
-    font-weight: 700 !important;
-    line-height: 1 !important;
-    background: var(--button-background-color, rgba(20, 18, 16, 0.65)) !important;
-    border: 1px solid var(--button-border-color, #9a8462) !important;
-    color: var(--button-text-color, #e5cfaa) !important;
-    border-radius: 4px !important;
-    box-shadow: none !important;
-}
-
 .pc-settings-tag.current-tag-item.tag-hover-active {
     background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
     color: var(--button-hover-text-color, #f2dfbd) !important;
@@ -966,18 +943,14 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 
 .pc-settings-tag.current-tag-item.dragging,
 .pc-settings-tag.current-tag-item.drag-over-left,
-.pc-settings-tag.current-tag-item.drag-over-right,
-.pc-settings-tag-list.drag-over-end .pc-settings-add-tag {
+.pc-settings-tag.current-tag-item.drag-over-right {
     background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
     color: var(--button-hover-text-color, #f2dfbd) !important;
     border-color: var(--button-hover-border-color, #c9b183) !important;
 }
 
-.pc-settings-add-tag:hover,
-.pc-settings-add-tag:focus-visible {
-    background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
-    color: var(--button-hover-text-color, #f2dfbd) !important;
-    border-color: var(--button-hover-border-color, #c9b183) !important;
+.pc-settings-tag-list.drag-over-end {
+    box-shadow: inset 0 -2px 0 var(--button-hover-border-color, #c9b183);
 }
 
 .pc-settings-tag .current-tag-label {
@@ -1087,6 +1060,13 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     font-size: 15px;
     font-weight: 700;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.pc-foundry-section > legend.control,
+.pc-settings-group > legend.control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .pc-skills-tab-panel,
@@ -1472,11 +1452,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     color: #bca99a;
     font-size: 13px;
     line-height: 1.35;
-}
-
-.pc-effects-modifiers .add-combat-halt-buff {
-    min-height: 30px;
-    align-self: end;
 }
 
 @media (max-width: 860px) {
@@ -4133,7 +4108,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     text-shadow: 0 0 6px rgba(143,209,255,0.12);
 }
 
-.halt-letter:hover {
+.editable .halt-letter:hover {
     color: #fff;
 }
 
@@ -4575,7 +4550,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     justify-self: center;
     width: 66px;
     min-width: 60px;
-    color: #f4ead5;
+    color: var(--color-light-2, #f4ead5);
     text-align: center;
 }
 
@@ -4591,7 +4566,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none;
-    color: var(--pc-hex-gold);
+    color: var(--button-text-color, var(--color-light-3, #e7d1b1));
     cursor: pointer;
     font-size: 11px;
     font-weight: 900;
@@ -4599,21 +4574,21 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     line-height: 1;
     text-align: center;
     text-transform: uppercase;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+    text-shadow: none;
     appearance: none;
     -webkit-appearance: none;
 }
 
 .pc-hex-attributes .attr-label.pc-attr-hex-name:hover,
 .pc-hex-attributes .attr-label.pc-attr-hex-name:focus-visible {
-    color: #fff4cf;
-    text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.95),
-        0 0 7px rgba(222, 123, 42, 0.42);
+    color: var(--button-hover-text-color, var(--color-light-1, #ffffff));
+    text-shadow: none;
     outline: none;
 }
 
 .pc-attr-hex-frame {
+    --pc-hex-input-focus-outline: var(--input-focus-outline-color, var(--color-cool-3, #584a75));
+    --pc-hex-input-focus-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 62 52' preserveAspectRatio='none'%3E%3Cpolygon points='16 2 46 2 60 26 46 50 16 50 2 26' fill='none' stroke='black' stroke-width='2' stroke-linejoin='miter'/%3E%3C/svg%3E");
     position: relative;
     z-index: 1;
     display: flex;
@@ -4622,24 +4597,34 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     width: 62px;
     height: 52px;
     padding: 2px;
-    background: linear-gradient(180deg, rgba(80, 88, 107, 0.98), rgba(49, 55, 70, 0.98));
+    background: var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
     clip-path: polygon(24% 0, 76% 0, 100% 50%, 76% 100%, 24% 100%, 0 50%);
-    filter:
-        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7))
-        drop-shadow(0 0 0 rgba(222, 123, 42, 0));
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
     transition: filter 140ms ease, background 140ms ease;
 }
 
-.pc-attr-hex-card:hover .pc-attr-hex-frame,
-.pc-attr-hex-card:focus-within .pc-attr-hex-frame {
-    background: linear-gradient(180deg, rgba(114, 105, 82, 0.96), rgba(54, 57, 68, 0.98));
-    filter:
-        drop-shadow(0 2px 5px rgba(0, 0, 0, 0.74))
-        drop-shadow(0 0 6px rgba(222, 123, 42, 0.26));
+.pc-attr-hex-frame::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    background: var(--pc-hex-input-focus-outline);
+    -webkit-mask: var(--pc-hex-input-focus-mask) center / 100% 100% no-repeat;
+    mask: var(--pc-hex-input-focus-mask) center / 100% 100% no-repeat;
+    transition: opacity 120ms ease;
+}
+
+.pc-attr-hex-card:focus-within .pc-attr-hex-frame::after {
+    opacity: 1;
 }
 
 .pc-attr-hex-score,
 .pc-hex-attributes .pc-attr-hex-score-input {
+    --pc-foundry-input-focus-outline: transparent;
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4650,32 +4635,22 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     padding: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.08)),
-        var(--pc-hex-face) !important;
-    box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.48) !important;
+    background: var(--input-background-color, var(--pc-sheet-surface)) !important;
+    box-shadow: none !important;
     clip-path: polygon(24% 0, 76% 0, 100% 50%, 76% 100%, 24% 100%, 0 50%);
-    color: #f7f1e4 !important;
+    color: var(--input-text-color, var(--color-light-1, #f7f1e4)) !important;
     font-size: 20px;
     font-weight: 900;
     line-height: 1;
     text-align: center;
-    text-shadow:
-        0 2px 3px rgba(0, 0, 0, 0.95),
-        0 0 5px rgba(255, 255, 255, 0.18);
+    text-shadow: none;
     appearance: textfield;
     -moz-appearance: textfield;
 }
 
-.pc-hex-attributes .pc-attr-hex-score-input:focus,
-.pc-hex-attributes .pc-attr-hex-score-input:hover {
-    background:
-        linear-gradient(180deg, rgba(255, 244, 207, 0.08), rgba(0, 0, 0, 0.08)),
-        var(--pc-hex-face) !important;
-    box-shadow:
-        inset 0 0 14px rgba(0, 0, 0, 0.48),
-        inset 0 0 9px var(--pc-foundry-input-focus-shadow),
-        0 0 4px var(--pc-foundry-input-focus-shadow) !important;
+.pc-hex-attributes .pc-attr-hex-score-input:focus {
+    background: var(--input-focus-background-color, var(--input-background-color, var(--pc-sheet-surface))) !important;
+    box-shadow: none !important;
     outline: none;
 }
 
@@ -4695,17 +4670,17 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     min-height: 20px;
     margin: -10px 0 0;
     padding: 2px 7px;
-    border: 1px solid rgba(203, 191, 154, 0.68);
+    border: 1px solid var(--button-border-color, var(--pc-accent-border, #9f8475));
     border-radius: 999px;
-    background: var(--pc-sheet-surface);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.68);
-    color: #efe7d2;
+    background: rgba(11, 10, 19, 0.94);
+    box-shadow: none;
+    color: var(--button-text-color, var(--color-light-3, #efe7d2));
     cursor: pointer;
     font-size: 11px;
     font-weight: 900;
     line-height: 1;
     text-align: center;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+    text-shadow: none;
     appearance: none;
     -webkit-appearance: none;
 }
@@ -4714,10 +4689,8 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .pc-hex-attributes .attr-calculated.pc-attr-save-pill:focus-visible {
     border-color: var(--button-hover-border-color, #c9b183);
     background: var(--button-hover-background-color, rgba(46, 38, 28, 0.92));
-    color: #ffffff;
-    box-shadow:
-        0 0 0 1px rgba(255, 244, 207, 0.08),
-        0 0 7px rgba(222, 123, 42, 0.38);
+    color: var(--button-hover-text-color, #ffffff);
+    box-shadow: none;
     outline: none;
 }
 
@@ -4789,33 +4762,41 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     padding: 4px 6px 5px;
     border: 0;
     border-radius: 0;
-    background: linear-gradient(180deg, rgba(80, 88, 107, 0.98), rgba(49, 55, 70, 0.98));
+    background: var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
     clip-path: polygon(24% 0, 76% 0, 100% 50%, 76% 100%, 24% 100%, 0 50%);
-    box-shadow:
-        inset 0 0 0 1px rgba(255, 244, 207, 0.04),
-        0 3px 7px rgba(0, 0, 0, 0.5);
-    color: #f3ead4;
+    box-shadow: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+    color: var(--color-light-2, #f3ead4);
     text-align: center;
+    transition: filter 140ms ease, background 140ms ease;
 }
 
 .pc-hex-characteristic-row .pc-characteristic-card { grid-column: auto; }
+
+.pc-characteristic-card:hover,
+.pc-characteristic-card:focus-within {
+    background: var(--button-hover-border-color, var(--color-light-3, #f2dfbd));
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
+}
 
 .pc-characteristic-card::before {
     content: "";
     position: absolute;
     inset: 2px;
     z-index: 0;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.08)),
-        var(--pc-hex-face);
+    background: var(--input-background-color, var(--pc-sheet-surface));
     clip-path: polygon(24% 0, 76% 0, 100% 50%, 76% 100%, 24% 100%, 0 50%);
+    transition: background 140ms ease;
+}
+
+.pc-characteristic-card:hover::before,
+.pc-characteristic-card:focus-within::before {
+    background: var(--button-hover-background-color, var(--color-warm-2, #c9593f));
 }
 
 .pc-characteristic-card.blessed {
-    background: linear-gradient(180deg, rgba(113, 134, 151, 0.98), rgba(47, 63, 82, 0.98));
-    box-shadow:
-        inset 0 0 0 1px rgba(120, 190, 255, 0.12),
-        0 0 8px rgba(120, 190, 255, 0.28);
+    background: var(--button-hover-border-color, var(--pc-accent-border, #9f8475));
+    box-shadow: none;
 }
 
 .pc-characteristic-name {
@@ -4824,13 +4805,13 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     align-items: center;
     justify-content: center;
     min-height: 14px;
-    color: var(--pc-hex-gold);
+    color: var(--button-text-color, var(--color-light-3, #e7d1b1));
     font-size: 10px;
     font-weight: 900;
     letter-spacing: 0.04em;
     line-height: 1;
     text-transform: uppercase;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+    text-shadow: none;
 }
 
 .pc-hex-attributes .pc-characteristic-tohit {
@@ -4846,25 +4827,23 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: #ffffff;
+    color: var(--input-text-color, var(--color-light-1, #ffffff));
     cursor: pointer;
     font-size: 15px;
     font-weight: 900;
     line-height: 18px;
     text-align: center;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+    text-shadow: none;
     appearance: none;
     -webkit-appearance: none;
 }
 
 .pc-hex-attributes .pc-characteristic-tohit:hover,
 .pc-hex-attributes .pc-characteristic-tohit:focus-visible {
-    color: #fff4cf;
+    color: var(--button-hover-text-color, var(--color-light-1, #ffffff));
     background: transparent;
     box-shadow: none;
-    text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.95),
-        0 0 7px rgba(222, 123, 42, 0.45);
+    text-shadow: none;
     outline: none;
 }
 
@@ -5535,28 +5514,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     color: #ff8080 !important;
 }
 
-.add-skill-btn {
-    background: #2a5a2a;
-    color: #ffffff;
-    border: 1px solid #3a6a3a;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-    font-weight: bold;
-    font-size: 13px;
-    width: 100%;
-    transition: background 0.3s;
-}
-
-.add-skill-btn:hover {
-    background: #3a7a3a;
-}
-
-.add-skill-btn:active {
-    background: #1a4a1a;
-}
-
 /* Flexible Advantages Section */
 .advantages-title {
     color: #e0e0e0;
@@ -5673,28 +5630,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 .advantage-delete:hover {
     background: #5a3a3a;
     color: #ff8080;
-}
-
-.add-advantage-btn {
-    background: #2a5a2a;
-    color: #ffffff;
-    border: 1px solid #3a6a3a;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    --button-size: 20px;
-    font-weight: bold;
-    font-size: 13px;
-    width: 100%;
-    transition: background 0.3s;
-}
-
-.add-advantage-btn:hover {
-    background: #3a7a3a;
-}
-
-.add-advantage-btn:active {
-    background: #1a4a1a;
 }
 
 /* Hide the advantage drag placeholder - only use CSS classes for feedback */
@@ -6214,7 +6149,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 }
 
 .pc-inventory-menu-toggle.header-control:hover,
-.pc-inventory-menu-toggle.header-control:focus,
+.pc-inventory-menu-toggle.header-control:focus-visible,
 .pc-inventory-menu-toggle.header-control.context {
     background: var(--button-hover-background-color);
     border-color: var(--button-hover-border-color);
@@ -6343,6 +6278,11 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
   min-height: 0 !important;
   padding: 12px !important;
   overflow: hidden !important;
+}
+
+/* Keep Foundry's standard-form spacing inside the editor, not between the window header and content. */
+.pc-notable-combat-tag-editor.standard-form {
+  gap: 0;
 }
 
 .pc-notable-combat-tag-editor-body {
@@ -6666,11 +6606,40 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     line-height: 1.2 !important;
 }
 
+#chat-log .message .message-header .message-sender.pc-chat-message-sender-with-image,
+.chat-message .message-header .message-sender.pc-chat-message-sender-with-image {
+    position: relative !important;
+    padding-left: 32px !important;
+}
+
+#chat-log .message .message-header .pc-chat-speaker-image,
+.chat-message .message-header .pc-chat-speaker-image {
+    position: absolute;
+    top: -4px;
+    left: 0;
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    object-fit: cover;
+    cursor: pointer;
+    pointer-events: auto;
+    border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.34);
+}
+
 #chat-log .message .message-header .message-metadata,
 .chat-message .message-header .message-metadata {
     justify-self: end !important;
     white-space: nowrap !important;
     margin-left: 0 !important;
+}
+
+#chat-log .message .message-header .pc-chosen-location-flavor,
+.chat-message .message-header .pc-chosen-location-flavor {
+    display: block;
+    position: relative;
+    top: 4px;
 }
 
 #chat-log .message .message-content,
@@ -6734,6 +6703,74 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
     white-space: normal !important;
     overflow: visible !important;
     overflow-wrap: anywhere !important;
+}
+
+#chat-log .message .pc-skill-effect-offer-list,
+.chat-message .pc-skill-effect-offer-list {
+    display: grid;
+    gap: 6px;
+}
+
+#chat-log .message .pc-skill-effect-offer-list p,
+.chat-message .pc-skill-effect-offer-list p {
+    margin: 0;
+    color: var(--color-light-3, #e7d1b1);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+#chat-log .message .pc-skill-effect-offer-button,
+.chat-message .pc-skill-effect-offer-button {
+    /* Chat and actor sheets can use different Foundry themes. Match the dark-sheet Wound button. */
+    --button-background-color: var(--color-cool-5-50) !important;
+    --button-border-color: var(--color-light-5) !important;
+    --button-text-color: var(--color-light-3) !important;
+    --button-focus-outline-color: var(--color-warm-2) !important;
+    --button-hover-background-color: var(--color-warm-2) !important;
+    --button-hover-border-color: var(--color-light-3) !important;
+    --button-hover-text-color: var(--color-light-1) !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 32px !important;
+    padding: 5px 8px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    line-height: 1.25 !important;
+}
+
+#chat-log .message .pc-skill-effect-offer-button:disabled,
+.chat-message .pc-skill-effect-offer-button:disabled {
+    --button-background-color: var(--color-cool-5) !important;
+    --button-border-color: transparent !important;
+    --button-text-color: var(--color-light-5) !important;
+    --button-hover-background-color: var(--button-background-color) !important;
+    --button-hover-border-color: var(--button-border-color) !important;
+    --button-hover-text-color: var(--button-text-color) !important;
+}
+
+#chat-log .message .skill-roll-card .pc-chat-card-primary-row,
+.chat-message .skill-roll-card .pc-chat-card-primary-row {
+    align-items: center;
+    min-width: 0;
+}
+
+#chat-log .message .skill-roll-card .pc-chat-card-primary-content,
+.chat-message .skill-roll-card .pc-chat-card-primary-content {
+    flex: 1 1 auto !important;
+    min-width: 0;
+}
+
+#chat-log .message .skill-roll-card .pc-chat-card-image,
+.chat-message .skill-roll-card .pc-chat-card-image {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    box-sizing: border-box;
+    object-fit: cover;
+    border: 1px solid var(--pc-accent-border, var(--color-light-5, #9f8475));
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.34);
 }
 
 /* Gold fieldset-style row containers (keep success/failure + value chips untouched) */
@@ -7325,27 +7362,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   color: #ff8080 !important;
 }
 
-.add-combat-btn {
-  background: #2a5a2a;
-  color: #ffffff;
-  border: 1px solid #3a6a3a;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 13px;
-  width: 100%;
-  transition: background 0.3s;
-}
-
-.add-combat-btn:hover {
-  background: #3a7a3a;
-}
-
-.add-combat-btn:active {
-  background: #1a4a1a;
-}
-
 /* Combat name with description - clickable style */
 .combat-name-view.combat-has-desc {
   font-weight: bold;
@@ -7445,7 +7461,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   font-size: 11px;
 }
 
-.add-combat-halt-buff,
 .remove-combat-halt-buff {
   --button-size: 24px;
   width: var(--button-size);
@@ -7466,9 +7481,7 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   cursor: var(--cursor-pointer);
 }
 
-.add-combat-halt-buff:hover,
 .remove-combat-halt-buff:hover,
-.add-combat-halt-buff:focus-visible,
 .remove-combat-halt-buff:focus-visible {
   background: var(--button-hover-background-color);
   border-color: var(--button-hover-border-color);
@@ -7511,6 +7524,174 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 4px;
+}
+
+/* Inventory-style notable combat list */
+.pc-notable-combat-browser {
+  overflow: visible;
+  border: 1px solid rgba(159, 132, 117, 0.26);
+  border-radius: 4px;
+  background: rgba(6, 7, 12, 0.78);
+}
+
+.pc-inventory-section-header.pc-notable-combat-section-header {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.combat-view-item.pc-notable-combat-tags-collapsed .combat-tags-inline {
+  display: none !important;
+}
+
+.notable-combats-list.pc-notable-combat-list,
+.pc-notable-combat-list {
+  display: block;
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+
+.pc-notable-combat-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-notable-combat-list .pc-notable-combat-items > .combat-view-item {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid rgba(159, 132, 117, 0.16);
+  border-radius: 0;
+  background: transparent;
+  color: #e0e0e0;
+}
+
+.pc-notable-combat-list .combat-item[data-indent] {
+  padding-left: 0;
+}
+
+.pc-notable-combat-list .combat-view-line {
+  --pc-notable-combat-tree-color: rgba(225, 177, 116, 0.95);
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: 0;
+  min-height: 46px;
+  padding: 5px 8px 5px calc(8px + var(--indent-offset, 0px));
+  background: rgba(8, 9, 15, 0.88);
+}
+
+.pc-notable-combat-list .pc-notable-combat-has-children > .combat-view-line::before {
+  content: "";
+  position: absolute;
+  top: 41px;
+  bottom: -1px;
+  left: calc(26px + var(--indent-offset, 0px));
+  border-left: 1px solid var(--pc-notable-combat-tree-color);
+  pointer-events: none;
+}
+
+.pc-notable-combat-tree {
+  position: absolute;
+  inset: 0 auto 0 8px;
+  display: flex;
+  width: var(--indent-offset, 0px);
+  pointer-events: none;
+}
+
+.pc-notable-combat-tree-lane {
+  position: relative;
+  flex: 0 0 28px;
+}
+
+.pc-notable-combat-tree-lane--rail::before,
+.pc-notable-combat-tree-lane--branch::before,
+.pc-notable-combat-tree-lane--last::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 18px;
+  border-left: 1px solid var(--pc-notable-combat-tree-color);
+}
+
+.pc-notable-combat-tree-lane--rail::before,
+.pc-notable-combat-tree-lane--branch::before {
+  bottom: -1px;
+}
+
+.pc-notable-combat-tree-lane--last::before {
+  height: 24px;
+}
+
+.pc-notable-combat-tree-lane--branch::after,
+.pc-notable-combat-tree-lane--last::after {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: 18px;
+  width: 10px;
+  height: 5px;
+  background:
+    linear-gradient(var(--pc-notable-combat-tree-color), var(--pc-notable-combat-tree-color)) left center / 7px 1px no-repeat,
+    radial-gradient(circle, var(--pc-notable-combat-tree-color) 0 2px, transparent 2.25px) right center / 5px 5px no-repeat;
+}
+
+.pc-notable-combat-list .combat-item .combat-view-line {
+  grid-template-columns: 36px minmax(0, 1fr) max-content;
+  cursor: grab;
+}
+
+.pc-notable-combat-list .combat-view-line:has(> .pc-notable-combat-row-controls) {
+  grid-template-columns: 36px minmax(0, 1fr) max-content;
+}
+
+.pc-notable-combat-list .combat-item.dragging .combat-view-line {
+  cursor: grabbing;
+}
+
+.pc-notable-combat-list .combat-item.drag-over-top,
+.pc-notable-combat-list .combat-item.drag-over-bottom {
+  box-shadow: none;
+}
+
+.pc-notable-combat-list .combat-item.drag-over-top .combat-view-line {
+  box-shadow: inset 0 2px 0 var(--color-shadow-primary, #ff0000);
+}
+
+.pc-notable-combat-list .combat-item.drag-over-bottom .combat-view-line {
+  box-shadow: inset 0 -2px 0 var(--color-shadow-primary, #ff0000);
+}
+
+.pc-notable-combat-image {
+  align-self: start;
+  pointer-events: none;
+}
+
+.pc-notable-combat-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: center;
+  gap: 2px 4px;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.pc-notable-combat-content > .combat-edit-heading,
+.pc-notable-combat-content > .combat-tags-inline {
+  flex: 1 1 100%;
+}
+
+.pc-notable-combat-row-controls {
+  align-self: stretch;
+  width: max-content;
+  min-width: max-content;
+}
+
+.pc-notable-combat-menu-toggle.header-control {
+  align-self: center;
 }
 
 /* Combat class/rank display - compact */
@@ -7820,24 +8001,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 /* ========== COMBAT TAG EDITOR POPUP ========== */
 
 
-/* Tag type dropdown */
-.peasant-tag-editor .tag-type-select {
-  width: 100%;
-  padding: 6px 10px;
-  background: #2a2a2a;
-  border: 1px solid #555;
-  border-radius: 4px;
-  color: #e0e0e0;
-  font-size: 13px;
-}
-
-.peasant-tag-editor .tag-type-select:focus {
-  outline: none;
-  border-color: var(--pc-foundry-input-focus-border);
-  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
-  background: #333;
-}
-
 /* Tag input area */
 .peasant-tag-editor .tag-input-area {
   min-height: 60px;
@@ -7999,59 +8162,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 
 
 
-
-/* BEGIN unified apply/add buttons */
-.add-combat-btn,
-.add-skill-btn,
-.add-advantage-btn,
-.add-effect-btn,
-.add-item-btn {
-  --button-size: 28px;
-  min-width: max-content;
-  min-height: var(--button-size) !important;
-  padding: 0 0.5rem !important;
-  margin: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.25rem;
-  background: transparent !important;
-  border: 1px solid var(--button-border-color) !important;
-  color: var(--button-text-color) !important;
-  border-radius: 4px !important;
-  line-height: normal !important;
-  cursor: var(--cursor-pointer) !important;
-}
-
-.add-combat-btn:hover,
-.add-skill-btn:hover,
-.add-advantage-btn:hover,
-.add-effect-btn:hover,
-.add-item-btn:hover {
-  background: var(--button-hover-background-color) !important;
-  color: var(--button-hover-text-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-}
-
-.add-combat-btn:active,
-.add-skill-btn:active,
-.add-advantage-btn:active,
-.add-effect-btn:active,
-.add-item-btn:active {
-  background: var(--button-hover-background-color) !important;
-  color: var(--button-hover-text-color) !important;
-  border-color: var(--button-hover-border-color) !important;
-}
-
-.add-combat-btn,
-.add-skill-btn,
-.add-advantage-btn,
-.add-effect-btn,
-.add-item-btn {
-  width: 100%;
-  font-size: 13px;
-}
-/* END unified apply/add buttons */
 
 /* BEGIN unified close buttons */
 /* Match custom Close/X controls and entry delete buttons to one Foundry-style button system */
@@ -8298,14 +8408,24 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 .pc-defense-prompt-dialog,
 .window-app.pc-force-pass-dialog,
 .pc-force-pass-dialog,
-.window-app.pc-waiting-dialog,
-.pc-waiting-dialog,
 .window-app.pc-location-by-skill-dialog,
 .pc-location-by-skill-dialog,
 .window-app.pc-incoming-hit-dialog,
 .pc-incoming-hit-dialog {
   min-width: min(440px, calc(100vw - 32px)) !important;
   max-width: calc(100vw - 32px) !important;
+}
+
+.window-app.pc-waiting-dialog,
+.pc-waiting-dialog {
+  min-width: min(300px, calc(100vw - 32px)) !important;
+  max-width: min(300px, calc(100vw - 32px)) !important;
+}
+
+.window-app.pc-save-force-pass-dialog,
+.pc-save-force-pass-dialog {
+  min-width: min(300px, calc(100vw - 32px)) !important;
+  max-width: min(300px, calc(100vw - 32px)) !important;
 }
 
 .window-app.pc-defense-prompt-dialog .pc-defense-prompt-select,
@@ -8366,6 +8486,25 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   color: var(--input-text-color, #e0e0e0) !important;
 }
 
+.pc-defense-prompt-dialog .pc-mage-barrier-effect-group {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.pc-defense-prompt-dialog .pc-mage-barrier-effect-summary {
+  width: 100%;
+}
+
+.pc-defense-prompt-dialog .pc-mage-barrier-effect {
+  overflow: hidden;
+  border: 1px solid rgba(159, 132, 117, 0.26);
+  border-radius: 4px;
+}
+
+.pc-defense-prompt-dialog .pc-inventory-item-row.pc-mage-barrier-effect-row {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
 .window-app.pc-waiting-dialog .dialog-buttons,
 .pc-waiting-dialog .dialog-buttons,
 .window-app.pc-waiting-dialog .form-footer,
@@ -8396,7 +8535,7 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 
 .window-app.pc-waiting-dialog .pc-waiting-dialog-body,
 .pc-waiting-dialog .pc-waiting-dialog-body {
-  min-height: 120px !important;
+  min-height: 48px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -8779,54 +8918,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   border-radius: 4px !important;
 }
 
-.window-app.peasant-core .peasant-tag-editor .tag-type-select,
-.peasant-tag-editor .tag-type-select {
-  background: var(--input-background-color, #2a2a2a) !important;
-  color: #e0e0e0 !important;
-  border: 1px solid var(--input-border-color, #555) !important;
-  border-radius: 3px !important;
-  min-height: 24px !important;
-  height: 24px !important;
-  padding: 0 8px !important;
-  font-size: 11px !important;
-  line-height: normal !important;
-  box-shadow: none !important;
-  outline: none !important;
-  appearance: auto;
-  color-scheme: dark;
-}
-
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:hover,
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:focus,
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:focus-visible,
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:active,
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:open,
-.peasant-tag-editor .tag-type-select:hover,
-.peasant-tag-editor .tag-type-select:focus,
-.peasant-tag-editor .tag-type-select:focus-visible,
-.peasant-tag-editor .tag-type-select:active,
-.peasant-tag-editor .tag-type-select:open {
-  background: #333 !important;
-  border-color: var(--pc-foundry-input-focus-border) !important;
-  outline: none !important;
-  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
-}
-
-/* Prevent Foundry/browser invalid/focus chrome from showing red on the notable tag select. */
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:invalid,
-.peasant-tag-editor .tag-type-select:invalid {
-  border-color: var(--input-border-color, #555) !important;
-  box-shadow: none !important;
-}
-
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:invalid:focus,
-.window-app.peasant-core .peasant-tag-editor .tag-type-select:invalid:focus-visible,
-.peasant-tag-editor .tag-type-select:invalid:focus,
-.peasant-tag-editor .tag-type-select:invalid:focus-visible {
-  border-color: var(--pc-foundry-input-focus-border) !important;
-  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
-}
-
 .window-app.peasant-core .peasant-tag-editor .add-tag-section .form-group,
 .peasant-tag-editor .add-tag-section .form-group,
 .window-app.peasant-core .peasant-tag-editor .add-tag-section .form-group:focus-within,
@@ -9200,7 +9291,7 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 }
 
 /* Hard compact mode for notable tags (view + editor chips) */
-.window-app.peasant-core .actor-sheet .combat-tags-inline .combat-tag-compact,
+:is(.window-app, .application).peasant-core .actor-sheet .combat-tags-inline .combat-tag-compact,
 .window-app.peasant-core .peasant-tag-editor .combat-tag-compact,
 .peasant-tag-editor .combat-tag-compact {
   --button-size: 21px !important;
@@ -9211,6 +9302,11 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   line-height: 1 !important;
 }
 
+:is(.window-app, .application).peasant-core .actor-sheet .combat-tags-inline .combat-tag-compact {
+  --button-size: 18px !important;
+  padding: 0 0.12rem !important;
+}
+
 .window-app.peasant-core .peasant-tag-editor .current-tag-item.combat-tag-button.combat-tag-compact,
 .peasant-tag-editor .current-tag-item.combat-tag-button.combat-tag-compact {
   min-height: calc(var(--button-size) + 4px) !important;
@@ -9218,15 +9314,15 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   gap: 0.06rem !important;
 }
 
-.window-app.peasant-core .actor-sheet .combat-tags-inline .combat-tag-compact input[type="number"],
+:is(.window-app, .application).peasant-core .actor-sheet .combat-tags-inline .combat-tag-compact input[type="number"],
 .window-app.peasant-core .peasant-tag-editor .combat-tag-compact input[type="number"],
 .peasant-tag-editor .combat-tag-compact input[type="number"] {
   width: 1.55em !important;
 }
 
-.window-app.peasant-core .actor-sheet .notable-combats-list-view .combat-tags-inline,
-.window-app.peasant-core .actor-sheet .notable-combats-list .combat-tags-inline {
-  gap: 2px 3px !important;
+:is(.window-app, .application).peasant-core .actor-sheet .notable-combats-list-view .combat-tags-inline,
+:is(.window-app, .application).peasant-core .actor-sheet .notable-combats-list .combat-tags-inline {
+  gap: 0 1px !important;
 }
 
 /* Notable tag Uses: keep exactly the same visual style as regular Uses */
@@ -9355,7 +9451,7 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 
 .window-app.peasant-core .actor-sheet .attributes-table.pc-hex-attributes .pc-attr-save-pill,
 .peasant-core .actor-sheet .attributes-table.pc-hex-attributes .pc-attr-save-pill {
-  border: 1px solid rgba(203, 191, 154, 0.68) !important;
+  border: 1px solid var(--button-border-color, var(--pc-accent-border, #9f8475)) !important;
 }
 
 .window-app.peasant-core .actor-sheet .hp-cell,
@@ -9424,18 +9520,25 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 .pc-damage-dialog:not(.minimized, .minimizing, .maximizing),
 .pc-defense-prompt-dialog:not(.minimized, .minimizing, .maximizing),
 .pc-flexible-damage-dialog:not(.minimized, .minimizing, .maximizing),
-.pc-force-pass-dialog:not(.minimized, .minimizing, .maximizing),
 .pc-location-by-skill-dialog:not(.minimized, .minimizing, .maximizing),
 .pc-incoming-hit-dialog:not(.minimized, .minimizing, .maximizing) {
   min-width: 360px;
   min-height: 220px;
 }
 
+.pc-force-pass-dialog:not(.minimized, .minimizing, .maximizing) {
+  min-width: 360px;
+  min-height: 0;
+}
+
 .pc-heal-dialog:not(.minimized, .minimizing, .maximizing),
-.pc-stress-dialog:not(.minimized, .minimizing, .maximizing),
-.pc-waiting-dialog:not(.minimized, .minimizing, .maximizing) {
+.pc-stress-dialog:not(.minimized, .minimizing, .maximizing) {
   min-width: 300px;
   min-height: 160px;
+}
+
+.pc-waiting-dialog:not(.minimized, .minimizing, .maximizing) {
+  min-height: 0;
 }
 
 .pc-blessing-dialog:not(.minimized, .minimizing, .maximizing) {
@@ -9449,8 +9552,8 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 }
 
 .pc-notable-combat-tag-editor:not(.minimized, .minimizing, .maximizing) {
-  min-width: 520px;
-  min-height: 0;
+  min-width: 560px;
+  min-height: 420px;
   max-height: calc(100vh - 80px);
 }
 
@@ -9660,6 +9763,26 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   font-weight: 800;
 }
 
+.pc-wounds-devastating-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pc-wounds-devastating-count {
+  min-width: 1.5em;
+  text-align: center;
+}
+
+.pc-adjust-devastating-wounds {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  margin: 0;
+}
+
 .pc-wound-tag.tag-hover-active,
 .pc-wound-tag:focus-visible {
   background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75));
@@ -9677,7 +9800,8 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   margin: 0 !important;
 }
 
-.pc-remove-condition.tag-hover-active {
+.pc-remove-condition.tag-hover-active,
+.pc-adjust-devastating-wounds.tag-hover-active {
   background: var(--button-hover-background-color, rgba(46, 38, 28, 0.75)) !important;
   border-color: var(--button-hover-border-color, #c9b183) !important;
   color: var(--button-hover-text-color, #f2dfbd) !important;
@@ -9930,17 +10054,17 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 }
 
 .pc-hex-attributes .pc-attr-hex-score-input:hover:not(:focus):not(:focus-visible) {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.08)),
-    var(--pc-hex-face) !important;
-  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.48) !important;
+  background: var(--input-background-color, var(--pc-sheet-surface)) !important;
+  box-shadow: none !important;
 }
 
+.window-app.peasant-core .actor-sheet .attributes-table.pc-hex-attributes .pc-attr-hex-score-input:is(:focus, :focus-visible),
+.peasant-core .actor-sheet .attributes-table.pc-hex-attributes .pc-attr-hex-score-input:is(:focus, :focus-visible),
 .pc-hex-attributes .pc-attr-hex-score-input:is(:focus, :focus-visible) {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.08)),
-    var(--pc-hex-face) !important;
-  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.48) !important;
+  background: var(--input-focus-background-color, var(--input-background-color, var(--pc-sheet-surface))) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 
 /* Final seize-size lock: keep all combat tracker seize buttons identical */
@@ -10389,10 +10513,16 @@ nav.pc-item-tabs .pc-item-tab.active {
 
 .pc-item-loot-type-row > span,
 .pc-item-equipment-type-row > span,
+.pc-item-equipment-armor-row > span,
 .pc-item-equipment-shield-row > span {
   color: #f0e5d0;
   font-size: 13px;
   font-weight: 700;
+}
+
+.pc-item-equipment-armor-row > span,
+.pc-item-equipment-shield-row > span {
+  padding-bottom: 8px;
 }
 
 .pc-item-loot-type-select,
@@ -10401,11 +10531,22 @@ nav.pc-item-tabs .pc-item-tab.active {
   min-width: 0;
 }
 
-.pc-item-equipment-shield-row {
+.pc-item-equipment-shield-row,
+.pc-item-equipment-armor-row {
   display: grid;
   grid-template-columns: 120px minmax(180px, 1fr);
   gap: 12px;
   align-items: end;
+  min-width: 0;
+}
+
+.pc-item-equipment-armor-fields {
+  display: grid;
+  grid-template-columns: 92px 84px 96px 72px;
+  gap: 6px;
+  align-items: end;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -10417,11 +10558,28 @@ nav.pc-item-tabs .pc-item-tab.active {
   min-width: 0;
 }
 
+.pc-item-equipment-armor-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+
 .pc-item-equipment-shield-field {
   display: grid;
   gap: 4px;
   min-width: 0;
   margin: 0;
+}
+
+.pc-item-equipment-armor-field > span {
+  overflow: hidden;
+  color: #b9aa8f;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
 }
 
 .pc-item-equipment-shield-field > span {
@@ -10433,6 +10591,35 @@ nav.pc-item-tabs .pc-item-tab.active {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.pc-item-equipment-armor-field > .pc-item-equipment-armor-halt-heading {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--font-size-14, 14px);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pc-item-equipment-armor-row:not(.pc-item-equipment-armor-row-editable) .halt-letter {
+  cursor: default;
+}
+
+.pc-item-equipment-armor-halt-input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+.pc-item-equipment-armor-input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding-inline: 4px;
+  text-align: center;
 }
 
 .pc-item-equipment-shield-input {
@@ -10556,6 +10743,673 @@ nav.pc-item-tabs .pc-item-tab.active {
   display: none !important;
 }
 
+/* Shared Skill / Notable editor: native sheet hierarchy matching the compact concept. */
+.pc-skill-editor .window-content {
+  container-type: inline-size;
+}
+
+.pc-skill-editor-body {
+  gap: 0;
+}
+
+.pc-skill-editor-header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-tabs-border, rgba(159, 132, 117, 0.75));
+}
+
+.pc-skill-editor .pc-notable-combat-editor-summary {
+  gap: 10px;
+}
+
+.pc-skill-editor-title-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.pc-skill-editor .pc-item-title-row {
+  align-self: center;
+}
+
+.pc-skill-editor .pc-skill-editor-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(54px, 62px));
+  gap: 6px;
+  align-items: end;
+}
+
+.pc-skill-editor .pc-skill-editor-identity-grid--single {
+  grid-template-columns: minmax(54px, 62px);
+}
+
+.pc-skill-editor .pc-skill-editor-special-grade {
+  grid-column: auto;
+}
+
+.pc-skill-editor-primary-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.pc-skill-editor-type-choice {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pc-skill-editor :is(.pc-skill-editor-primary-meta, .pc-skill-editor-meta) :is(input:not([type="checkbox"]), select),
+.pc-skill-editor .pc-skill-editor-identity-grid input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+}
+
+.pc-skill-editor-meta {
+  display: grid;
+  gap: 8px;
+  padding: 10px 4px;
+}
+
+.pc-skill-editor-stat-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.pc-skill-editor-stat-band--multiple {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.pc-skill-editor-characteristic-block {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pc-skill-editor-characteristic-row {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.pc-skill-editor-row-label,
+.pc-skill-tag-toolbar-title {
+  color: #b9aa8f;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pc-skill-editor-row-label,
+.pc-skill-editor .pc-notable-combat-stat-field > span {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pc-skill-override-control {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-size: 9px;
+}
+
+.pc-skill-editor-characteristics,
+.pc-skill-editor-roll-row,
+.pc-skill-editor-advancement-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: end;
+}
+
+.pc-skill-editor-characteristics {
+  flex: 1 1 auto;
+}
+
+.pc-skill-editor-stat-band--multiple .pc-skill-editor-characteristics {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0 4px;
+}
+
+.pc-skill-editor-characteristics .checkbox,
+.pc-skill-editor-signature-toggle,
+.pc-skill-editor-duress-toggle {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  min-height: 30px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.pc-skill-editor .pc-skill-editor-counter-row > label.pc-skill-editor-duress-toggle {
+  flex: 0 0 auto;
+  gap: 3px;
+}
+
+.pc-skill-editor-characteristic-mode {
+  flex: 0 1 100px;
+}
+
+.pc-skill-editor-control-band {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.pc-skill-editor-stat-band--multiple .pc-skill-editor-control-band {
+  gap: 8px;
+  align-items: start;
+  align-self: start;
+  justify-content: space-between;
+}
+
+.pc-skill-editor-stat-band--multiple .pc-skill-editor-characteristics .checkbox {
+  gap: 3px;
+}
+
+.pc-skill-editor-stat-band--multiple .pc-skill-editor-characteristic-mode {
+  flex-basis: 92px;
+}
+
+.pc-skill-editor-stat-band--multiple .pc-skill-editor-roll-row {
+  gap: 6px;
+}
+
+.pc-skill-editor-stat-band--multiple .pc-skill-editor-roll-row > .pc-notable-combat-stat-field {
+  flex-basis: 68px;
+}
+
+.pc-skill-editor-roll-stack {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.pc-skill-editor-stat-band--multiple .pc-skill-editor-roll-row {
+  flex-wrap: nowrap;
+}
+
+.pc-skill-editor-roll-row {
+  justify-content: flex-end;
+}
+
+.pc-skill-editor-roll-row > .pc-notable-combat-stat-field,
+.pc-skill-editor-advancement-row > .pc-notable-combat-stat-field {
+  flex: 0 1 78px;
+}
+
+.pc-skill-editor-advancement-row {
+  justify-content: flex-end;
+  min-height: 30px;
+}
+
+.pc-skill-editor-advancement-row--usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(68px, 78px));
+  gap: 8px;
+  align-items: end;
+}
+
+.pc-skill-editor-usage-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.pc-skill-editor-usage-inline .pc-skill-editor-usage-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.pc-skill-editor .pc-skill-editor-counter-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: end;
+  min-width: 0;
+  padding: 8px;
+}
+
+.pc-skill-editor-counter-row > .pc-notable-combat-stat-field {
+  flex: 0 1 72px;
+}
+
+.pc-skill-editor-counter-row > .pc-skill-editor-duress-field {
+  flex: 0 0 max-content;
+}
+
+.pc-skill-editor-duress-field > .pc-input {
+  justify-self: start;
+  width: 72px;
+  max-width: 72px;
+  padding-inline: 4px;
+}
+
+.pc-skill-editor-counter-separator {
+  align-self: end;
+  min-height: 30px;
+  line-height: 30px;
+  text-align: center;
+}
+
+.pc-skill-editor-usage-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 280px) 28px;
+  gap: 8px;
+  align-items: end;
+  margin: 0;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(159, 132, 117, 0.34);
+}
+
+.pc-skill-editor-usage-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.pc-skill-editor-usage-field > .pc-entry-usage-select {
+  width: 100%;
+  margin: 0;
+}
+
+.pc-skill-editor-body > .pc-item-tabs {
+  flex: 0 0 auto;
+  min-height: 42px;
+  border-bottom: 1px solid var(--color-tabs-border, rgba(159, 132, 117, 0.75));
+}
+
+.pc-skill-editor-body > .pc-notable-combat-editor-panel {
+  padding-top: 8px;
+}
+
+.pc-skill-editor-body > .pc-notable-combat-editor-panel[data-pc-notable-combat-panel="details"] {
+  min-height: 240px;
+}
+
+.pc-skill-editor .pc-skill-tags-section {
+  padding-top: 10px;
+}
+
+.pc-skill-editor .pc-skill-tags-browser {
+  margin-top: 0;
+  overflow: visible;
+}
+
+.pc-skill-editor .pc-skill-tags-list-header {
+  grid-template-columns: minmax(90px, 1fr) minmax(72px, auto) 28px;
+  gap: 6px;
+}
+
+.pc-skill-tags-summary-column {
+  text-align: right;
+}
+
+.pc-skill-tag-draft {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
+  border-radius: 4px;
+}
+
+.pc-skill-tag-chooser {
+  margin-top: 4px;
+  padding: 10px;
+  overflow: visible;
+}
+
+.pc-skill-tag-combobox {
+  position: relative;
+}
+
+.pc-skill-tag-combobox > [data-pc-tag-search] {
+  width: 100%;
+}
+
+.pc-skill-tag-options {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 1px);
+  left: 0;
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0;
+  border: 1px solid #858585;
+  border-radius: 0;
+  background: var(--color-cool-4, #302831);
+  box-shadow: none;
+  color: var(--color-light-1, #f7f3e8);
+  font-family: var(--font-body);
+  font-size: var(--font-size-14, 14px);
+  font-weight: 600;
+  scrollbar-width: thin;
+  scrollbar-color: #858585 var(--color-cool-4, #302831);
+}
+
+.pc-skill-tag-options[hidden] {
+  display: none !important;
+}
+
+.pc-skill-tag-option {
+  display: flex;
+  align-items: center;
+  min-height: 25px;
+  overflow: hidden;
+  padding: 0 12px;
+  cursor: pointer;
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-skill-tag-option:hover,
+.pc-skill-tag-option.selected {
+  background: #99c8ff;
+  color: var(--color-text-dark-primary, #191813);
+}
+
+.pc-skill-tag-option-empty,
+.pc-skill-tag-option-empty:hover {
+  cursor: default;
+  background: var(--color-cool-4, #302831);
+  color: var(--color-light-5, #a79d94);
+}
+
+.pc-skill-editor .current-tags-section {
+  gap: 0;
+}
+
+.pc-skill-editor .current-tags-list {
+  display: grid !important;
+  gap: 0 !important;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: visible;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.pc-skill-editor .current-tags-list > .pc-skill-tag-row {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 4px !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(159, 132, 117, 0.16) !important;
+  border-radius: 0 !important;
+  background: rgba(8, 9, 15, 0.88) !important;
+  color: inherit !important;
+}
+
+.pc-skill-editor .current-tags-list > .pc-skill-tag-row:first-child {
+  border-top: 0 !important;
+}
+
+.pc-skill-editor .current-tags-list > .pc-skill-tag-row:has(+ .pc-skill-tag-draft:not([hidden])) {
+  border-bottom: 0 !important;
+  border-radius: 0 !important;
+}
+
+.pc-skill-editor .current-tags-list > .pc-skill-tag-row + .pc-skill-tag-draft:not([hidden]) {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(8, 9, 15, 0.88);
+}
+
+.pc-skill-editor .current-tags-list > .pc-skill-tag-row-readonly {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pc-skill-editor .pc-skill-tag-row-summary {
+  --button-background-color: transparent;
+  --button-border-color: transparent;
+  display: grid;
+  grid-template-columns: 16px minmax(90px, 1fr) minmax(0, auto);
+  gap: 3px 6px;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.pc-skill-editor .pc-skill-tag-row-summary:hover,
+.pc-skill-editor .pc-skill-tag-row-summary:focus {
+  border: 0 !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  text-shadow: none !important;
+}
+
+.pc-skill-editor .pc-skill-tag-row-summary:hover :is(.pc-skill-tag-disclosure, .pc-skill-tag-name),
+.pc-skill-editor .pc-skill-tag-row-summary:focus :is(.pc-skill-tag-disclosure, .pc-skill-tag-name),
+.pc-skill-editor .pc-skill-tag-row:has(+ .pc-skill-tag-draft:not([hidden])) .pc-skill-tag-row-summary :is(.pc-skill-tag-disclosure, .pc-skill-tag-name) {
+  color: #f0e5d0;
+  text-shadow: 0 0 10px var(--color-shadow-primary, #ff0000);
+}
+
+.pc-skill-tag-disclosure {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--color-light-4, #aaa);
+  font-size: 10px;
+  text-align: center;
+  transition: transform 120ms ease;
+}
+
+.pc-skill-tag-row:has(+ .pc-skill-tag-draft:not([hidden])) .pc-skill-tag-disclosure {
+  transform: rotate(90deg);
+}
+
+.pc-skill-tag-name-line {
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pc-skill-tag-name {
+  overflow: hidden;
+  color: var(--color-light-1, #e0e0e0);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-skill-tag-condition {
+  flex: 0 0 auto;
+  color: var(--color-light-4, #aaa);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pc-skill-tag-summary {
+  grid-column: 3;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.pc-skill-editor .pc-skill-tag-row > .header-control {
+  align-self: center;
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.pc-skill-editor .pc-skill-tag-row.drag-over-left {
+  box-shadow: inset 0 2px 0 var(--color-shadow-primary, #ff0000) !important;
+}
+
+.pc-skill-editor .pc-skill-tag-row.drag-over-right {
+  box-shadow: inset 0 -2px 0 var(--color-shadow-primary, #ff0000) !important;
+}
+
+.pc-skill-tag-empty {
+  padding: 18px 12px;
+  border-top: 1px solid rgba(159, 132, 117, 0.16);
+  background: rgba(8, 9, 15, 0.88);
+  color: var(--color-light-4, #aaa);
+  font-style: italic;
+  text-align: center;
+}
+
+.pc-skill-tag-draft {
+  gap: 6px;
+  margin: 8px 0;
+  padding: 6px 8px 8px;
+}
+
+.pc-skill-editor .pc-skill-tag-draft .tag-input-area {
+  min-height: 0;
+  padding: 0;
+}
+
+.pc-skill-tag-draft .pc-tag-field-row--compact {
+  gap: 6px;
+}
+
+.pc-skill-tag-draft .pc-tag-field-row--compact > .pc-tag-field-label,
+.pc-skill-tag-draft .split-second-uses > .pc-tag-field-label {
+  margin-right: 0;
+}
+
+.pc-skill-tag-draft .pc-tag-select-compact {
+  flex: 0 1 clamp(120px, 25%, 140px);
+  width: clamp(120px, 25%, 140px);
+  min-width: 120px;
+}
+
+.pc-skill-tag-draft .resource-costs-container,
+.pc-skill-tag-draft .resource-costs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pc-skill-tag-draft .resource-cost-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pc-skill-tag-draft .pc-tag-add-cost-compact {
+  align-self: flex-start;
+  width: auto;
+  min-width: 110px;
+  margin: 0;
+}
+
+.pc-skill-tag-draft-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.pc-skill-tag-draft-actions > button {
+  flex: 0 1 140px;
+  margin: 0;
+}
+
+@container (max-width: 500px) {
+  .pc-skill-editor-header {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .pc-skill-editor-header .pc-item-image-frame {
+    width: 76px;
+    height: 76px;
+  }
+
+  .pc-skill-editor-title-line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pc-skill-editor .pc-skill-editor-identity-grid {
+    grid-template-columns: repeat(2, minmax(54px, 68px));
+  }
+
+  .pc-skill-editor .pc-skill-editor-identity-grid--single {
+    grid-template-columns: minmax(54px, 68px);
+  }
+
+  .pc-skill-editor-primary-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pc-skill-editor-stat-band {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pc-skill-editor-roll-row,
+  .pc-skill-editor-advancement-row {
+    justify-content: flex-start;
+  }
+}
+
+@container (max-width: 340px) {
+  .pc-skill-editor-header {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .pc-skill-editor-header .pc-item-image-frame {
+    width: 64px;
+    height: 64px;
+  }
+
+  .pc-skill-editor-primary-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pc-skill-tag-summary {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    text-align: left;
+  }
+}
+
 #hotbar #action-bar .slot.pc-notable-combat-hotbar {
   overflow: hidden;
 }
@@ -10641,11 +11495,16 @@ nav.pc-item-tabs .pc-item-tab.active {
 .pc-ae-key-browser {
   position: absolute;
   z-index: 1000;
-  padding: 6px;
-  border: 1px solid var(--pc-accent-border-muted, rgba(159, 132, 117, 0.65));
-  background: var(--pc-sheet-surface, rgba(11, 10, 19, 0.95));
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  color: var(--color-text-light-highlight, #f0f0e0);
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #858585;
+  border-radius: 0;
+  background: var(--color-cool-4, #302831);
+  box-shadow: none;
+  color: var(--color-light-1, #f7f3e8);
+  font-family: var(--font-body);
+  font-size: var(--font-size-14, 14px);
+  font-weight: 600;
 }
 
 .pc-ae-key-browser[hidden] {
@@ -10654,17 +11513,20 @@ nav.pc-item-tabs .pc-item-tab.active {
 
 .pc-ae-key-browser .pc-ae-key-browser-content {
   overflow-y: auto;
-  border: 1px solid rgba(159, 132, 117, 0.3);
+  border: 0;
   scrollbar-width: thin;
+  scrollbar-color: #858585 var(--color-cool-4, #302831);
 }
 
 .pc-ae-key-browser .pc-ae-key-option {
+  display: flex;
+  align-items: center;
+  min-height: 25px;
   overflow: hidden;
-  padding: 4px 8px;
-  border-bottom: 1px solid rgba(159, 132, 117, 0.3);
+  padding: 0 12px;
+  border-bottom: 1px solid transparent;
   cursor: pointer;
-  font-size: 12px;
-  line-height: 1.2;
+  line-height: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -10675,14 +11537,14 @@ nav.pc-item-tabs .pc-item-tab.active {
 
 .pc-ae-key-browser .pc-ae-key-option:hover,
 .pc-ae-key-browser .pc-ae-key-option.selected {
-  background: var(--color-text-selection-bg, rgba(88, 74, 117, 0.85));
-  color: var(--color-text-light-highlight, #ffffff);
+  background: #99c8ff;
+  color: var(--color-text-dark-primary, #191813);
 }
 
 .pc-ae-key-browser .pc-ae-key-option-empty,
 .pc-ae-key-browser .pc-ae-key-option-empty:hover {
   cursor: default;
-  background: transparent;
-  color: var(--color-text-light-6, #a79d94);
+  background: var(--color-cool-4, #302831);
+  color: var(--color-light-5, #a79d94);
 }
 

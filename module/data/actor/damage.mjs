@@ -136,6 +136,11 @@ export function absorbTempHpFromCounts(counts, tempHp) {
       tempRemaining -= canAbsorb * cost;
       tempUsed += canAbsorb * cost;
     }
+    if (remaining[type] > 0 && tempRemaining > 0 && tempRemaining < cost) {
+      remaining[type] -= 1;
+      tempUsed += tempRemaining;
+      tempRemaining = 0;
+    }
   };
 
   absorb("critical", 4);

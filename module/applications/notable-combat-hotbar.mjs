@@ -1,14 +1,15 @@
 import { applyToHitAccuracy } from "../dice/roll-targets.mjs";
 import { formatOptionalIntegerInput, parseOptionalInteger } from "../data/actor/helpers.mjs";
+import { getEffectiveSkillCombatModifiers } from "../data/actor/combat-modifiers.mjs";
+import { isRollableSkillType } from "../data/actor/skill-entry-types.mjs";
 import { withPeasantActorSourceWriteContext } from "../data/actor/source-system.mjs";
 import { registerPeasantCoreApi } from "../utils/api.mjs";
 import { pcLog } from "../utils/logging.mjs";
 import { toElement } from "./dom.mjs";
-import { startNotableCombatRoll } from "./combat/notable-combat-workflow.mjs";
+import { startPeasantEntryUse } from "./combat/skill-entry-use.mjs";
 
-const HOTBAR_DRAG_TYPE = "peasant-core.notableCombat";
 const HOTBAR_FLAG = "notableCombatHotbar";
-const NO_TO_HIT_ACCURACY_TYPES = new Set(["stance", "perk", "style", "cantrip", "tm"]);
+const USAGE_HOTBAR_FLAG = "skillUsageHotbar";
 const EMPTY_COMBAT_STATS = { toHit: "", accuracy: "" };
 
 function getDefaultCombatImage() {
@@ -60,12 +61,9 @@ async function ensureNotableCombatId(actor, combatIndex) {
 }
 
 function formatCombatStats(actor, combat) {
-  const combatTypeKey = String(combat?.type || "").trim().toLowerCase();
-  const isStandard = !combat?.type || combat.type === "standard";
-  const allowToHitAcc = isStandard || !NO_TO_HIT_ACCURACY_TYPES.has(combatTypeKey);
-  if (!allowToHitAcc) return EMPTY_COMBAT_STATS;
+  if (!isRollableSkillType(combat?.type)) return EMPTY_COMBAT_STATS;
 
-  const combatMods = actor?.system?.combatMods || { toHit: 0, accuracy: 0 };
+  const combatMods = getEffectiveSkillCombatModifiers(actor);
   const toHitMod = Number.parseInt(combatMods.toHit, 10) || 0;
   const accuracyMod = Number.parseInt(combatMods.accuracy, 10) || 0;
   const tohitValue = parseOptionalInteger(combat?.tohit, { min: 1 });
@@ -92,7 +90,7 @@ async function resolveActor(actorUuid) {
   }
 }
 
-export async function rollNotableCombatHotbarMacro({ actorUuid = "", combatId = "", combatIndex = null } = {}) {
+export async function rollNotableCombatHotbarMacro({ actorUuid = "", combatId = "", combatIndex = null, usageId = null } = {}) {
   const actor = await resolveActor(actorUuid);
   if (!actor) {
     ui.notifications?.warn?.("Notable combat actor could not be found.");
@@ -103,15 +101,19 @@ export async function rollNotableCombatHotbarMacro({ actorUuid = "", combatId = 
     return false;
   }
 
+  await actor.ensurePeasantEntryIds?.("notableCombats");
   const resolvedIndex = resolveNotableCombatIndex(actor, { combatId, combatIndex });
   if (resolvedIndex < 0) {
     ui.notifications?.warn?.("That notable combat could not be found on the actor.");
     return false;
   }
 
-  return startNotableCombatRoll({
+  const entryId = String(getActorNotableCombats(actor)[resolvedIndex]?.id || "").trim();
+  if (!entryId) return false;
+  return startPeasantEntryUse({
     actor,
-    combatIndex: resolvedIndex,
+    ref: { collection: "notableCombats", entryId },
+    usageId,
     promptForTargets: true
   });
 }
@@ -144,7 +146,8 @@ async function createNotableCombatMacroData(data) {
   const flagData = {
     actorUuid: actor.uuid,
     combatId,
-    combatIndex
+    combatIndex,
+    usageId: combat.defaultUsageId || "base"
   };
   const command = `await game.peasantCore.rollNotableCombatHotbarMacro(${JSON.stringify(flagData)});`;
   return {
@@ -163,7 +166,7 @@ async function createNotableCombatMacroData(data) {
 
 async function createOrUpdateNotableCombatMacro(data, slot) {
   const macroData = await createNotableCombatMacroData(data);
-  if (!macroData) return;
+  if (!macroData) return false;
 
   const flagData = macroData.flags["peasant-core"][HOTBAR_FLAG];
   let macro = game.macros?.find?.((candidate) => {
@@ -185,6 +188,92 @@ async function createOrUpdateNotableCombatMacro(data, slot) {
   }
 
   await game.user.assignHotbarMacro(macro, slot);
+  return true;
+}
+
+export async function addNotableCombatToHotbar(data) {
+  const page = Number.isInteger(ui?.hotbar?.page) ? ui.hotbar.page : 1;
+  const slot = game.user?.getHotbarMacros?.(page)?.find(({ macro }) => !macro)?.slot ?? null;
+
+  if (!slot) {
+    ui.notifications?.warn?.("The current hotbar page has no empty slots.");
+    return false;
+  }
+
+  try {
+    return await createOrUpdateNotableCombatMacro(data, slot);
+  } catch (err) {
+    console.error("Peasant Core | Failed to create notable combat hotbar macro", err);
+    ui.notifications?.warn?.("Failed to create notable combat hotbar macro. See console for details.");
+    return false;
+  }
+}
+
+export async function addSkillUsageToHotbar({ actorUuid, collection, entryId, usageId } = {}) {
+  const page = Number.isInteger(ui?.hotbar?.page) ? ui.hotbar.page : 1;
+  const slot = game.user?.getHotbarMacros?.(page)?.find(({ macro }) => !macro)?.slot ?? null;
+  if (!slot) {
+    ui.notifications?.warn?.("The current hotbar page has no empty slots.");
+    return false;
+  }
+
+  const actor = await resolveActor(actorUuid);
+  if (!actor) {
+    ui.notifications?.warn?.("Skill or Notable actor could not be found.");
+    return false;
+  }
+  if (!actor.isOwner) {
+    ui.notifications?.warn?.(`You do not have permission to create Skill or Notable macros for ${actor.name}.`);
+    return false;
+  }
+  const key = String(collection ?? "");
+  const id = String(entryId ?? "");
+  const selectedId = String(usageId ?? "");
+  const entry = ["skills", "notableCombats"].includes(key)
+    ? actor.system?.[key]?.find(candidate => String(candidate?.id ?? "") === id)
+    : null;
+  const usage = selectedId === "base"
+    ? entry?.baseUsage
+    : entry?.usages?.find(candidate => String(candidate?.id ?? "") === selectedId);
+  if (!entry || !id || !usage || !selectedId) {
+    ui.notifications?.warn?.("That Skill, Notable, or usage is unavailable.");
+    return false;
+  }
+
+  const flagData = { actorUuid: actor.uuid, collection: key, entryId: id, usageId: selectedId };
+  const macroData = {
+    type: "script",
+    scope: "actor",
+    name: selectedId === "base" ? entry.name : `${entry.name}: ${usage.name || "Usage"}`,
+    img: getCombatImage(entry),
+    command: `await game.peasantCore.useSkillEntry(${JSON.stringify(flagData)});`,
+    flags: { "peasant-core": { [USAGE_HOTBAR_FLAG]: flagData } }
+  };
+  try {
+    let macro = game.macros?.find?.(candidate => {
+      if (candidate?.type !== "script" || !candidate?.isAuthor) return false;
+      const flags = candidate.getFlag?.("peasant-core", USAGE_HOTBAR_FLAG);
+      return candidate.command === macroData.command
+        || (flags?.actorUuid === flagData.actorUuid && flags?.collection === key
+          && flags?.entryId === id && flags?.usageId === selectedId);
+    });
+    if (macro) {
+      await macro.update({
+        name: macroData.name,
+        img: macroData.img,
+        command: macroData.command,
+        [`flags.peasant-core.${USAGE_HOTBAR_FLAG}`]: flagData
+      });
+    } else {
+      macro = await Macro.create(macroData);
+    }
+    await game.user.assignHotbarMacro(macro, slot);
+    return true;
+  } catch (error) {
+    console.error("Peasant Core | Failed to create usage hotbar macro", error);
+    ui.notifications?.warn?.("Failed to create usage hotbar macro. See console for details.");
+    return false;
+  }
 }
 
 function getNotableCombatFlagData(macro) {
@@ -350,22 +439,14 @@ function refreshNotableCombatHotbar() {
 
 export function registerPeasantNotableCombatHotbarApi() {
   registerPeasantCoreApi({
+    addNotableCombatToHotbar,
+    addSkillUsageToHotbar,
     rollNotableCombatHotbarMacro
   });
 }
 
 registerPeasantNotableCombatHotbarApi();
 Hooks.once("ready", registerPeasantNotableCombatHotbarApi);
-
-Hooks.on("hotbarDrop", (bar, data, slot) => {
-  if (data?.type !== HOTBAR_DRAG_TYPE) return;
-  if (bar?.locked) return false;
-  void createOrUpdateNotableCombatMacro(data, slot).catch((err) => {
-    console.error("Peasant Core | Failed to create notable combat hotbar macro", err);
-    ui.notifications?.warn?.("Failed to create notable combat hotbar macro. See console for details.");
-  });
-  return false;
-});
 
 Hooks.on("renderApplicationV2", (app, html) => {
   if (app?.id !== "hotbar") return;

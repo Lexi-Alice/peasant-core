@@ -5,7 +5,21 @@ import {
   normalizeCombatDefenseEffectivenessEntry,
   parseCombatDefenseMosPer
 } from "./combat-defense.mjs";
+import { getCombatMagnetismGrade } from "./combat-tags.mjs";
 import { PC_DEFAULT_PRIMAL_EVASION, PC_PRIMAL_EVASION_FLAG } from "./sheet-settings.mjs";
+
+export function getWeaponMasteryMagnetismGrade(combat, defensePromptResult) {
+  const baseGrade = getCombatMagnetismGrade(combat);
+  const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
+  const masteryApplies = !!(
+    defensePromptResult?.selection === "defense"
+    && defense.block
+    && defense.blockType === "Weapon"
+    && defense.masteryBonus
+    && defensePromptResult?.defenseRoll?.rollResult?.isSuccess
+  );
+  return masteryApplies ? Math.max(baseGrade, 1) : baseGrade;
+}
 
 export function getDefenseEffectivenessForTargeting(defenseData, targetingType) {
   const targetKey = getCombatDefenseResponseKey(targetingType);
@@ -14,6 +28,8 @@ export function getDefenseEffectivenessForTargeting(defenseData, targetingType) 
 }
 
 export function getAccuracyPenaltyFromDefenseRoll(defenseData, targetingType, rollResult) {
+  const defense = normalizeCombatDefense(defenseData);
+  if (defense.block && defense.blockType === "Mage") return 0;
   const effectiveness = getDefenseEffectivenessForTargeting(defenseData, targetingType);
   const mosPer = parseCombatDefenseMosPer(effectiveness?.mosPer);
   const accuracyPenalty = Math.abs(Number.parseInt(effectiveness?.accuracyPenalty, 10) || 0);
@@ -110,14 +126,89 @@ function doesAttackDamageReachBlock(attackRoll) {
   );
 }
 
-export function isMageDefenseDamageRedirect(attackRoll, defensePromptResult) {
+function hasPassedMageBlock(defensePromptResult) {
+  const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
+  const rawMoS = defensePromptResult?.defenseRoll?.rollResult?.totalMoS;
+  const totalMoS = Number(rawMoS);
+  return !!(
+    defensePromptResult?.selection === "defense"
+    && defense.block
+    && defense.blockType === "Mage"
+    && rawMoS !== null
+    && rawMoS !== undefined
+    && String(rawMoS).trim() !== ""
+    && Number.isFinite(totalMoS)
+    && totalMoS >= 0
+  );
+}
+
+export function isConfirmedManifestDomeResult(domeResult) {
+  const penetration = domeResult?.penetration;
+  return !!(
+    domeResult?.handled
+    && penetration !== null
+    && penetration !== undefined
+    && String(penetration).trim() !== ""
+    && Number.isFinite(Number(penetration))
+  );
+}
+
+export function doesAttackReachManifestDome({
+  attackRoll = null,
+  preDefenseRollResult = null,
+  defensePromptResult = null
+} = {}) {
+  const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
+  const successfulPreDomeDeflection = !!(
+    defensePromptResult?.selection === "defense"
+    && defensePromptResult?.defenseRoll?.rollResult?.isSuccess
+    && !defense.block
+    && !defense.appliesDebuff
+  );
+  if (successfulPreDomeDeflection) return false;
+  if (hasPassedMageBlock(defensePromptResult)) return true;
+
+  if (defensePromptResult?.selection === "defense" && defense.block && doesAttackDamageReachBlock(attackRoll)) {
+    return true;
+  }
+  const relevantRollResult = defense.appliesDebuff ? preDefenseRollResult : attackRoll?.rollResult;
+  return !!(
+    relevantRollResult?.isSuccess
+    || (
+      relevantRollResult === attackRoll?.rollResult
+      && isNarrowSuccessAttack(attackRoll)
+      && !doesPromptResultCountAsActiveDefense(defensePromptResult)
+    )
+  );
+}
+
+export function getPostDomeMagnetismGrade(existingGrade, domeResult) {
+  const current = Math.max(0, Number.parseInt(existingGrade, 10) || 0);
+  if (!domeResult?.handled || !domeResult?.applied || Number(domeResult.penetration) <= 0) return current;
+  const domeGrade = Math.max(0, Number.parseInt(domeResult.magnetismGrade, 10) || 0);
+  return current + domeGrade;
+}
+
+export function shouldContinueAfterManifestDome({
+  attackRoll = null,
+  defensePromptResult = null,
+  domeResult = null
+} = {}) {
+  if (!isConfirmedManifestDomeResult(domeResult) || Number(domeResult.penetration) <= 0) return false;
+  if (attackRoll?.rollResult?.isSuccess) return true;
+  if (isNarrowSuccessAttack(attackRoll) && !doesPromptResultCountAsActiveDefense(defensePromptResult)) return true;
+  if (hasPassedMageBlock(defensePromptResult)) return true;
+
   const defense = normalizeCombatDefense(defensePromptResult?.selectedDefense);
   return !!(
     defensePromptResult?.selection === "defense"
-    && doesAttackDamageReachBlock(attackRoll)
     && defense.block
-    && defense.blockType === "Mage"
+    && doesAttackDamageReachBlock(attackRoll)
   );
+}
+
+export function isMageDefenseDamageRedirect(defensePromptResult) {
+  return hasPassedMageBlock(defensePromptResult);
 }
 
 export function isShieldDefenseDamageBlock(attackRoll, defensePromptResult) {

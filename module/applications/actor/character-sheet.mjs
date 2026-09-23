@@ -1,5 +1,4 @@
 ﻿import { PeasantCharacterModel, PC_ACTOR_SETTING_DEFINITIONS, PC_ART_PANEL_COLLAPSED_FLAG, PC_SIMPLIFIED_HP_FLAG, isPeasantCharacterType, sanitizePeasantCoreSettingNumber } from "../../data/actor/_module.mjs";
-import { PC_CUSTOM_SIR_LOCATION_VALUES_FLAG } from "../../data/actor/identity-options.mjs";
 import { formatOptionalIntegerInput, parseOptionalInteger } from "../../data/actor/helpers.mjs";
 import { PeasantActor } from "../../documents/_module.mjs";
 import { setupBlessingControls } from "./controls/blessing-controls.mjs";
@@ -25,7 +24,7 @@ import { buildPeasantActorSourceContext, prepareActorAdvantageContext, prepareAc
 import { setupActorEffectControls } from "./controls/effects-controls.mjs";
 import { setupNotableCombatControls } from "./notable-combat/notable-combat-controls.mjs";
 import { setupNotableCombatDragDropControls } from "./notable-combat/notable-combat-drag-drop.mjs";
-import { setupNotableCombatTagEditorControls } from "./notable-combat/notable-combat-tag-editor.mjs";
+import { openNotableCombatTagEditor } from "./notable-combat/notable-combat-tag-editor.mjs";
 import { setupBasicSkillAdvantageControls } from "./skills/skill-advantage-controls.mjs";
 import { setupSkillAdvantageDescriptionEditors } from "./skills/skill-advantage-description-editors.mjs";
 import { setupSkillAdvantageDragDropControls } from "./skills/skill-advantage-drag-drop.mjs";
@@ -1015,26 +1014,6 @@ export class PeasantActorSheet extends ActorSheetBase {
     }
   }
 
-  async _onCustomSirLocationChange(event) {
-    const input = event.currentTarget;
-    const sirKey = String(input?.dataset?.sirKey ?? "").trim();
-    if (!sirKey || !this.actor?.setFlag) return;
-
-    const value = String(input.value ?? "");
-    const current = this.actor.getFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG);
-    const values = current && typeof current === "object" && !Array.isArray(current) ? { ...current } : {};
-    if (value.trim()) values[sirKey] = value;
-    else delete values[sirKey];
-
-    if (Object.keys(values).length) {
-      await this.actor.setFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG, values);
-    } else if (typeof this.actor.unsetFlag === "function") {
-      await this.actor.unsetFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG);
-    } else {
-      await this.actor.setFlag("peasant-core", PC_CUSTOM_SIR_LOCATION_VALUES_FLAG, {});
-    }
-  }
-
   _applyReadOnlyObserverState(html) {
     if (!this.isReadOnlyObserver) return;
     const root = getApplicationElement(html);
@@ -1210,10 +1189,6 @@ export class PeasantActorSheet extends ActorSheetBase {
       if (action === "defenseFavorites") openDefenseFavoritesWindow(this);
     });
 
-    html.find(".pc-custom-sir-input").off("change.peasantCustomSir").on("change.peasantCustomSir", async (event) => {
-      await this._onCustomSirLocationChange(event);
-    });
-
     html.find(".pc-portrait-lozenge-input[data-field]").off("input.peasantPortraitLozenge change.peasantPortraitLozenge").on("input.peasantPortraitLozenge", (event) => {
       const input = event.currentTarget;
       if (input?.dataset?.field === "system.initiative") {
@@ -1282,9 +1257,13 @@ export class PeasantActorSheet extends ActorSheetBase {
     setupBasicSkillAdvantageControls(this, html, { blurActiveEditableInSheet, collectAdvantagesFromDOM, enqueueSheetUpdate, runQueuedInputUpdate });
     setupSkillAdvantageDragDropControls(this, html, { sheetDocument, sheetBody, blurActiveEditableInSheet, collectAdvantagesFromDOM, enqueueSheetUpdate });
     setupSkillAdvantageDescriptionEditors(this, html, { enqueueSheetUpdate });
-    setupNotableCombatControls(this, html, { blurActiveEditableInSheet, enqueueSheetUpdate, runQueuedInputUpdate });
+    setupNotableCombatControls(this, html, {
+      blurActiveEditableInSheet,
+      enqueueSheetUpdate,
+      runQueuedInputUpdate,
+      openCombatEditor: openNotableCombatTagEditor
+    });
     setupNotableCombatDragDropControls(this, html, { sheetDocument });
-    setupNotableCombatTagEditorControls(this, html, { sheetDocument, sheetBody });
     setupInventoryControls(this, html, { runQueuedInputUpdate });
 
   }

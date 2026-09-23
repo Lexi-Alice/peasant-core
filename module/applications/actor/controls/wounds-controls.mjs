@@ -1,4 +1,5 @@
 import { escapeHtml } from "../../../utils/chat.mjs";
+import { getDevastatingWoundCount } from "../../../data/actor/wounds.mjs";
 import { delegate, qs, qsa, toElement } from "../../dom.mjs";
 import { renderSheetResourceDialog } from "./resource-dialogs.mjs";
 
@@ -26,6 +27,10 @@ function bindWoundTagHover(tagEl) {
   tagEl.dataset.pcWoundHoverBound = "true";
 
   const removeBtn = tagEl.querySelector(".pc-remove-condition, .remove-condition");
+  const actionButtons = [...new Set([
+    ...(removeBtn ? [removeBtn] : []),
+    ...tagEl.querySelectorAll(".pc-adjust-devastating-wounds")
+  ])];
   const setTagHoverState = (active) => {
     tagEl.classList.toggle("tag-hover-active", !!active);
     if (!active) {
@@ -47,34 +52,37 @@ function bindWoundTagHover(tagEl) {
     tagEl.style.setProperty("border-color", hoverBorder, "important");
     tagEl.style.setProperty("color", hoverText, "important");
   };
-  const setRemoveHoverState = (active) => {
-    if (!removeBtn) return;
-    removeBtn.classList.toggle("tag-hover-active", !!active);
+  const setActionHoverState = (button, active) => {
+    button.classList.toggle("tag-hover-active", !!active);
   };
 
   tagEl.addEventListener("mouseenter", () => setTagHoverState(true));
   tagEl.addEventListener("mouseleave", () => setTagHoverState(false));
 
-  if (!removeBtn) return;
-
-  removeBtn.addEventListener("mouseenter", () => {
-    setTagHoverState(false);
-    setRemoveHoverState(true);
-  });
-  removeBtn.addEventListener("mouseleave", () => {
-    setRemoveHoverState(false);
-    if (tagEl.matches(":hover")) setTagHoverState(true);
-  });
-  removeBtn.addEventListener("focusin", () => {
-    setTagHoverState(false);
-    setRemoveHoverState(true);
-  });
-  removeBtn.addEventListener("focusout", () => {
-    setRemoveHoverState(false);
-    setTimeout(() => {
-      if (tagEl.matches(":hover")) setTagHoverState(true);
-    }, 0);
-  });
+  for (const button of actionButtons) {
+    button.addEventListener("mouseenter", () => {
+      setTagHoverState(false);
+      setActionHoverState(button, true);
+    });
+    button.addEventListener("mouseleave", () => {
+      setActionHoverState(button, false);
+      if (tagEl.matches(":hover") && !actionButtons.some(action => action.matches(":hover"))) {
+        setTagHoverState(true);
+      }
+    });
+    button.addEventListener("focusin", () => {
+      setTagHoverState(false);
+      setActionHoverState(button, true);
+    });
+    button.addEventListener("focusout", () => {
+      setActionHoverState(button, false);
+      setTimeout(() => {
+        if (tagEl.matches(":hover") && !actionButtons.some(action => action.matches(":focus"))) {
+          setTagHoverState(true);
+        }
+      }, 0);
+    });
+  }
 }
 
 function getDialogWindowPosition(html, width) {
@@ -181,6 +189,22 @@ function bindWoundsDialog(sheet, html, { readOnly = !!sheet?.isReadOnlyObserver 
       }
     });
   }
+
+  for (const button of qsa(html, ".pc-adjust-devastating-wounds")) {
+    button.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const delta = Number.parseInt(button.dataset.delta, 10);
+      if (!Number.isFinite(delta)) return;
+      try {
+        await sheet.actor.adjustPeasantDevastatingWounds?.(delta);
+        refreshWoundsDialog(sheet, html);
+      } catch (err) {
+        console.warn("Failed to adjust Devastating Wounds:", err);
+      }
+    });
+  }
 }
 
 function openAddWoundDialog(sheet, trigger = null, position = null) {
@@ -190,6 +214,7 @@ function openAddWoundDialog(sheet, trigger = null, position = null) {
         <span>Select Wound Type</span>
         <select name="woundType" class="pc-select">
           <option value="wounded">Wounded</option>
+          <option value="devastatingly-wounded">Devastatingly Wounded</option>
           <optgroup label="--- Disabled ---">
             <option value="disabled:head">Disabled Head</option>
             <option value="disabled:rightArm">Disabled Right Arm</option>
@@ -227,10 +252,6 @@ function openAddWoundDialog(sheet, trigger = null, position = null) {
           openWoundsDialog(sheet, trigger, position);
           return true;
         }
-      },
-      cancel: {
-        icon: "fa-solid fa-xmark",
-        label: "Cancel"
       }
     },
     default: "add"
@@ -269,9 +290,23 @@ function renderActiveWounds(actor, { readOnly = false } = {}) {
     });
   }
 
-  if (!entries.length) return `<div class="pc-resource-empty">No active wounds</div>`;
+  const devastatingWoundCount = getDevastatingWoundCount(actor);
+  const countRow = devastatingWoundCount > 0 ? `
+    <div class="pc-wound-tag pc-wounds-devastating-row">
+      <span>Devastating Wounds</span>
+      ${readOnly
+        ? `<span class="pc-wounds-devastating-count">${devastatingWoundCount}</span>`
+        : `<span class="pc-wounds-devastating-controls">
+            <button type="button" class="pc-adjust-devastating-wounds" data-delta="1" data-tooltip="Add one Devastating Wound" aria-label="Add one Devastating Wound">+</button>
+            <span class="pc-wounds-devastating-count">${devastatingWoundCount}</span>
+            <button type="button" class="pc-adjust-devastating-wounds pc-remove-condition" data-delta="-1" data-tooltip="${devastatingWoundCount === 1 ? "Clear Devastating Wounds" : "Remove one Devastating Wound"}" aria-label="${devastatingWoundCount === 1 ? "Clear Devastating Wounds" : "Remove one Devastating Wound"}">${devastatingWoundCount === 1 ? "&times;" : "&minus;"}</button>
+          </span>`}
+    </div>
+  ` : "";
 
-  return entries.map((entry) => `
+  if (!entries.length) return `${countRow}<div class="pc-resource-empty">No active wounds</div>`;
+
+  return countRow + entries.map((entry) => `
     <div class="pc-wound-tag"${readOnly ? ` tabindex="0"` : ""}>
       <span>${escapeHtml(entry.label)}</span>
       ${readOnly ? "" : `<button type="button" class="pc-remove-condition" data-condition="${escapeHtml(entry.key)}" data-tooltip="Remove ${escapeHtml(entry.label)}" aria-label="Remove ${escapeHtml(entry.label)}">&times;</button>`}

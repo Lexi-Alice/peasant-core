@@ -1,32 +1,96 @@
 import { getCombatDefenseSummary } from "../../../data/actor/combat-defense.mjs";
-import { COMBAT_EDITOR_TAG_TYPES, formatRangeRateValue, getCombatCustomTags, getCombatTargetingType, hasRangeRateValue } from "../../../data/actor/combat-tags.mjs";
+import { COMBAT_FULL_TAG_ORDER, formatRangeRateValue, getCombatCustomTags, getCombatTargetingType, hasRangeRateValue } from "../../../data/actor/combat-tags.mjs";
 import { formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 
 export function getActiveNotableCombatEditorTags(combatData) {
   const rawTagOrder = Array.isArray(combatData?.tagOrder) ? combatData.tagOrder : [];
   const hasCustomOrder = rawTagOrder.length > 0;
   const tagOrder = hasCustomOrder
-    ? rawTagOrder.filter((tagType) => COMBAT_EDITOR_TAG_TYPES.includes(tagType))
-    : [...COMBAT_EDITOR_TAG_TYPES];
+    ? rawTagOrder.filter((tagType) => COMBAT_FULL_TAG_ORDER.includes(tagType))
+    : [...COMBAT_FULL_TAG_ORDER];
 
-  for (const tagType of COMBAT_EDITOR_TAG_TYPES) {
+  for (const tagType of COMBAT_FULL_TAG_ORDER) {
     if (!tagOrder.includes(tagType)) tagOrder.push(tagType);
   }
 
   const activeTags = [];
   for (const tagType of tagOrder) {
+    if (tagType === "description") continue;
     if (tagType === "custom") {
       const customTags = getCombatCustomTags(combatData);
       customTags.forEach((tag, customIndex) => {
-        const display = tag.value ? `${tag.name}: ${tag.value}` : tag.name;
-        activeTags.push({ type: "custom", display, customIndex });
+        const customId = String(tag.id || customIndex);
+        activeTags.push({
+          kind: "tag",
+          type: "custom",
+          key: `custom:${customId}`,
+          label: tag.name,
+          summary: tag.value || "",
+          display: tag.value ? `${tag.name}: ${tag.value}` : tag.name,
+          customIndex,
+          customId
+        });
       });
       continue;
     }
     const display = formatNotableCombatEditorTagValue(tagType, combatData);
-    if (display) activeTags.push({ type: tagType, display });
+    if (display) {
+      const label = getNotableCombatTagLabel(tagType);
+      const prefix = `${label}: `;
+      activeTags.push({
+        kind: "tag",
+        type: tagType,
+        key: tagType,
+        label,
+        summary: display.startsWith(prefix) ? display.slice(prefix.length) : (display === label ? "" : display),
+        display
+      });
+    }
   }
-  return activeTags;
+
+  const layout = Array.isArray(combatData?.layout)
+    ? combatData.layout
+    : (Array.isArray(combatData?.baseUsage?.layout) ? combatData.baseUsage.layout : []);
+  if (!layout.length) return activeTags;
+
+  const byKey = new Map(activeTags.map(tag => [tag.key, tag]));
+  const rendered = [];
+  for (const row of layout) {
+    const tag = byKey.get(row?.key);
+    if (!tag) continue;
+    rendered.push(tag);
+    byKey.delete(row.key);
+  }
+  rendered.push(...byKey.values());
+  return rendered;
+}
+
+export function getNotableCombatTagLabel(tagType) {
+  return ({
+    resourceCosts: "Resource Costs",
+    speed: "Speed",
+    staminaCost: "Stamina Cost",
+    attunementCost: "Attunement Cost",
+    range: "Range",
+    rangeRate: "Range-Rate",
+    damage: "Damage",
+    desperate: "Desperate",
+    overkill: "Overkill",
+    magnetism: "Magnetism",
+    heal: "Heal",
+    manifest: "Manifest",
+    manifestDome: "Manifest Dome",
+    manifestResistance: "Manifest Resistance",
+    tagUses: "Uses",
+    sections: "Sections",
+    targetingType: "Targeting",
+    defense: "Defense",
+    reach: "Reach",
+    stability: "Stability",
+    strengthen: "Strengthen",
+    custom: "Custom",
+    self: "Self"
+  })[tagType] || tagType;
 }
 
 export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
@@ -82,11 +146,18 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
       }
       return null;
     case "manifest":
-      if (hasCombatDice(combatData.manifest)) {
-        const str = `Manifest: ${formatCombatDiceDisplay(combatData.manifest.diceCount, combatData.manifest.diceValue, combatData.manifest.flat, combatData.manifest.diceBonus)}`;
+    case "manifestDome":
+    case "manifestResistance": {
+      const manifestData = combatData[tagType];
+      if (hasCombatDice(manifestData)) {
+        const label = tagType === "manifestDome"
+          ? "Manifest Dome"
+          : (tagType === "manifestResistance" ? "Manifest Resistance" : "Manifest");
+        const str = `${label}: ${formatCombatDiceDisplay(manifestData.diceCount, manifestData.diceValue, manifestData.flat, manifestData.diceBonus)}`;
         return str;
       }
       return null;
+    }
     case "tagUses":
       if (combatData.tagUses && combatData.tagUses.max > 0) {
         return `Uses: ${combatData.tagUses.current}/${combatData.tagUses.max}`;

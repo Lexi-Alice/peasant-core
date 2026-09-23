@@ -132,13 +132,9 @@
         <div class="sir-item">
           <label class="sir-label">{{sir.label}}</label>
           {{#if @root.editable}}
-            {{#if sir.isCustom}}
-              <input type="text" value="{{sir.value}}" class="sir-input pc-custom-sir-input pc-input" data-sir-key="{{sir.key}}" placeholder="+/-" inputmode="numeric" pattern="[+=\-]?\d*">
-            {{else}}
-              <input type="text" name="{{sir.inputName}}" value="{{sir.value}}" class="sir-input pc-input" placeholder="+/-" inputmode="numeric" pattern="[+=\-]?\d*">
-            {{/if}}
+            <input type="number" name="{{sir.inputName}}" value="{{sir.value}}" class="sir-input pc-input" step="1" inputmode="numeric" data-dtype="Number">
           {{else}}
-            <div class="sir-value">{{sir.value}}</div>
+            <div class="sir-value">{{sir.displayValue}}</div>
           {{/if}}
         </div>
       {{/each}}

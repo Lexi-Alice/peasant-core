@@ -3,12 +3,14 @@ import { parseOptionalInteger } from "../../data/actor/helpers.mjs";
 import { PC_SAVE_MODIFIER_FLAG } from "../../data/actor/sheet-settings.mjs";
 import { applyToHitFloor } from "../../dice/roll-targets.mjs";
 import { performSavingRoll } from "../../dice/rolls.mjs";
+import { getArmorAdjustedAoeSaveTarget, getEquippedArmorEffects } from "../../data/actor/equipped-armor.mjs";
 import { getActorRollSpeaker } from "./actor-targets.mjs";
 
 export function getActorAoeReflexSaveTn(actor) {
+  const equippedArmor = getEquippedArmorEffects(actor);
   const aoeSaveTarget = parseOptionalInteger(actor?.system?.reflexAoeSaveTarget, { min: 1 });
   if (actor?.system?.reflexAoeSaveEnabled && aoeSaveTarget !== null) {
-    return Math.max(2, aoeSaveTarget);
+    return getArmorAdjustedAoeSaveTarget(aoeSaveTarget, equippedArmor);
   }
 
   const combatMods = actor?.system?.combatMods || { toHit: 0 };
@@ -17,7 +19,8 @@ export function getActorAoeReflexSaveTn(actor) {
   const saveConfigMod = Number.isFinite(saveConfigModRaw) ? Math.trunc(saveConfigModRaw) : 0;
   const baseSaves = computeBaseSaves(actor?.system || {});
   const baseTn = Number.isFinite(baseSaves.reflex) ? baseSaves.reflex : 7;
-  return applyToHitFloor(baseTn, toHitMod + saveConfigMod, 2).toHit;
+  const reflexSaveTarget = applyToHitFloor(baseTn, toHitMod + saveConfigMod, 2).toHit;
+  return getArmorAdjustedAoeSaveTarget(reflexSaveTarget, equippedArmor);
 }
 
 export async function rollAoeReflexSaveForTarget({
@@ -28,11 +31,15 @@ export async function rollAoeReflexSaveForTarget({
 } = {}) {
   const actor = targetActor || target?.actor || null;
   if (!actor) return null;
+  if (getEquippedArmorEffects(actor).aoeAutoFail) {
+    return { toHit: null, rollResult: null, passed: false, automaticFailure: true };
+  }
 
   const token = targetToken || target?.token || target?.tokenDocument || null;
   const toHit = getActorAoeReflexSaveTn(actor);
   const label = String(targetingType || "AoE").trim() || "AoE";
   const rollResult = await performSavingRoll({
+    actor,
     toHit,
     skillName: `${label} Reflex Save`,
     speaker: getActorRollSpeaker(actor, token)

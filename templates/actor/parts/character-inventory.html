@@ -1,7 +1,7 @@
 <hr class="section-divider pc-tab-detached-divider">
 <div class="pc-tab-panel pc-inventory-tab-panel tab{{#if (eq activeSheetTab "inventory")}} active{{/if}}" data-pc-tab-panel="inventory" data-group="primary" data-tab="inventory">
   <fieldset class="pc-foundry-section pc-inventory-foundry-section">
-    <legend>Inventory</legend>
+    <legend class="control"><span>Inventory</span>{{#if @root.owner}}<button type="button" class="add-item-btn icon fa-regular fa-square-plus inline-control" data-pc-inventory-add-item data-tooltip aria-label="Add Item"></button>{{/if}}</legend>
 
     <section class="pc-inventory-browser{{#if inventoryDropEnabled}} pc-inventory-drop-enabled{{/if}}" aria-label="Inventory" data-pc-inventory-browser>
       <div class="pc-inventory-currency-strip" aria-label="Currency">
@@ -61,9 +61,6 @@
         <div class="pc-inventory-empty-state pc-inventory-search-empty" hidden>No matching items.</div>
       </section>
 
-      {{#if @root.editable}}
-        <button type="button" class="add-item-btn" data-pc-inventory-add-item> + Add Item </button>
-      {{/if}}
     </section>
   </fieldset>
 </div>

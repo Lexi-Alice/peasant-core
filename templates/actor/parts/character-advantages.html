@@ -1,7 +1,7 @@
 <hr class="section-divider pc-tab-detached-divider">
 <div class="pc-tab-panel pc-advantages-tab-panel tab{{#if (eq activeSheetTab "aspects-advantages")}} active{{/if}}" data-pc-tab-panel="aspects-advantages" data-group="primary" data-tab="aspects-advantages">
   <fieldset class="pc-foundry-section pc-advantages-foundry-section">
-    <legend>Flexible Advantages</legend>
+    <legend class="control"><span>Flexible Advantages</span>{{#if @root.editable}}<button type="button" class="add-advantage-btn icon fa-regular fa-square-plus inline-control" data-tooltip aria-label="Add Advantage"></button>{{/if}}</legend>
 
     <div class="advantages-container">
       {{#if @root.editable}}
@@ -16,7 +16,6 @@
             </li>
           {{/each}}
         </ul>
-        <button type="button" class="add-advantage-btn">+ Add Advantage</button>
       {{else}}
         <div class="advantages-list-view" style="padding: 10px; border-radius: 4px;">
           <ul style="padding-left: 20px; margin: 0; list-style-type: disc;">

@@ -63,6 +63,16 @@ export class PeasantEquipmentModel extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       ...equipableItemSchema(),
+      armor: new fields.SchemaField({
+        haltValues: new fields.ArrayField(new fields.NumberField({ integer: true, min: 0, initial: 0 }), { initial: [0, 0, 0, 0] }),
+        hardHead: new fields.BooleanField({ initial: false }),
+        hardArms: new fields.BooleanField({ initial: false }),
+        hardLegs: new fields.BooleanField({ initial: false }),
+        hardTorso: new fields.BooleanField({ initial: false }),
+        runStaminaModifier: new fields.NumberField({ integer: true, initial: 0 }),
+        movementProfile: new fields.StringField({ initial: "0" }),
+        aoeSaveModifier: new fields.StringField({ initial: "0" })
+      }),
       shield: new fields.SchemaField({
         hp: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         hardness: new fields.NumberField({ integer: true, min: 0, initial: 0 })

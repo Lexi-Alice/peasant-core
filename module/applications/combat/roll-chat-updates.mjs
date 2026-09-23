@@ -1,6 +1,24 @@
 import { formatThresholdValue } from "../../data/actor/sheet-settings.mjs";
 import { getForcePassSpendTypeLabel } from "../../data/actor/stress.mjs";
 
+export function formatSkillDiceLine(rollResult = {}) {
+  const initialDice = Array.isArray(rollResult.initialDice)
+    ? rollResult.initialDice.map(Number).filter(Number.isFinite)
+    : [];
+  const allDice = Array.isArray(rollResult.allDice)
+    ? rollResult.allDice.map(Number).filter(Number.isFinite)
+    : [];
+  const total = Number.isFinite(Number(rollResult.initialTotal)) ? Number(rollResult.initialTotal) : 0;
+  if (initialDice.length) return `Dice: [${initialDice.join(", ")}] = ${total}`;
+
+  const maxValue = Math.max(...allDice);
+  const maxIndex = allDice.indexOf(maxValue);
+  const display = allDice
+    .map((die, index) => index === maxIndex ? `<span style="color: #888;">${die}</span>` : die)
+    .join(", ");
+  return `Dice: [${display}] = ${total}`;
+}
+
 export async function markRollFailureDueToDefense(rollResult, { label = "Failure due to Defense" } = {}) {
   return updateSkillRollChatCardFromResult(rollResult, { label });
 }
@@ -39,7 +57,10 @@ export async function updateSkillRollChatCardFromResult(rollResult, { label = nu
 
   const rollDetails = container.querySelector(".roll-details");
   if (rollDetails instanceof HTMLElement) {
+    if (rollResult?.clearForcePassNote) rollDetails.querySelector(".pc-force-pass-note")?.remove();
     const detailLines = Array.from(rollDetails.children).filter((child) => child instanceof HTMLElement);
+    const diceLine = detailLines.find((child) => child.textContent?.trim().startsWith("Dice:"));
+    if (diceLine instanceof HTMLElement) diceLine.innerHTML = formatSkillDiceLine(rollResult);
     const baseMosLine = detailLines.find((child) => child.textContent?.trim().startsWith("Base MoS:"));
     if (baseMosLine instanceof HTMLElement && Number.isFinite(Number(rollResult?.baseMoS))) {
       const baseMoS = Number(rollResult.baseMoS);
@@ -123,10 +144,11 @@ export async function markRollForcedPass(rollResult, { stressCost = 0, spendType
   const rollDetails = container.querySelector(".roll-details");
   if (rollDetails instanceof HTMLElement) {
     const detailLines = Array.from(rollDetails.children).filter((child) => child instanceof HTMLElement);
-    const baseMosLine = detailLines.find((child) => child.textContent?.trim().startsWith("Base MoS:"));
+    const baseMosLine = detailLines.find((child) => /^(Base )?MoS:/.test(child.textContent?.trim()));
     if (baseMosLine instanceof HTMLElement && Number.isFinite(Number(rollResult?.baseMoS))) {
       const baseMoS = Number(rollResult.baseMoS);
-      baseMosLine.textContent = `Base MoS: ${baseMoS >= 0 ? "+" : ""}${baseMoS.toFixed(2)}`;
+      const label = baseMosLine.textContent.trim().startsWith("Base ") ? "Base MoS" : "MoS";
+      baseMosLine.textContent = `${label}: ${baseMoS >= 0 ? "+" : ""}${baseMoS.toFixed(2)}`;
     }
 
     let note = rollDetails.querySelector(".pc-force-pass-note");

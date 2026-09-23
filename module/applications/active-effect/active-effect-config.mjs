@@ -73,7 +73,7 @@ function getKeyBrowser(app) {
   let browser = KEY_BROWSER_BY_APP.get(app);
   if (!browser) {
     browser = new PeasantActiveEffectKeyBrowser({
-      keys: collectPeasantActiveEffectKeys()
+      keys: collectPeasantActiveEffectKeys({ effect: app.document })
     });
     KEY_BROWSER_BY_APP.set(app, browser);
   }
@@ -103,7 +103,7 @@ function bindKeyBrowser(app, element = getApplicationElement(app)) {
   }
 
   const browser = getKeyBrowser(app);
-  browser.setKeys(collectPeasantActiveEffectKeys());
+  browser.setKeys(collectPeasantActiveEffectKeys({ effect: app.document }));
 
   for (const input of element.querySelectorAll(".pc-ae-key-input")) {
     updateKeyMetadataHint(input);

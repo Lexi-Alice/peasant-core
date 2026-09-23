@@ -2,7 +2,7 @@
   <div class="pc-settings-groups">
     {{#each groups as |group|}}
       <fieldset class="pc-settings-group">
-        <legend>{{group.label}}</legend>
+        <legend class="control"><span>{{group.label}}</span>{{#if group.tagGroup}}<button type="button" class="pc-settings-add-tag icon fa-regular fa-square-plus inline-control" data-tooltip aria-label="Add {{group.addLabel}}"></button>{{/if}}</legend>
 
         {{#if group.tagGroup}}
           <div class="current-tags-list pc-settings-tag-list" role="list">
@@ -13,9 +13,6 @@
                 <button type="button" class="remove-tag-btn" data-tooltip="Remove {{tag.label}}" aria-label="Remove {{tag.label}}" draggable="false">&times;</button>
               </div>
             {{/each}}
-            <button type="button" class="pc-settings-add-tag" data-tooltip="Add {{group.addLabel}}" aria-label="Add {{group.addLabel}}">
-              +
-            </button>
           </div>
         {{else if group.settings.length}}
           {{#each group.settings as |setting|}}

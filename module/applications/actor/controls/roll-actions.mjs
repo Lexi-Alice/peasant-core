@@ -1,14 +1,15 @@
 import { computeBaseAttrToHits, computeBaseSaves } from "../../../data/actor/attributes.mjs";
+import { getDevastatingWoundAccuracyModifier } from "../../../data/actor/combat-modifiers.mjs";
 import { hasOptionalInteger, parseOptionalInteger } from "../../../data/actor/helpers.mjs";
 import { PC_CONSCIOUSNESS_SAVE_FLAG, PC_SAVE_MODIFIER_FLAG } from "../../../data/actor/sheet-settings.mjs";
-import { hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
-import { performConsciousnessCheck, performSavingRoll, performSkillRoll, performUntrainedSkillRoll } from "../../../dice/rolls.mjs";
+import { performConsciousnessCheck, performSavingRoll, performUntrainedSkillRoll } from "../../../dice/rolls.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
-import { attachRollUndoToChatMessage, captureActorRollUndo } from "../../chat-undo.mjs";
-import { attachEdgeChainToChatMessage, createActorSkillEdgeChainContext } from "../../combat/edge-chain-rolls.mjs";
+import { attachRollUndoToChatMessage } from "../../chat-undo.mjs";
+import { attachEdgeChainToChatMessage, createActorAttributeSkillEdgeChainContext } from "../../combat/edge-chain-rolls.mjs";
+import { maybeForcePassFailedRoll } from "../../combat/force-pass.mjs";
 import { rollManualCombatTag } from "../../combat/manual-combat-tag-rolls.mjs";
-import { startNotableCombatRoll } from "../../combat/notable-combat-workflow.mjs";
+import { createPeasantEntryUsageContext, startPeasantEntryUse } from "../../combat/skill-entry-use.mjs";
 
 function getActionElement(sheet, event, target) {
   return sheet?._getActionTarget?.(event, target) ?? target ?? event?.currentTarget ?? null;
@@ -40,14 +41,21 @@ export async function rollConsciousnessFromElement(sheet, event, target) {
     const th = Number.isFinite(parsedTh) ? parsedTh : null;
     if (th === null) return;
     const asSave = !!sheet.actor?.getFlag?.("peasant-core", PC_CONSCIOUSNESS_SAVE_FLAG);
-    await performConsciousnessCheck({
-      tn: th,
-      asSave,
-      speaker: ChatMessage.getSpeaker({ actor: sheet.actor })
-    });
+    await rollActorConsciousnessCheck({ actor: sheet.actor, tn: th, asSave });
   } catch (err) {
     console.warn("Consciousness TH click handler failed:", err);
   }
+}
+
+export async function rollActorConsciousnessCheck({ actor = null, tn = 7, asSave = false } = {}) {
+  if (!actor) return null;
+  const rollResult = await performConsciousnessCheck({
+    actor,
+    tn,
+    asSave,
+    speaker: ChatMessage.getSpeaker({ actor })
+  });
+  return { rollResult, forcePassResult: rollResult.forcePassResult };
 }
 
 export async function rollInitiativeFromElement(sheet, event, target) {
@@ -117,9 +125,12 @@ export async function rollCombatFromElement(sheet, event, target) {
       actor: sheet.actor?.name,
       combatIndex: idx
     });
-    await startNotableCombatRoll({
+    await sheet.actor.ensurePeasantEntryIds?.("notableCombats");
+    const entryId = String(sheet.actor.system?.notableCombats?.[idx]?.id || "").trim();
+    if (!entryId) return;
+    return startPeasantEntryUse({
       actor: sheet.actor,
-      combatIndex: idx,
+      ref: { collection: "notableCombats", entryId },
       sheet,
       promptForTargets: true
     });
@@ -149,24 +160,22 @@ export async function rollCombatTagFromElement(sheet, event, target) {
       return;
     }
 
+    await sheet.actor.ensurePeasantEntryIds?.("notableCombats");
     const combats = sheet.actor.system.notableCombats || [];
     const combat = combats[idx] || {};
-
-    if (rollType === "heal" && hasCombatDice(combat.heal)) {
-      await startNotableCombatRoll({
-        actor: sheet.actor,
-        combatIndex: idx,
-        sheet,
-        promptForTargets: true,
-        rollMode: "heal"
-      });
-      return;
-    }
+    const entryId = String(combat.id || "").trim();
+    if (!entryId) return;
+    const { usageContext } = await createPeasantEntryUsageContext({
+      actor: sheet.actor,
+      ref: { collection: "notableCombats", entryId }
+    });
+    if (!usageContext) return;
 
     await rollManualCombatTag({
       actor: sheet.actor,
       combatIndex: idx,
-      rollType
+      rollType,
+      usageContext
     });
   } catch (e) {
     console.error("combat-tag-rollable handler failed", e);
@@ -179,72 +188,14 @@ export async function rollSkillFromElement(sheet, event, target) {
     const el = getActionElement(sheet, event, target);
     const idx = readDataInt(el, "index");
     if (Number.isNaN(idx)) return;
-    const skills = sheet.actor.system.skills || [];
-    const skill = skills[idx] || {};
-    const combatMods = sheet.actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0 };
-    const toHitMod = parseInt(combatMods.toHit) || 0;
-    const accuracyMod = parseInt(combatMods.accuracy) || 0;
-    const skillTohit = parseOptionalInteger(skill.tohit, { min: 1 });
-    const skillAccuracy = parseOptionalInteger(skill.accuracy, { allowSign: true });
-    const baseTohit = hasOptionalInteger(skillTohit) ? skillTohit : 7;
-    const baseAccuracy = skillAccuracy ?? 0;
-    const skillCalc = applyToHitAccuracy(baseTohit, baseAccuracy, toHitMod, accuracyMod, 2);
-    const tohit = skillCalc.toHit;
-    const accuracy = skillCalc.accuracy;
-    const skillName = `${skill.name || "Skill"} Skill Roll`;
-    const isUntrained = String(skill.rank || "").trim().toLowerCase() === "u";
-
-    const consumeSigUse = async () => {
-      try {
-        const result = await sheet.actor.consumePeasantSkillUse?.(idx);
-        if (result?.skills) sheet._lastSkillsSnapshot = JSON.parse(JSON.stringify(result.skills));
-      } catch (err) {
-        console.warn("Failed to consume SIG use after autoroll:", err);
-      }
-    };
-
-    const accVal = accuracy !== 0 ? accuracy : undefined;
-    let rollResult = null;
-    let edgeChainContext = null;
-    if (isUntrained) {
-      const untrainedSkillName = `${skill.name || "Skill"} Untrained Skill Roll`;
-      edgeChainContext = createActorSkillEdgeChainContext({
-        actor: sheet.actor,
-        skillIndex: idx,
-        skillName: skill.name || "Skill"
-      });
-      rollResult = await performUntrainedSkillRoll({
-        toHit: tohit,
-        accuracy: 0,
-        skillName: untrainedSkillName,
-        speaker: ChatMessage.getSpeaker({ actor: sheet.actor }),
-        edgeChainContext
-      });
-    } else {
-      edgeChainContext = createActorSkillEdgeChainContext({
-        actor: sheet.actor,
-        skillIndex: idx,
-        skillName: skill.name || "Skill"
-      });
-      rollResult = await performSkillRoll({
-        toHit: tohit,
-        accuracy: accVal,
-        skillName,
-        speaker: ChatMessage.getSpeaker({ actor: sheet.actor }),
-        edgeChainContext
-      });
-    }
-    const useResult = await captureActorRollUndo(
-      sheet.actor,
-      `${skill.name || "Skill"} Skill Use`,
-      consumeSigUse
-    );
-    await attachRollUndoToChatMessage(rollResult?.chatMessage, useResult.undoRecords, {
-      label: `Undo ${skill.name || "Skill"} Roll Effects`
-    });
-    await attachEdgeChainToChatMessage(rollResult?.chatMessage, edgeChainContext, useResult.undoRecords, {
-      preRollRecords: useResult.undoRecords,
-      postRollRecords: []
+    await sheet.actor.ensurePeasantEntryIds?.("skills");
+    const skill = sheet.actor.system?.skills?.[idx];
+    const entryId = String(skill?.id || "").trim();
+    if (!entryId) return;
+    return startPeasantEntryUse({
+      actor: sheet.actor,
+      ref: { collection: "skills", entryId },
+      sheet
     });
   } catch (err) {
     console.warn("Skill roll click failed:", err);
@@ -260,12 +211,36 @@ export async function rollAttributeToHitFromElement(sheet, event, target) {
     const toHitMod = parseInt(combatMods.toHit) || 0;
     const baseMap = computeBaseAttrToHits(sheet.actor.system);
     const baseTn = Number.isFinite(baseMap[characteristic]) ? baseMap[characteristic] : 7;
-    const attrCalc = applyToHitAccuracy(baseTn, 0, toHitMod, 0, 2);
+    const woundAccuracyModifier = getDevastatingWoundAccuracyModifier(sheet.actor);
+    const attrCalc = applyToHitAccuracy(baseTn, 0, toHitMod, woundAccuracyModifier, 2);
     const tn = attrCalc.toHit;
     const accOverflow = attrCalc.accuracy;
     const skillName = `Untrained ${characteristic} Skill Roll`;
+    const edgeChainContext = createActorAttributeSkillEdgeChainContext({
+      actor: sheet.actor,
+      characteristic,
+      woundAccuracyModifier
+    });
 
-    await performUntrainedSkillRoll({ toHit: tn, accuracy: accOverflow, skillName, speaker: ChatMessage.getSpeaker({ actor: sheet.actor }) });
+    const rollResult = await performUntrainedSkillRoll({
+      toHit: tn,
+      accuracy: accOverflow,
+      skillName,
+      speaker: ChatMessage.getSpeaker({ actor: sheet.actor }),
+      edgeChainContext
+    });
+    const forcePassResult = await maybeForcePassFailedRoll({
+      actor: sheet.actor,
+      rollLabel: skillName,
+      rollResult
+    });
+    await attachRollUndoToChatMessage(rollResult?.chatMessage, forcePassResult?.undoRecords, {
+      label: `Undo ${characteristic} Roll Effects`
+    });
+    await attachEdgeChainToChatMessage(rollResult?.chatMessage, edgeChainContext, forcePassResult?.undoRecords, {
+      preRollRecords: [],
+      postRollRecords: forcePassResult?.undoRecords
+    });
   } catch (err) {
     console.warn("Attribute to-hit click failed:", err);
   }
@@ -298,7 +273,12 @@ export async function rollAttributeSaveFromElement(sheet, event, target) {
       skillName = `${pretty} Save`;
     }
 
-    await performSavingRoll({ toHit: tn, skillName, speaker: ChatMessage.getSpeaker({ actor: sheet.actor }) });
+    await performSavingRoll({
+      actor: sheet.actor,
+      toHit: tn,
+      skillName,
+      speaker: ChatMessage.getSpeaker({ actor: sheet.actor })
+    });
   } catch (err) {
     console.warn("Attribute save click failed:", err);
   }

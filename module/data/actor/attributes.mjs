@@ -10,7 +10,7 @@ function getAttributeValues(system) {
 
 export function computeBaseSaves(system) {
   const attrVals = getAttributeValues(system);
-  const blessing = system.blessing || { type: null, target: null };
+  const blessing = system.blessing || {};
   const baseSaves = {
     build: 18 - (attrVals.build * 2),
     reflex: 18 - (attrVals.reflex * 2),
@@ -19,30 +19,21 @@ export function computeBaseSaves(system) {
     charisma: 18 - (attrVals.charisma * 2)
   };
 
-  if (blessing.type === "spring" && blessing.target) {
-    const t = blessing.target;
-    if (baseSaves[t] !== undefined) baseSaves[t] = 16 - (attrVals[t] * 2);
-  }
-
-  if (blessing.type === "fall" && blessing.target) {
-    const t = blessing.target;
-    const otherSaves = Object.entries(baseSaves).filter(([k]) => k !== t).map(([, v]) => v);
-    if (otherSaves.length > 0) baseSaves[t] = Math.min(...otherSaves);
-  }
+  if (blessing.type === "spring") baseSaves.learn = 16 - (attrVals.learn * 2);
 
   return baseSaves;
 }
 
+export function getOmniWorstSaveTarget(system) {
+  return Math.max(...Object.values(computeBaseSaves(system)));
+}
+
 export function computeBaseAttrToHits(system) {
   const attrVals = getAttributeValues(system);
-  const blessing = system.blessing || { type: null, target: null };
-  const isSummer = blessing.type === "summer" && blessing.target;
-  const blessedValue = isSummer ? (attrVals[blessing.target] || 0) : 0;
-
-  const strBase = isSummer ? (22 - attrVals.build - attrVals.reflex - blessedValue) : (18 - attrVals.build - attrVals.reflex);
-  const dexBase = isSummer ? (22 - attrVals.reflex - attrVals.intuition - blessedValue) : (18 - attrVals.reflex - attrVals.intuition);
-  const mntBase = isSummer ? (22 - attrVals.intuition - attrVals.learn - blessedValue) : (18 - attrVals.intuition - attrVals.learn);
-  const socBase = isSummer ? (22 - attrVals.intuition - attrVals.charisma - blessedValue) : (18 - attrVals.intuition - attrVals.charisma);
+  const strBase = 18 - attrVals.build - attrVals.reflex;
+  const dexBase = 18 - attrVals.reflex - attrVals.intuition;
+  const mntBase = 18 - attrVals.intuition - attrVals.learn;
+  const socBase = 18 - attrVals.intuition - attrVals.charisma;
 
   const penaltyTarget = system.toHitPenaltyTarget || "";
   const str = (penaltyTarget === "Strength") ? (strBase - 1) : strBase;

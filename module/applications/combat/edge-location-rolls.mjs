@@ -324,7 +324,6 @@ async function createEdgeLocationRollSummary({
   const content = `<fieldset class="skill-roll-card pc-edge-location-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
     <legend>Edge Location Roll</legend>
     <div class="roll-details" style="display: block; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 12px; line-height: 1.55;">
-      <div>${escapeHtml(spenderActor?.name || "Actor")} spent 1 Edge.</div>
       <div>Old Location: ${escapeHtml(oldLabel)}</div>
       <div>New Location: ${escapeHtml(newLabel)}</div>
     </div>

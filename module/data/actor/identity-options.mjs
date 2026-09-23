@@ -1,3 +1,5 @@
+import { formatOptionalIntegerInput } from "./helpers.mjs";
+
 const SYSTEM_ID = "peasant-core";
 
 export const PC_NATIONAL_ORIGINS_SETTING = "nationalOriginOptions";
@@ -36,6 +38,21 @@ export const DEFAULT_SIR_LOCATIONS = Object.freeze([
   Object.freeze({ key: "sirDoomi", field: "sirDoomi", label: "Doomi" }),
   Object.freeze({ key: "sirSkeever", field: "sirSkeever", label: "Skeever" })
 ]);
+
+export function normalizeSirValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number) : 0;
+}
+
+export function normalizeSirValueMap(values) {
+  if (!values || typeof values !== "object" || Array.isArray(values)) return {};
+  const normalized = {};
+  for (const [rawKey, value] of Object.entries(values)) {
+    const key = sanitizeKey(rawKey);
+    if (key) normalized[key] = normalizeSirValue(value);
+  }
+  return normalized;
+}
 
 export function registerPeasantCoreIdentitySettings() {
   game.settings.register(SYSTEM_ID, PC_NATIONAL_ORIGINS_SETTING, {
@@ -115,22 +132,28 @@ export function getNationalOriginOptions(selectedValue) {
   return options;
 }
 
-export function getSirLocationRows(actor) {
-  const system = actor?.system ?? {};
-  const customValues = getCustomSirLocationValues(actor);
-  return getSirLocationEntries().map((entry) => ({
-    key: entry.key,
-    field: entry.field,
-    label: entry.label,
-    isCustom: !!entry.custom,
-    inputName: entry.field ? `system.${entry.field}` : "",
-    value: entry.custom ? (customValues[entry.key] ?? "") : (system?.[entry.field] ?? "")
-  }));
+export function getSirLocationRows(actor, { system = actor?.system ?? {} } = {}) {
+  const customValues = {
+    ...getCustomSirLocationValues(actor),
+    ...normalizeSirValueMap(system?.customSirs)
+  };
+  return getSirLocationEntries().map((entry) => {
+    const value = normalizeSirValue(entry.custom ? customValues[entry.key] : system?.[entry.field]);
+    return {
+      key: entry.key,
+      field: entry.field,
+      label: entry.label,
+      isCustom: !!entry.custom,
+      inputName: entry.field ? `system.${entry.field}` : `system.customSirs.${entry.key}`,
+      value,
+      displayValue: formatOptionalIntegerInput(value, { showPlus: true })
+    };
+  });
 }
 
 export function getCustomSirLocationValues(actor) {
   const raw = actor?.getFlag?.(SYSTEM_ID, PC_CUSTOM_SIR_LOCATION_VALUES_FLAG);
-  return raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+  return normalizeSirValueMap(raw);
 }
 
 export function getNationalOriginKeyForValue(value) {

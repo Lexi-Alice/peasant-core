@@ -5,6 +5,8 @@ import {
   normalizeRangeRateValue
 } from "../../data/actor/combat-tags.mjs";
 import { hasOptionalInteger, parseOptionalInteger } from "../../data/actor/helpers.mjs";
+import { getEffectiveSkillCombatModifiers } from "../../data/actor/combat-modifiers.mjs";
+import { getNotableCombatImage } from "../../data/actor/notable-combat-image.mjs";
 import { applyToHitAccuracy } from "../../dice/roll-targets.mjs";
 import { performSkillRoll, performUntrainedSkillRoll } from "../../dice/rolls.mjs";
 import { applyMessageMode, escapeHtml } from "../../utils/chat.mjs";
@@ -71,9 +73,9 @@ export async function renderNotableCombatsChat() {
     if (!combat.isDisplayable) return '';
 
     const indent = (Number(combat.indent) || 0) * 20;
-    const isStandard = !!combat.isStandard;
-    const classRank = isStandard ? escapeHtml(combat.classRankDisplay ?? '') : escapeHtml(combat.type ?? '');
-    const sigLabel = (combat.sig && isStandard) ? '<span class="combat-sig-label">SIG</span>' : '';
+    const isSkillType = !!combat.isSkillType;
+    const classRank = isSkillType ? escapeHtml(combat.classRankDisplay ?? '') : escapeHtml(combat.type ?? '');
+    const sigLabel = (combat.isSignature && isSkillType) ? '<span class="combat-sig-label">SIG</span>' : '';
 
     const nameSuffix = (combat.hasToHit || combat.hasAccuracy) ? ':' : '';
     const nameText = escapeHtml(combat.name ?? '');
@@ -94,7 +96,7 @@ export async function renderNotableCombatsChat() {
       ? `<span class="combat-roll-clickable" data-index="${index}" tabindex="0" data-tooltip="Roll ${nameText}" aria-label="Roll ${nameText}">${rollText.trim()}</span>`
       : '';
 
-    const usesHtml = combat.sig ? `
+    const usesHtml = combat.isSignature ? `
       <span class="combat-uses-display">
         <span class="uses-label">Uses</span>
         <span class="combat-uses-box">
@@ -190,7 +192,7 @@ export async function renderNotableCombatsChat() {
         const combatsRaw = actorNow.system.notableCombats || [];
         const combat = combatsRaw[idx] || {};
 
-        const combatMods = actorNow.system.combatMods || { toHit: 0, accuracy: 0 };
+        const combatMods = getEffectiveSkillCombatModifiers(actorNow);
         const toHitMod = parseInt(combatMods.toHit) || 0;
         const accuracyMod = parseInt(combatMods.accuracy) || 0;
 
@@ -214,13 +216,14 @@ export async function renderNotableCombatsChat() {
 
           const speaker = ChatMessage.getSpeaker({ actor: actorNow });
           const combatName = combat.name || 'Combat';
+          const imageSrc = getNotableCombatImage(combat);
 
           if (isUntrained && rollFns.performUntrainedSkillRoll) {
-            await rollFns.performUntrainedSkillRoll({ toHit: finalTohit, accuracy: finalAccuracy, skillName: `${combatName} Untrained Roll`, speaker });
+            await rollFns.performUntrainedSkillRoll({ toHit: finalTohit, accuracy: finalAccuracy, skillName: `${combatName} Untrained Roll`, speaker, imageSrc });
             return;
           }
           if (rollFns.performSkillRoll) {
-            await rollFns.performSkillRoll({ toHit: finalTohit, accuracy: accVal, skillName: `${combatName} Roll`, speaker });
+            await rollFns.performSkillRoll({ toHit: finalTohit, accuracy: accVal, skillName: `${combatName} Roll`, speaker, imageSrc });
             return;
           }
 
@@ -261,8 +264,7 @@ export async function renderNotableCombatsChat() {
                   const accAdj = -idx;
                   await executeCombatRoll(toHitAdj, accAdj);
                 }
-              },
-              cancel: { icon: '<i class="fas fa-times"></i>', label: 'Cancel' }
+              }
             },
             default: 'roll'
           }, { classes: ["peasant-macro-dialog", "peasant-macro-dialog-force"] });

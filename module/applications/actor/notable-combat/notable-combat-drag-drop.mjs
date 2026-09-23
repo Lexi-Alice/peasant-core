@@ -2,7 +2,6 @@ import { delegate, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
 const COMBAT_ROW_DRAG_BLOCK_SELECTOR = "button, input, select, textarea, a, .combat-tag-draggable, .combat-roll-clickable, .combat-actions";
-const COMBAT_HOTBAR_DRAG_TYPE = "peasant-core.notableCombat";
 const COMBAT_ROW_DRAG_PREFIX = "peasant-core.notable-combat-sort";
 
 export function setupNotableCombatDragDropControls(sheet, html) {
@@ -10,13 +9,13 @@ export function setupNotableCombatDragDropControls(sheet, html) {
   if (!root) return;
 
   setupCombatTagDragDrop(sheet, root);
-  setupCombatHotbarDrag(sheet, root);
   setupCombatRowDragDrop(sheet, root);
 }
 
-export function setupNotableCombatTagEditorDrag(sheet, container, combatIndex, { onChanged } = {}) {
+export function setupNotableCombatTagEditorDrag(sheet, container, combatIndex, { onChanged, reorderTag } = {}) {
   const root = toElement(container);
-  const list = root?.querySelector(".current-tags-list");
+  const list = root?.querySelector("[data-pc-local-tags-list] > .current-tags-list")
+    ?? root?.querySelector(".current-tags-list");
   if (!list) return;
 
   let draggedTag = null;
@@ -53,11 +52,11 @@ export function setupNotableCombatTagEditorDrag(sheet, container, combatIndex, {
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
       if (!draggedTag || draggedTag === tag) return;
 
-      const rect = tag.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
+      const pointer = tag.classList.contains("pc-skill-tag-row") ? event.clientY : event.clientX;
+      const insertAfter = isDropAfter(tag, pointer);
       clearDragMarkers(list, ".editor-tag-draggable", "drag-over-left", "drag-over-right");
-      tag.classList.toggle("drag-over-left", event.clientX < midX);
-      tag.classList.toggle("drag-over-right", event.clientX >= midX);
+      tag.classList.toggle("drag-over-left", !insertAfter);
+      tag.classList.toggle("drag-over-right", insertAfter);
     });
 
     tag.addEventListener("dragleave", () => {
@@ -74,7 +73,13 @@ export function setupNotableCombatTagEditorDrag(sheet, container, combatIndex, {
       const target = getTagDescriptor(tag);
       if (!dragged.type || !target.type || !dragged.key || !target.key || dragged.key === target.key) return;
 
-      const insertAfter = isDropAfter(tag, event.clientX);
+      const pointer = tag.classList.contains("pc-skill-tag-row") ? event.clientY : event.clientX;
+      const insertAfter = isDropAfter(tag, pointer);
+      if (typeof reorderTag === "function") {
+        const result = await reorderTag(dragged.key, target.key, { insertAfter });
+        if (result?.changed) onChanged?.();
+        return;
+      }
       if (dragged.type === "custom" && target.type === "custom" && !Number.isNaN(dragged.customIndex) && !Number.isNaN(target.customIndex)) {
         const result = await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIndex, dragged.customIndex, target.customIndex, { insertAfter });
         if (result?.changed) onChanged?.();
@@ -239,8 +244,8 @@ function setupCombatRowDragDrop(sheet, root) {
       const fromIndex = sheet._combatDragState.fromIndex;
       if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) return;
 
-      targetRow.classList.toggle("drag-over-bottom", dropAfter);
-      targetRow.classList.toggle("drag-over-top", !dropAfter);
+      const nextRow = getCombatRowsInList(list).find(row => resolveElementIndex(row, "data-combat-index") === toIndex);
+      (nextRow ?? targetRow).classList.add(nextRow ? "drag-over-top" : "drag-over-bottom");
     } catch (e) {}
   });
 
@@ -279,41 +284,6 @@ function setupCombatRowDragDrop(sheet, root) {
     } catch (e) {
       console.warn("Failed to reorder combats via drag/drop:", e);
     }
-  });
-}
-
-function setupCombatHotbarDrag(sheet, root) {
-  delegate(root, "dragstart", ".pc-notable-combat-hotbar-drag", (event, item) => {
-    try {
-      if (event.target?.closest?.(COMBAT_ROW_DRAG_BLOCK_SELECTOR)) return;
-
-      const combatIndex = resolveElementIndex(item, "data-combat-index");
-      if (Number.isNaN(combatIndex)) return;
-
-      const combat = sheet.actor?.system?.notableCombats?.[combatIndex] || null;
-      const combatId = String(item.dataset.combatId || combat?.id || "").trim();
-      const actorUuid = sheet.actor?.uuid || "";
-      if (!actorUuid) return;
-
-      if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = "copy";
-        event.dataTransfer.setData("text/plain", JSON.stringify({
-          type: COMBAT_HOTBAR_DRAG_TYPE,
-          actorUuid,
-          combatId,
-          combatIndex
-        }));
-      }
-      item.classList.add("dragging");
-    } catch (e) {
-      pcLog.debug("combat hotbar dragstart failed", e);
-    }
-  });
-
-  delegate(root, "dragend", ".pc-notable-combat-hotbar-drag", (event, item) => {
-    try {
-      item.classList.remove("dragging");
-    } catch (e) {}
   });
 }
 
@@ -361,6 +331,10 @@ function getTagDescriptor(tag) {
 
 function isDropAfter(element, clientX) {
   const rect = element.getBoundingClientRect();
+  if (element.classList?.contains("pc-skill-tag-row")) {
+    const siblings = qsa(element.parentElement, ".editor-tag-draggable");
+    return siblings.at(-1) === element && clientX >= rect.top + rect.height / 2;
+  }
   const midX = rect.left + rect.width / 2;
   return clientX >= midX;
 }

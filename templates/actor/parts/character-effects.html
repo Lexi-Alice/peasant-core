@@ -1,7 +1,7 @@
 <hr class="section-divider pc-tab-detached-divider">
 <div class="pc-tab-panel pc-effects-tab-panel tab{{#if (eq activeSheetTab "effects")}} active{{/if}}" data-pc-tab-panel="effects" data-group="primary" data-tab="effects">
   <fieldset class="pc-foundry-section pc-passive-effects-foundry-section">
-    <legend>Active Effects</legend>
+    <legend class="control"><span>Active Effects</span>{{#if @root.owner}}<button type="button" class="add-effect-btn icon fa-regular fa-square-plus inline-control" data-pc-passive-effect-add data-tooltip aria-label="Add Effect"></button>{{/if}}</legend>
 
     <section class="pc-inventory-browser pc-passive-effects-browser" aria-label="Active Effects" data-pc-passive-effects-browser>
       <div class="pc-inventory-toolbar pc-passive-effects-toolbar">
@@ -43,6 +43,8 @@
                       {{#if @root.owner}}
                         {{#if effect.canToggle}}
                           <button type="button" class="pc-passive-effect-toggle header-control icon fa-solid {{#if effect.disabled}}fa-toggle-off{{else}}fa-toggle-on active{{/if}}" data-tooltip="{{effect.toggleTooltip}}" aria-label="{{effect.toggleTooltip}}" aria-pressed="{{#if effect.disabled}}false{{else}}true{{/if}}" data-pc-passive-effect-toggle></button>
+                        {{/if}}
+                        {{#if effect.canManage}}
                           <button type="button" class="pc-inventory-menu-toggle pc-passive-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-passive-effect-menu></button>
                         {{/if}}
                       {{/if}}
@@ -60,14 +62,11 @@
         <div class="pc-inventory-empty-state pc-passive-effects-search-empty" hidden>No matching effects.</div>
       </section>
 
-      {{#if @root.editable}}
-        <button type="button" class="add-effect-btn" data-pc-passive-effect-add> + Add Effect </button>
-      {{/if}}
     </section>
   </fieldset>
 
   <fieldset class="pc-foundry-section pc-effects-foundry-section">
-    <legend>Combat Adjustments</legend>
+    <legend class="control"><span>Combat Adjustments</span>{{#if @root.owner}}<button type="button" class="add-combat-halt-buff icon fa-regular fa-square-plus inline-control" data-tooltip aria-label="Add Buff"></button>{{/if}}</legend>
 
     <div class="combat-modifiers pc-effects-modifiers">
       <div class="combat-modifier-box">
@@ -163,7 +162,6 @@
         {{/if}}
       {{/each}}
 
-      <button type="button" class="add-combat-halt-buff" data-tooltip="Add Buff" aria-label="Add Buff">+</button>
     </div>
   </fieldset>
 </div>
