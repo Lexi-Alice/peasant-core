@@ -27,7 +27,7 @@ import {
 } from "../edge-resources.mjs";
 import { getActorBolsteredMax, getActorHealthMax, isSimplifiedHpActor } from "../helpers.mjs";
 import { addEquippedArmorHalt, getEquippedArmorEffects } from "../equipped-armor.mjs";
-import { getActiveArmorTraining } from "../active-armor.mjs";
+import { getEquippedArmorGrade } from "../active-armor.mjs";
 import {
   PC_ART_PANEL_COLLAPSED_FLAG,
   PC_DEFAULT_RUN_MULTIPLIER,
@@ -151,21 +151,12 @@ export function prepareActorHealthResourceContext(data, actor, { isEditMode = fa
   const attunementBar = buildResourceBar("attunement", "Attunement");
   const capacityBar = buildResourceBar("capacity", "Capacity");
   const edgeBar = buildResourceBar("edge", data.edgeDisplayLabel || "Edge");
-  const armorTraining = getActiveArmorTraining(actor);
-  const armorChargeCapacity = armorTraining.capacity;
-  const armorChargeValue = Math.max(0, Math.min(Number(system?.armorCharge?.value) || 0, armorChargeCapacity));
-  const armorChargeValueInput = Math.max(0, Math.min(numberInput(editSystem?.armorCharge?.value, armorChargeValue), armorChargeCapacity));
-  const armorGradeLabel = armorTraining.grade ? `${armorTraining.grade} armor` : "no physical armor";
-  const armorSkillLabel = armorTraining.skill
-    ? `Armor Class ${armorTraining.skill.class}, Rank ${armorTraining.skill.rank}`
-    : "no Armor skill";
+  const armorChargeBar = buildResourceBar("armorCharge", "Armor Charge");
+  const armorGrade = getEquippedArmorGrade(actor);
+  const armorGradeLabel = armorGrade ? `${armorGrade} armor` : "no physical armor";
   data.armorCharge = {
-    ...buildResourceBar("armorCharge", "Armor Charge"),
-    value: armorChargeValue,
-    valueInput: armorChargeValueInput,
-    max: armorChargeCapacity,
-    maxInput: armorChargeCapacity,
-    tooltip: `Armor Charge ${armorChargeValue} / ${armorChargeCapacity}; ${armorGradeLabel}, ${armorSkillLabel}.`
+    ...armorChargeBar,
+    tooltip: `Armor Charge ${armorChargeBar.value} / ${armorChargeBar.max}; ${armorGradeLabel}.`
   };
   data.resourceBars = {
     stamina: staminaBar,

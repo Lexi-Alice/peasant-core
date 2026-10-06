@@ -2,7 +2,7 @@ import { PEASANT_ITEM_TYPES } from "../../data/item/_module.mjs";
 import { PeasantItem } from "../../documents/_module.mjs";
 import { normalizeHaltSlashValue, normalizeHaltSlashValueEditable, normalizeHaltValues } from "../../data/actor/combat-modifiers.mjs";
 import { ensureSlideToggleElement } from "../components/slide-toggle.mjs";
-import { delegate, qs, qsa } from "../dom.mjs";
+import { delegate, markVerticalDropBoundary, qs, qsa } from "../dom.mjs";
 import { configurePeasantItemSheetHooks } from "./hooks.mjs";
 
 const ItemSheetV2Class = foundry?.applications?.sheets?.ItemSheetV2;
@@ -504,7 +504,6 @@ export class PeasantItemSheet extends ItemSheetBase {
     root?.classList.toggle("editable", this.isEditable && this.isEditMode);
     root?.classList.toggle("interactable", this.isEditable && !this.isEditMode);
     root?.classList.toggle("locked", !this.isEditable);
-    this._fitToContent();
   }
 
   _configureRenderOptions(options) {
@@ -915,14 +914,6 @@ export class PeasantItemSheet extends ItemSheetBase {
     }
   }
 
-  _fitToContent() {
-    const root = getApplicationElement(this);
-    if (!root) return;
-    root.style.height = "auto";
-    root.style.minHeight = "0";
-    root.style.maxHeight = "calc(100vh - 80px)";
-  }
-
   _bindItemTabButtons() {
     const root = getApplicationElement(this);
     if (!root) return;
@@ -1291,8 +1282,7 @@ export class PeasantItemSheet extends ItemSheetBase {
 
       const targetRow = getItemEffectDropTargetRow(event.target, list);
       if (!targetRow || targetRow.dataset.effectId === this._pcItemEffectDragState.effectId) return;
-      targetRow.classList.toggle("drag-over-bottom", isItemEffectDropAfter(targetRow, event.clientY));
-      targetRow.classList.toggle("drag-over-top", !isItemEffectDropAfter(targetRow, event.clientY));
+      markVerticalDropBoundary(getItemEffectRowsInList(list), targetRow, isItemEffectDropAfter(targetRow, event.clientY));
     });
 
     delegate(browser, "dragleave", ".pc-item-effects-items", () => {

@@ -11,7 +11,8 @@ export async function resolveSuccessfulHealForTarget({
   target = null,
   attackRoll = null,
   edgeIndividualDieReplay = null,
-  combatMods = null
+  combatMods = null,
+  onSaveReplayProgress = null
 } = {}) {
   if (!actor || !combat?.heal || !target) return null;
   if (!attackRoll?.rollResult?.isSuccess) return null;
@@ -39,6 +40,7 @@ export async function resolveSuccessfulHealForTarget({
     combatMods,
     maximize: targetActor.system?.blessing?.type === "summer"
   });
+  onSaveReplayProgress?.({ healRoll });
   if (!healRoll || !Number.isFinite(Number(healRoll.total)) || Number(healRoll.total) <= 0) {
     return { handled: false, reason: "noHealRolled", healRoll };
   }
@@ -52,6 +54,7 @@ export async function resolveSuccessfulHealForTarget({
     healRoll,
     healType
   });
+  onSaveReplayProgress?.({ healRoll, application });
   if (application?.handled && !application?.applied) {
     ui.notifications?.warn?.(application?.applyResult?.message || `Could not apply healing to ${targetActor.name || "target"}.`);
   }

@@ -159,11 +159,11 @@
           <div class="pc-skill-editor-usage-inline" aria-label="Selected usage">
             <label class="pc-notable-combat-stat-field pc-skill-editor-usage-field">
               <span>Usage</span>
-              <select class="pc-entry-usage-select pc-select" data-pc-usage-select aria-label="Usage" {{#unless editable}}disabled{{/unless}}>
+              <select class="pc-entry-usage-select pc-select" data-pc-usage-select aria-label="Usage" {{#unless canManageEntry}}disabled{{/unless}}>
                 {{#each usageOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}{{#if isDefault}} (Default){{/if}}</option>{{/each}}
               </select>
             </label>
-            {{#if editable}}<button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-pc-usage-menu data-tooltip="Usage Options" aria-label="Usage Options"></button>{{/if}}
+            {{#if canManageEntry}}<button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-pc-usage-menu data-tooltip="Usage Options" aria-label="Usage Options"></button>{{/if}}
           </div>
         {{/if}}
         <label class="pc-notable-combat-stat-field"><span>AP</span><input type="text" class="pc-entry-ap-input pc-input" value="{{apInput}}" inputmode="numeric" {{#unless editable}}disabled{{/unless}}></label>
@@ -192,11 +192,11 @@
     <section class="pc-skill-editor-usage-row" aria-label="Selected usage">
       <label class="pc-notable-combat-stat-field pc-skill-editor-usage-field">
         <span>Usage</span>
-        <select class="pc-entry-usage-select pc-select" data-pc-usage-select aria-label="Usage" {{#unless editable}}disabled{{/unless}}>
+        <select class="pc-entry-usage-select pc-select" data-pc-usage-select aria-label="Usage" {{#unless canManageEntry}}disabled{{/unless}}>
           {{#each usageOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}{{#if isDefault}} (Default){{/if}}</option>{{/each}}
         </select>
       </label>
-      {{#if editable}}<button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-pc-usage-menu data-tooltip="Usage Options" aria-label="Usage Options"></button>{{/if}}
+      {{#if canManageEntry}}<button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-pc-usage-menu data-tooltip="Usage Options" aria-label="Usage Options"></button>{{/if}}
     </section>
   {{/unless}}
   {{/if}}
@@ -219,7 +219,11 @@
   <section class="pc-item-tab-panel pc-notable-combat-editor-panel active" data-pc-notable-combat-panel="description" role="tabpanel">
     <fieldset class="pc-foundry-section pc-notable-combat-description-section">
       <legend>Description</legend>
-      <prose-mirror name="combatDescription" class="pc-notable-combat-description-editor pc-item-description-editor inventory-editor peasant-desc-editor" value="{{combatDescription}}" data-document-uuid="{{documentUuid}}"></prose-mirror>
+      {{#if editable}}
+        <prose-mirror name="combatDescription" class="pc-notable-combat-description-editor pc-item-description-editor inventory-editor peasant-desc-editor" value="{{combatDescription}}" data-document-uuid="{{documentUuid}}"></prose-mirror>
+      {{else}}
+        <div class="pc-item-description">{{{descriptionHTML}}}</div>
+      {{/if}}
     </fieldset>
   </section>
 
@@ -244,6 +248,7 @@
           <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="desperate" role="option">Desperate</div>
           <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="overkill" role="option">Overkill</div>
           <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="magnetism" role="option">Magnetism</div>
+          <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="tippingScales" role="option">Tipping Scales</div>
           <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="heal" role="option">Heal</div>
           <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="manifest" role="option">Manifest</div>
           <div class="pc-skill-tag-option" data-pc-tag-option data-tag-type="manifestDome" role="option">Manifest Dome</div>
@@ -278,12 +283,9 @@
       </div>
 
       <div data-pc-tag-draft-home>
-        {{#if editable}}
+        {{#if canManageEntry}}
         <section class="pc-skill-tag-draft" data-pc-tag-draft hidden>
           <div class="tag-input-area"></div>
-          <div class="pc-skill-tag-draft-actions">
-            <button type="button" class="peasant-tag-add" data-pc-tag-save><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span>Save Tag</span></button>
-          </div>
         </section>
         {{/if}}
       </div>
@@ -337,7 +339,7 @@
                           <div class="pc-inventory-row-field pc-item-effect-state">{{effect.status}}</div>
 
                           <div class="pc-inventory-row-controls pc-item-effect-controls">
-                            {{#if @root.editable}}
+                            {{#if @root.canManageEntry}}
                               <button type="button" class="pc-inventory-menu-toggle pc-item-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-notable-combat-effect-menu></button>
                             {{/if}}
                           </div>
@@ -377,7 +379,7 @@
                         <div class="pc-inventory-row-field pc-item-effect-state">{{effect.status}}</div>
 
                         <div class="pc-inventory-row-controls pc-item-effect-controls">
-                          {{#if @root.editable}}
+                          {{#if @root.canManageEntry}}
                             <button type="button" class="pc-inventory-menu-toggle pc-item-effect-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="Effect Options" aria-label="Effect Options" data-pc-notable-combat-effect-menu></button>
                           {{/if}}
                         </div>

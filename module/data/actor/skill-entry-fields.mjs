@@ -56,6 +56,7 @@ export function createSkillMechanicFields(fields) {
     })),
     desperate: new fields.NumberField({ integer: true, initial: 0 }),
     overkill: new fields.BooleanField({ initial: false }),
+    tippingScales: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
     magnetism: new fields.SchemaField({
       grade: new fields.NumberField({ integer: true, min: 0, initial: 0 })
     }),

@@ -1,5 +1,6 @@
 ﻿// Peasant Core System Initialization
 import { configurePeasantCombat } from "./documents/_module.mjs";
+import { configurePeasantActorDelta } from "./documents/actor-delta.mjs";
 import { configurePeasantActiveEffects } from "./data/active-effect/_module.mjs";
 import { configurePeasantActiveEffectStateOperations } from "./data/active-effect/state-operations.mjs";
 import { configurePeasantSpellEffectSlotGuards } from "./data/active-effect/spell-effects.mjs";
@@ -25,6 +26,7 @@ initializePeasantSockets();
 Hooks.once('init', () => {
   console.log('Peasant Core | System initialized');
   configurePeasantCombat();
+  configurePeasantActorDelta();
   configurePeasantActiveEffectStateOperations();
   configurePeasantSpellEffectSlotGuards();
   configurePeasantSpellEffectLifecycle();

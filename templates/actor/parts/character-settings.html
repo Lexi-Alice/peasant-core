@@ -28,8 +28,8 @@
                 <input
                   type="checkbox"
                   id="{{setting.id}}"
-                  class="pc-sheet-setting-input"
-                  data-pc-setting="{{setting.flagKey}}"
+                  class="{{#if setting.blessingType}}pc-blessing-choice{{else}}pc-sheet-setting-input{{/if}}"
+                  {{#if setting.blessingType}}data-blessing-type="{{setting.blessingType}}"{{else}}data-pc-setting="{{setting.flagKey}}"{{/if}}
                   {{#if setting.checked}}checked{{/if}}
                   {{#unless setting.editable}}disabled{{/unless}}>
               {{else}}
@@ -53,8 +53,8 @@
                   <input
                     type="number"
                     id="{{setting.id}}"
-                    class="pc-sheet-setting-input pc-input"
-                    data-pc-setting="{{setting.flagKey}}"
+                    class="{{#if setting.fallUseField}}pc-fall-blessing-uses-input{{else}}pc-sheet-setting-input{{/if}} pc-input"
+                    {{#if setting.fallUseField}}data-fall-use-field="{{setting.fallUseField}}"{{else}}data-pc-setting="{{setting.flagKey}}"{{/if}}
                     value="{{setting.value}}"
                     step="{{setting.step}}"
                     inputmode="{{setting.inputMode}}"

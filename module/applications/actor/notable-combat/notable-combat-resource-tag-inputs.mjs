@@ -89,5 +89,7 @@ export function renderResourceCostTagInputs(area, combatData) {
 
   delegate(root, "click", ".remove-cost-row", (event, button) => {
     button.closest(".resource-cost-row")?.remove();
+    const ChangeEvent = root.ownerDocument?.defaultView?.Event ?? Event;
+    root.dispatchEvent(new ChangeEvent("change", { bubbles: true }));
   }, { signal });
 }

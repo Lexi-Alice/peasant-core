@@ -4,9 +4,13 @@ tests/
 tests/*
 !tests/skill-entry-links.test.mjs
 !tests/notable-combat-hotbar.test.mjs
+!tests/notable-combat-inline-edit.test.mjs
 !tests/skill-entry-replay.test.mjs
 !tests/skill-entry-use.test.mjs
 !tests/section-add-control-listeners.test.mjs
+!tests/e5-*.test.mjs
+!tests/equipped-armor-effects.test.mjs
+!tests/flexible-advantage-descriptions.test.mjs
 tmp/
 docs/
 !docs/
@@ -16,4 +20,5 @@ docs/superpowers/*
 !docs/superpowers/plans/
 docs/superpowers/plans/*
 !docs/superpowers/plans/2026-09-07-skill-and-notable-editor-validation.md
+!docs/superpowers/plans/2026-10-02-e5-audit-repairs.md
 .superpowers/

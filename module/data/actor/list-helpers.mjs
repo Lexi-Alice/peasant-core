@@ -31,6 +31,24 @@ export function removeActorListEntry(list, index) {
   return { ok: true, changed: true, list };
 }
 
+export function duplicateActorListEntry(list, index, createId) {
+  const sourceIndex = parseActorListIndex(index);
+  const source = list?.[sourceIndex];
+  if (sourceIndex === null || !Array.isArray(list) || !source || typeof source !== "object" || typeof createId !== "function") {
+    return { ok: false, changed: false };
+  }
+
+  const indent = Math.max(0, Number.parseInt(source.indent, 10) || 0);
+  let insertIndex = sourceIndex + 1;
+  while (insertIndex < list.length && (Math.max(0, Number.parseInt(list[insertIndex]?.indent, 10) || 0) > indent)) insertIndex++;
+  const entry = cloneActorList([source])[0];
+  entry.id = createId();
+  entry.name = `${String(source.name ?? "")} (Copy)`;
+  entry.indent = indent;
+  list.splice(insertIndex, 0, entry);
+  return { ok: true, changed: true, list, entry };
+}
+
 export function reorderActorListEntry(list, fromIndex, toIndex) {
   const from = parseActorListIndex(fromIndex);
   let to = parseActorListIndex(toIndex);

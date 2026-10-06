@@ -6,11 +6,11 @@ export const SKILL_TYPE_OPTIONS = Object.freeze([
   { value: "Signature", label: "Signature" },
   { value: "Stance", label: "Stance" },
   { value: "Perk", label: "Perk" },
-  { value: "Style", label: "Style" },
   { value: "Cantrip", label: "Cantrip" },
   { value: "Historic", label: "Historic" },
   { value: "TM", label: "TM" },
   { value: "Spellcraft", label: "Spellcraft" },
+  { value: "Style", label: "Style" },
   { value: "Gate", label: "Gate" },
   { value: "Spell", label: "Spell" },
   { value: "Subskill", label: "Subskill" },
@@ -20,7 +20,7 @@ export const SKILL_TYPE_OPTIONS = Object.freeze([
 const FIXED_SKILL_TYPE_OPTIONS = SKILL_TYPE_OPTIONS.slice(0, -1);
 const CATEGORY_TYPE_VALUES = Object.freeze({
   martial: ["Weapon", "Defense", "Combat Trick", "Signature", "Stance", "Perk"],
-  magic: ["Spellcraft", "Gate", "TM", "Cantrip", "Historic", "Spell", "Subskill"],
+  magic: ["Spellcraft", "Style", "Gate", "TM", "Cantrip", "Historic", "Spell", "Subskill"],
   tradewrite: ["skill", "Signature"],
   mundane: ["skill", "Signature"],
   "": ["skill"]

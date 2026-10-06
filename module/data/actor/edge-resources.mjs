@@ -13,9 +13,17 @@ const EDGE_LABEL_MODES = new Set([
 ]);
 
 export function getDefaultEdgeLabelMode(source) {
-  return source?.getFlag?.("peasant-core", PC_WINTER_EDGE_FLAG)
+  return actorUsesWinterEdge(source)
     ? EDGE_LABEL_MODE_WINTER
     : EDGE_LABEL_MODE_EDGE;
+}
+
+export function actorUsesWinterEdge(actor) {
+  return !!actor?.getFlag?.("peasant-core", PC_WINTER_EDGE_FLAG);
+}
+
+export function getActorEdgeLabelMode(actor, mode = actor?.system?.edgeLabelMode) {
+  return actorUsesWinterEdge(actor) ? EDGE_LABEL_MODE_WINTER : sanitizeEdgeLabelMode(mode, getDefaultEdgeLabelMode(actor));
 }
 
 export function sanitizeEdgeLabelMode(value, fallback = EDGE_LABEL_MODE_EDGE) {

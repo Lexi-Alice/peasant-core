@@ -1,4 +1,4 @@
-import { delegate, qs, qsa } from "../../dom.mjs";
+import { delegate, markVerticalDropBoundary, qs, qsa } from "../../dom.mjs";
 
 const PC_ITEM_TYPES = Object.freeze(["weapon", "equipment", "tool", "consumable", "loot"]);
 const PC_ITEM_TYPE_SET = new Set(PC_ITEM_TYPES);
@@ -490,8 +490,7 @@ function setupInventoryManualSortControls(sheet, root, browser) {
 
     const targetRow = getInventoryDropTargetRow(event.target, list);
     if (!targetRow || targetRow.dataset.itemId === sheet._pcInventoryDragState.itemId) return;
-    targetRow.classList.toggle("drag-over-bottom", isInventoryDropAfter(targetRow, event.clientY));
-    targetRow.classList.toggle("drag-over-top", !isInventoryDropAfter(targetRow, event.clientY));
+    markVerticalDropBoundary(getInventoryRowsInList(list), targetRow, isInventoryDropAfter(targetRow, event.clientY));
   });
 
   delegate(browser, "dragleave", ".pc-inventory-items", () => {

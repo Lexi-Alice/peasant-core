@@ -4,6 +4,7 @@ import {
   isManifestSpellEffectChangeKey
 } from "./spell-effect-change-keys.mjs";
 import { isPassiveSkillEffectDefinition, isSkillEditorDefinition } from "../actor/skill-entry-conditions.mjs";
+import { OVERCHARGED_KEY } from "./overcharged.mjs";
 
 export const DEFENSIVE_REFLEXES_TO_HIT_KEY = "system.defensiveReflexes.toHit";
 
@@ -57,7 +58,6 @@ const STATE_ACTIVE_EFFECT_KEY_PATTERNS = Object.freeze([
 ]);
 
 const UNSUPPORTED_ACTIVE_EFFECT_KEY_PATTERNS = Object.freeze([
-  /^system\.conditions\.overcharged$/,
   /^system\.hp\.grid(?:\.|$)/,
   /^system\.skills(?:\.|$)/,
   /^system\.notableCombats(?:\.|$)/,
@@ -169,7 +169,7 @@ export function getPeasantActiveEffectKeyMetadata(path) {
     };
   }
 
-  if (VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEY_SET.has(key)) {
+  if (key === OVERCHARGED_KEY || VIRTUAL_DYNAMIC_ACTIVE_EFFECT_KEY_SET.has(key)) {
     return {
       key,
       category: PEASANT_ACTIVE_EFFECT_KEY_CATEGORIES.DYNAMIC,

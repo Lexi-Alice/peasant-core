@@ -25,6 +25,7 @@ import { rollAoeReflexSaveForTarget } from "./aoe-reflex-save.mjs";
 import { resolveDefensePromptActor } from "./actor-targets.mjs";
 import { isChainCancelledResult } from "./prompt-dialogs.mjs";
 import { registerActiveRemotePrompt, unregisterActiveRemotePrompt } from "./remote-prompt-registry.mjs";
+import { createPeasantEntryUsageContext } from "./skill-entry-use.mjs";
 
 const DEFENSE_FAVORITE_MODE_ALWAYS = "always";
 const DEFENSE_FAVORITE_MODE_WHEN_OVER = "whenOver";
@@ -48,6 +49,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     });
     return null;
   }
+  await defenderActor.ensurePeasantEntryIds?.("notableCombats");
   const promptId = String(payload.promptId || "").trim();
 
   const targetingType = String(payload.attackTargetingType || "").trim();
@@ -97,16 +99,16 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     defender: defenderActor.name,
     targetingType,
     attack: payload.attackCombatName,
-    defenses: matchingDefenses.map(({ combat, index }) => ({ index, name: combat?.name })),
+    defenses: matchingDefenses.map(({ combat, index, usageId }) => ({ index, usageId, name: combat?.name })),
     reflexSaveOption: hasReflexSaveOption
   });
-  const previewByIndex = new Map(
-    matchingDefenses.map(({ combat, index }) => [String(index), getNotableCombatRollPreview(defenderActor, combat, { defenseRoll: true })])
+  const previewByKey = new Map(
+    matchingDefenses.map(({ data, key }) => [key, getNotableCombatRollPreview(defenderActor, data, { defenseRoll: true })])
   );
   const favoriteKey = getDefenseFavoriteKey(targetingType);
   const favorite = favoriteKey ? getDefenseFavorites(defenderActor)?.[favoriteKey] : null;
   const preferredDefenseMatch = getPreferredDefenseMatch(defenderActor, targetingType, matchingDefenses);
-  const preferredDefenseValue = preferredDefenseMatch ? String(preferredDefenseMatch.index) : "";
+  const preferredDefenseValue = preferredDefenseMatch?.key || "";
   const defaultDefenseValue = preferredDefenseValue || (hasReflexSaveOption ? "__reflex_save__" : "__none__");
   if (preferredDefenseMatch
     && normalizeCombatDefense(preferredDefenseMatch.defense).blockType !== "Mage"
@@ -123,9 +125,9 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
     if (automaticResult) return automaticResult;
   }
   const optionsHtml = [
-    ...matchingDefenses.map(({ combat, index }) => {
-      const label = String(combat?.name || `Defense ${index + 1}`).trim() || `Defense ${index + 1}`;
-      return `<option value="${index}">${escapeHtml(label)}</option>`;
+    ...matchingDefenses.map(({ combat, index, key, usageName }) => {
+      const name = String(combat?.name || `Defense ${index + 1}`).trim() || `Defense ${index + 1}`;
+      return `<option value="${escapeHtml(key)}">${escapeHtml(`${name} — ${usageName}`)}</option>`;
     }),
     ...(hasReflexSaveOption ? [`<option value="__reflex_save__">Reflex Save</option>`] : []),
     `<option value="__none__">None</option>`
@@ -181,6 +183,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
         selection: "none",
         selectedCombatIndex: null,
         selectedCombatId: null,
+        selectedUsageId: null,
         selectedDefense: null,
         defenseRoll: null,
         appliedAccuracyPenalty: 0,
@@ -246,22 +249,17 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               return true;
             }
 
-            const selectedIndex = Number.parseInt(selectedValue, 10);
-            if (!Number.isFinite(selectedIndex)) {
-              ui.notifications?.warn?.("No matching defenses are available for this attack.");
-              return false;
-            }
-
-            const selectedDefenseMatch = matchingDefenses.find(({ index }) => index === selectedIndex) || null;
+            const selectedDefenseMatch = matchingDefenses.find(({ key }) => key === selectedValue) || null;
             if (!selectedDefenseMatch) {
               ui.notifications?.warn?.("That defense is no longer available.");
               return false;
             }
+            const selectedIndex = selectedDefenseMatch.index;
 
             const selectedDefense = normalizeCombatDefense(selectedDefenseMatch.defense);
             const isMageBlock = !!(selectedDefense.block && selectedDefense.blockType === "Mage");
             const mageIdentity = isMageBlock
-              ? getMageBlockDefenseIdentity("notableCombats", selectedDefenseMatch.combat?.id, "base")
+              ? getMageBlockDefenseIdentity("notableCombats", selectedDefenseMatch.combat?.id, selectedDefenseMatch.usageId)
               : "";
             const mageBlockInitialized = isMageBlock
               && !!getMageBlockBarrierEffect(defenderActor, mageIdentity)
@@ -295,10 +293,16 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               ui.notifications?.warn?.("Defense roll workflow is unavailable.");
               return false;
             }
+            const usageContextResult = await getDefenseRollUsageContext(defenderActor, selectedDefenseMatch);
+            if (!usageContextResult.ok) {
+              ui.notifications?.warn?.(usageContextResult.error || "That defense usage is unavailable.");
+              return false;
+            }
 
             const defenseRoll = await rollNotableCombat({
               actor: defenderActor,
               combatIndex: selectedIndex,
+              usageContext: usageContextResult.usageContext,
               promptForTargets: false,
               targetLabel: attackerName,
               cardClass: "pc-defense-roll-card",
@@ -315,6 +319,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
                 selection: "close",
                 selectedCombatIndex: selectedIndex,
                 selectedCombatId: selectedDefenseMatch.combat?.id || null,
+                selectedUsageId: selectedDefenseMatch.usageId,
                 mageBarrierAction,
                 selectedDefense: normalizeCombatDefense(selectedDefenseMatch.defense),
                 defenseRoll,
@@ -339,6 +344,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
               selection: "defense",
               selectedCombatIndex: selectedIndex,
               selectedCombatId: selectedDefenseMatch.combat?.id || null,
+              selectedUsageId: selectedDefenseMatch.usageId,
               selectedDefense,
               mageBarrierAction,
               defenseRoll,
@@ -408,11 +414,11 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
 
         const updatePreview = () => {
           const selectedValue = String($select.val() || "");
-          const selectedDefenseMatch = matchingDefenses.find(({ index }) => String(index) === selectedValue) || null;
+          const selectedDefenseMatch = matchingDefenses.find(({ key }) => key === selectedValue) || null;
           const selectedDefense = normalizeCombatDefense(selectedDefenseMatch?.defense);
           const isMageBlock = !!(selectedDefense.block && selectedDefense.blockType === "Mage");
           if (isMageBlock) {
-            const identity = getMageBlockDefenseIdentity("notableCombats", selectedDefenseMatch?.combat?.id, "base");
+            const identity = getMageBlockDefenseIdentity("notableCombats", selectedDefenseMatch?.combat?.id, selectedDefenseMatch?.usageId);
             const barrier = getMageBlockBarrierEffect(defenderActor, identity);
             const duressExists = !!getMageBlockDuressEffect(defenderActor, identity);
             $mageBarrierSummary.html(barrier ? `<div class="pc-inventory-item pc-passive-effect pc-mage-barrier-effect">
@@ -450,7 +456,7 @@ export async function showDefensePromptDialog(payload = {}, { rollNotableCombat 
             return;
           }
 
-          const preview = previewByIndex.get(selectedValue);
+          const preview = previewByKey.get(selectedValue);
           if (!preview) {
             $toHit.val("");
             $accuracy.val("");
@@ -485,7 +491,7 @@ async function rollAutomaticFavoriteDefense({
 } = {}) {
   if (typeof rollNotableCombat !== "function" || !defenderActor || !defenseMatch) return null;
 
-  const preview = getNotableCombatRollPreview(defenderActor, defenseMatch.combat, { defenseRoll: true });
+  const preview = getNotableCombatRollPreview(defenderActor, defenseMatch.data, { defenseRoll: true });
   const overrideToHit = Number.parseInt(preview?.modifiedTohit, 10);
   const rollOverrides = Number.isFinite(overrideToHit)
     ? {
@@ -494,9 +500,12 @@ async function rollAutomaticFavoriteDefense({
     }
     : null;
 
+  const usageContextResult = await getDefenseRollUsageContext(defenderActor, defenseMatch);
+  if (!usageContextResult.ok) return null;
   const defenseRoll = await rollNotableCombat({
     actor: defenderActor,
     combatIndex: defenseMatch.index,
+    usageContext: usageContextResult.usageContext,
     promptForTargets: false,
     targetLabel: attackerName,
     cardClass: "pc-defense-roll-card",
@@ -513,6 +522,7 @@ async function rollAutomaticFavoriteDefense({
       selection: "close",
       selectedCombatIndex: defenseMatch.index,
       selectedCombatId: defenseMatch.combat?.id || null,
+      selectedUsageId: defenseMatch.usageId,
       selectedDefense,
       defenseRoll,
       appliedAccuracyPenalty: 0,
@@ -529,6 +539,7 @@ async function rollAutomaticFavoriteDefense({
     selection: "defense",
     selectedCombatIndex: defenseMatch.index,
     selectedCombatId: defenseMatch.combat?.id || null,
+    selectedUsageId: defenseMatch.usageId,
     selectedDefense,
     defenseRoll,
     appliedAccuracyPenalty: getAccuracyPenaltyFromDefenseRoll(
@@ -544,6 +555,15 @@ async function rollAutomaticFavoriteDefense({
     primalEvasionPenalty: 0,
     automaticDefenseFavorite: true
   };
+}
+
+async function getDefenseRollUsageContext(actor, defenseMatch) {
+  if (defenseMatch.usageId === "base") return { ok: true, usageContext: null };
+  return createPeasantEntryUsageContext({
+    actor,
+    ref: { collection: "notableCombats", entryId: defenseMatch.combat?.id },
+    usageId: defenseMatch.usageId
+  });
 }
 
 function shouldAutoUseDefenseFavorite(actor, favorite) {

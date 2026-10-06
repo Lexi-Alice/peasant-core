@@ -163,14 +163,22 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     case "stability":
       $area.html(`
         <div class="pc-tag-message">
-          <p style="margin:0;">Click <strong>Add Tag</strong> to add the <em>Stability</em> tag.</p>
+          <p style="margin:0;">Stability is active while this tag is present.</p>
         </div>
       `);
       return true;
     case "overkill":
       $area.html(`
         <div class="pc-tag-message">
-          <p style="margin:0;">Click <strong>Add Tag</strong> to add the <em>Overkill</em> tag.</p>
+          <p style="margin:0;">Overkill is active while this tag is present.</p>
+        </div>
+      `);
+      return true;
+    case "tippingScales":
+      $area.html(`
+        <div class="pc-tag-field-row">
+          <label class="pc-tag-field-label">Scale Penetration:</label>
+          <input type="number" class="tag-tipping-scales ${PC_TAG_INPUT_CLASS}" aria-label="Scale Penetration" value="${combatData.tippingScales || 1}" min="1" step="1" ${PC_TAG_INTEGER_ATTRS}>
         </div>
       `);
       return true;
@@ -185,7 +193,7 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     case "strengthen":
       $area.html(`
         <div class="pc-tag-message">
-          <p style="margin:0;">Requires <strong>Stability</strong>. Click <strong>Add Tag</strong> to add the <em>Strengthen</em> tag.</p>
+          <p style="margin:0;">Strengthen requires <strong>Stability</strong> on this usage.</p>
         </div>
       `);
       return true;
@@ -207,7 +215,7 @@ export function renderStandardNotableCombatTagInputs($area, tagType, combatData,
     case "self":
       $area.html(`
         <div class="pc-tag-message">
-          <p style="margin:0;">Click <strong>Add Tag</strong> to add the <em>Self</em> tag.</p>
+          <p style="margin:0;">Self is active while this tag is present.</p>
         </div>
       `);
       return true;

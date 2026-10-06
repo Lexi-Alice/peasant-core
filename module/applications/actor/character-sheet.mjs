@@ -78,7 +78,7 @@ export class PeasantActorSheet extends ActorSheetBase {
   }
 
   static get SHEET_WIDTH() {
-    return 800;
+    return 900;
   }
 
   static get SHEET_HEIGHT() {
@@ -282,6 +282,7 @@ export class PeasantActorSheet extends ActorSheetBase {
     const tabPartials = this.TAB_DEFINITIONS.map(({ partial }) => `${this.SHEET_PARTIAL_PATH}/${partial}`);
     return [
       ...tabPartials,
+      `${this.SHEET_PARTIAL_PATH}/skill-entry-list.html`,
       `${this.SHEET_PARTIAL_PATH}/inventory-section.html`
     ];
   }
@@ -324,11 +325,14 @@ export class PeasantActorSheet extends ActorSheetBase {
   }
 
   async _onChangeSheetMode(event, target = event.currentTarget) {
+    if (!this.canModifyActor) {
+      target.checked = this.isEditMode;
+      return false;
+    }
     const { MODES } = this.constructor;
-    const label = target.checked ? "Enter View Mode" : "Enter Edit Mode";
-    target.dataset.tooltip = label;
-    target.setAttribute("aria-label", label);
     const nextMode = target.checked ? MODES.EDIT : MODES.PLAY;
+    const getEditors = () => Object.values(this._pcOwnedApplications ?? {})
+      .filter(application => typeof application._flushPendingEdits === "function");
 
     if (this.isEditMode && nextMode !== this._mode) {
       if (typeof this._flushPendingEditAutosaves === "function") {
@@ -337,14 +341,32 @@ export class PeasantActorSheet extends ActorSheetBase {
       if (typeof this._flushQueuedSaves === "function") {
         await this._flushQueuedSaves();
       }
+      let editors;
+      do {
+        if (!this.canModifyActor) {
+          target.checked = this.isEditMode;
+          return false;
+        }
+        editors = getEditors();
+        for (const editor of editors) {
+          if (!await editor._flushPendingEdits()) {
+            target.checked = this.isEditMode;
+            return false;
+          }
+        }
+      } while (getEditors().some(editor => !editors.includes(editor) || editor._hasPendingEdits?.()));
     }
 
     this._mode = nextMode;
+    const label = this.isEditMode ? "Enter View Mode" : "Enter Edit Mode";
+    target.dataset.tooltip = label;
+    target.setAttribute("aria-label", label);
 
     if (typeof this.submit === "function") await this.submit();
     const renderResult = this.render();
     refreshOpenHpGridDialogsForSheet(this);
     refreshOpenStressGridDialogsForSheet(this);
+    for (const editor of getEditors()) editor.render({ force: true });
     return renderResult;
   }
 
@@ -585,6 +607,16 @@ export class PeasantActorSheet extends ActorSheetBase {
     this._syncSheetTabRailViewportMode();
   }
 
+  _onDetach(from, to) {
+    super._onDetach(from, to);
+    this._syncSheetTabRailViewportMode();
+  }
+
+  _onAttach(from, to) {
+    super._onAttach(from, to);
+    this._syncSheetTabRailViewportMode();
+  }
+
   _getSheetJQ() {
     const root = getApplicationJQuery(this);
     if (!root.length) return $();
@@ -603,6 +635,7 @@ export class PeasantActorSheet extends ActorSheetBase {
     const sync = () => {
       const ownerDocument = this._getElementDocument(rootEl);
       const isDetached = !!ownerDocument?.body?.classList?.contains("detached");
+      root.toggleClass("pc-primary-detached-sheet", isDetached && this.window?.windowId === this.id);
       root.toggleClass("pc-tabs-inside-viewport", isDetached);
       if (isDetached) return;
 

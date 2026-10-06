@@ -18,12 +18,13 @@ import {
 } from "../skills/skill-editor.mjs";
 import { formatOptionalIntegerInput, sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
 import { getNotableCombatEffectImage } from "../../../data/actor/notable-combat-image.mjs";
-import { delegate, qs, qsa } from "../../dom.mjs";
+import { delegate, markVerticalDropBoundary, qs, qsa } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 import { moveSkillLayoutRow, resolveSkillUsage } from "../../../data/actor/skill-entries.mjs";
 import { skillEffectNeedsReview } from "../../../data/actor/skill-entry-conditions.mjs";
 import { startPeasantEntryUse } from "../../combat/skill-entry-use.mjs";
 import { createPeasantUsageLink } from "../../skill-usage-links.mjs";
+import { renderDialogModeToggle } from "../controls/health-stress/dialog-mode-toggle.mjs";
 
 const ApplicationV2 = foundry?.applications?.api?.ApplicationV2;
 const HandlebarsApplicationMixin = foundry?.applications?.api?.HandlebarsApplicationMixin;
@@ -322,24 +323,6 @@ async function promptSkillEffectLink(link, tags, rules = []) {
   });
 }
 
-async function chooseUnsavedUsageAction() {
-  const DialogV2 = foundry?.applications?.api?.DialogV2;
-  if (typeof DialogV2?.wait === "function") {
-    return DialogV2.wait({
-      window: { title: "Unsaved Usage Changes" },
-      position: { width: 420 },
-      content: "<p>Save or discard the current usage changes before switching?</p>",
-      buttons: [
-        { action: "save", label: "Save", icon: "fa-solid fa-floppy-disk", default: true, callback: () => "save" },
-        { action: "discard", label: "Discard", icon: "fa-solid fa-trash", callback: () => "discard" },
-        { action: "cancel", label: "Cancel", icon: "fa-solid fa-xmark", callback: () => "cancel" }
-      ],
-      close: () => "cancel"
-    });
-  }
-  return globalThis.window?.confirm?.("Save the current usage changes before switching?") ? "save" : "cancel";
-}
-
 function getNotableCombatEffectIds(combatData) {
   if (!Array.isArray(combatData?.effectIds)) return [];
   const seen = new Set();
@@ -354,7 +337,6 @@ function getNotableCombatEffectIds(combatData) {
 }
 
 export function prepareNotableCombatEffectContext(actor, combatData, {
-  entryKindLabel = "Skill",
   groupedByType = true,
   selectedUsageId = "base",
   sortMode = "manual"
@@ -397,32 +379,19 @@ export function prepareNotableCombatEffectContext(actor, combatData, {
       sortable: scope === "whole" && !missing
     };
   };
-  const wholeEffects = getNotableCombatEffectIds(combatData).map((id, index) => createEffectRow({
-    id,
-    index,
-    scope: "whole"
-  }));
   const selectedUsage = selectedUsageId === "base"
     ? combatData?.baseUsage
     : combatData?.usages?.find?.(usage => usage?.id === selectedUsageId);
-  const usageEffects = (selectedUsage?.effectLinks ?? []).map((link, index) => createEffectRow({
+  const effects = (selectedUsage?.effectLinks ?? []).map((link, index) => createEffectRow({
     id: String(link?.effectId ?? "").trim(),
     index,
     scope: "usage",
     link
   }));
-  const effects = [...(entryKindLabel === "Skill" ? wholeEffects : []), ...usageEffects];
-
-  const usageLabel = String(selectedUsage?.name ?? "").trim() || (selectedUsageId === "base" ? "Default" : "Usage");
-  const effectSections = entryKindLabel === "Notable"
-    ? conditionGroups.map(([type, label]) => ({
-      type, label, icon: "fa-solid fa-layer-group", visible: true,
-      effects: usageEffects.filter(effect => effect.conditionKey === type)
-    })).filter(section => section.effects.length > 0)
-    : [
-      { type: "whole", label: "Whole Skill", icon: "fa-solid fa-bolt", visible: true, addable: false, effects: wholeEffects },
-      { type: "usage", label: usageLabel, icon: "fa-solid fa-layer-group", visible: true, addable: true, effects: usageEffects }
-    ];
+  const effectSections = conditionGroups.map(([type, label]) => ({
+    type, label, icon: "fa-solid fa-layer-group", visible: true,
+    effects: effects.filter(effect => effect.conditionKey === type)
+  })).filter(section => section.effects.length > 0);
   const sortConfig = PC_NOTABLE_EFFECT_SORT_MODES[sortMode] ?? PC_NOTABLE_EFFECT_SORT_MODES.manual;
 
   return {
@@ -440,7 +409,7 @@ export function prepareNotableCombatEffectContext(actor, combatData, {
     effectGroupToggle: {
       active: groupedByType,
       pressed: groupedByType ? "true" : "false",
-      label: groupedByType ? (entryKindLabel === "Notable" ? "Grouped by Condition" : "Grouped by Scope") : "Flat List"
+      label: groupedByType ? "Grouped by Condition" : "Flat List"
     },
     effectSortToggle: {
       mode: sortMode,
@@ -530,6 +499,12 @@ export async function openNotableCombatTagEditor(sheet, index) {
 
 export async function openPeasantSkillEditor(sheet, ref, options = {}) {
   try {
+    const key = `skill-editor-${ref.collection}-${ref.entryId}`;
+    const existing = sheet?._pcOwnedApplications?.[key];
+    if (existing) {
+      existing.render({ force: false });
+      return existing;
+    }
     const adapter = createSkillEditorAdapter(sheet, ref);
     let entry = adapter.readSource();
     if (!entry) return null;
@@ -551,13 +526,16 @@ export async function openPeasantSkillEditor(sheet, ref, options = {}) {
         ...options
       };
     const application = new PeasantNotableCombatTagEditorApp(sheet, adapter, applicationOptions);
-    return renderSheetOwnedApplication(sheet, `skill-editor-${ref.collection}-${ref.entryId}`, application);
+    return renderSheetOwnedApplication(sheet, key, application);
   } catch (e) {
     pcLog.debug("openSkillEditor failed", e);
   }
 }
 
 class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
+  _saveQueue = Promise.resolve(true);
+  _dirtyMainInputs = new Set();
+  _descriptionSaveTimer = null;
   _pcNotableCombatEffectsGroupedByType = true;
   _pcNotableCombatEffectSortMode = "manual";
   _pcNotableCombatEffectDragState = null;
@@ -605,20 +583,62 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     return !!this.sheet?.canModifyActor;
   }
 
+  get isEditMode() {
+    return !!this.sheet?.isEditMode;
+  }
+
+  _canEditFields() {
+    return this._canEdit() && this.isEditMode;
+  }
+
+  _queueSave(callback) {
+    const save = this._saveQueue.then(callback);
+    this._saveQueue = save.catch(error => {
+      console.error("Failed to save Skill/Notable edits:", error);
+      ui.notifications?.error?.("Could not save changes. Your edits have been kept.");
+      return false;
+    });
+    return this._saveQueue;
+  }
+
+  _hasPendingEdits($container = $(this.element)) {
+    const descriptionEditor = $container[0]?.querySelector?.('prose-mirror[name="combatDescription"]');
+    return !!(this._dirtyMainInputs.size || this._tagSaveControls?.isDirty()
+      || (descriptionEditor && this._getDescriptionContent($container) !== (this._getCombatData()?.description || "")));
+  }
+
+  async _flushPendingEdits($container = $(this.element)) {
+    if (!this._canEditFields() || !$container[0] || !this._getCombatData()) return true;
+    clearTimeout(this._descriptionSaveTimer);
+    do {
+      await this._saveQueue;
+      if (!this._canEditFields()) return false;
+      while (this._dirtyMainInputs.size) {
+        if (!this._canEditFields() || !await this._saveMainFields($container, this._dirtyMainInputs.values().next().value)) return false;
+      }
+      if (!await this._saveDescription($container)) return false;
+      if ((await this._tagSaveControls?.saveCurrent({ notify: true })) === false) return false;
+      await this._saveQueue;
+      if (!this._canEditFields()) return false;
+    } while (this._hasPendingEdits($container));
+    return true;
+  }
+
+  _renderModeToggle() {
+    renderDialogModeToggle(this.sheet, this.element);
+  }
+
+  async close(options = {}) {
+    if (!await this._flushPendingEdits()) return false;
+    return super.close(options);
+  }
+
   get combatIndex() {
     return this._getEntryIndex();
   }
 
   static get DEFAULT_OPTIONS() {
     return foundry.utils.mergeObject(super.DEFAULT_OPTIONS, {
-      actions: {
-        addUsage() { return this._addUsage(); },
-        clearUsage() { return this._clearUsage(); },
-        deleteUsage() { return this._deleteUsage(); },
-        duplicateUsage() { return this._duplicateUsage(); },
-        makeDefaultUsage() { return this._makeDefaultUsage(); },
-        renameUsage() { return this._renameUsage(); }
-      },
       window: {
         minimizable: true,
         resizable: true
@@ -629,19 +649,24 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   _getHeaderControls() {
     const superControls = typeof super._getHeaderControls === "function" ? super._getHeaderControls() : [];
     const controls = Array.isArray(superControls) ? [...superControls] : [];
-    if (!this._canEdit()) return controls;
-    const isBase = this._selectedUsageId === "base";
-    const isDefault = this._getCombatData()?.defaultUsageId === this._selectedUsageId;
-    controls.unshift(
-      { action: "addUsage", icon: "fa-solid fa-plus", label: "Add Usage" },
-      { action: "renameUsage", icon: "fa-solid fa-pen-to-square", label: "Rename Usage" },
-      { action: "duplicateUsage", icon: "fa-solid fa-copy", label: "Duplicate Usage" }
-    );
-    if (!isDefault) controls.unshift({ action: "makeDefaultUsage", icon: "fa-solid fa-star", label: "Make Default" });
-    controls.unshift(isBase
-      ? { action: "clearUsage", icon: "fa-solid fa-eraser", label: "Clear Usage" }
-      : { action: "deleteUsage", icon: "fa-solid fa-trash", label: "Delete Usage" });
-    return controls;
+    // Match the actor sheet: keep the first visible label, or action for unlabeled controls.
+    const seenLabels = new Set();
+    const seenActions = new Set();
+    const deduped = [];
+    for (const control of controls) {
+      if (!control || typeof control !== "object") continue;
+      const labelKey = String(control.label ?? "").trim().toLowerCase();
+      const actionKey = String(control.action ?? "").trim().toLowerCase();
+      if (labelKey) {
+        if (seenLabels.has(labelKey)) continue;
+        seenLabels.add(labelKey);
+      } else if (actionKey) {
+        if (seenActions.has(actionKey)) continue;
+        seenActions.add(actionKey);
+      }
+      deduped.push(control);
+    }
+    return deduped;
   }
 
   static get PARTS() {
@@ -656,6 +681,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   async _prepareContext(options) {
+    if (this.element && !await this._flushPendingEdits()) throw new Error("Complete the current edits before refreshing the editor.");
     const context = await super._prepareContext(options);
     const combatData = this._getCombatData();
     if (!combatData) {
@@ -669,7 +695,6 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     const combatType = String(combatData.type || "skill");
     const entryKindLabel = this.ref.collection === "skills" ? "Skill" : "Notable";
     const effectContext = prepareNotableCombatEffectContext(this.sheet.actor, combatData, {
-      entryKindLabel,
       groupedByType: this._areNotableCombatEffectsGroupedByType(),
       selectedUsageId: this._selectedUsageId,
       sortMode: this._getNotableCombatEffectSortMode()
@@ -693,8 +718,12 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
       combatImageAlt: combatName || "Notable Combat",
       combatImageSrc: String(combatData.img || "").trim() || getDefaultCombatImage(),
       combatDescription: combatData.description || "",
+      descriptionHTML: await (foundry?.applications?.ux?.TextEditor?.implementation?.enrichHTML?.(
+        combatData.description || "", { async: true }
+      ) ?? combatData.description ?? ""),
       documentUuid: this.sheet.actor?.uuid || "",
-      editable: this._canEdit(),
+      canManageEntry: this._canEdit(),
+      editable: this._canEditFields(),
       ...effectContext
     });
   }
@@ -703,18 +732,23 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     if (typeof super._onRender === "function") await super._onRender(context, options);
 
     const $container = $(this.element);
+    this._renderModeToggle();
+    this.element?.classList?.toggle("editable", this._canEditFields());
+    this.element?.classList?.toggle("interactable", this._canEdit() && !this.isEditMode);
+    this.element?.classList?.toggle("locked", !this._canEdit());
+    for (const control of this.element?.querySelectorAll?.("[data-pc-roll-override]") ?? []) control.disabled = !this._canEditFields();
     if (!this._controlsBound || this._boundElement !== $container[0]) {
       this._tagEditor = createNotableCombatTagEditorState($container);
       this._bindTagEditorControls($container);
       this._boundElement = $container[0];
       this._controlsBound = true;
     }
+    this._dirtyMainInputs.clear();
 
     this._renderCurrentTags($container);
     this._syncDescriptionEditorFromData($container);
     this._applyActiveTab($container);
     this._bindNotableCombatEffectControls($container);
-    this._tagEditor?.syncUi();
   }
 
   _bindTagEditorControls($container) {
@@ -722,6 +756,9 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
       renderNotableCombatTagInputs($container, tagType, this._getSelectedUsageData(), {
         tagEditorState: this._tagEditor.state
       });
+      for (const input of $container[0]?.querySelectorAll?.(".tag-input-area input, .tag-input-area select, .tag-input-area textarea, .tag-input-area button") ?? []) {
+        input.disabled = !this._canEditFields();
+      }
     };
 
     this._bindLayoutControls($container);
@@ -730,8 +767,13 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     setupNotableCombatTagSelectionControls($container, {
       tagEditor: this._tagEditor,
       buildTagInputs,
+      beforeSelect: () => this._tagSaveControls?.saveCurrent({ notify: true }) ?? true,
       openDescriptionEditor: () => this._showDescriptionTab($container),
-      onBeginEdit: (row, selection) => this._showTagDraft($container, row, selection),
+      onBeginEdit: (row, selection) => {
+        this._showTagDraft($container, row, selection);
+        this._tagSaveControls?.beginDraft({ isNew: !row });
+        if (!row) void this._tagSaveControls?.saveCurrent();
+      },
       onCancel: () => this._hideTagDraft($container)
     });
     setupSkillUsageSelectionControls($container[0], {
@@ -739,11 +781,12 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     });
 
     const removeTagFromElement = setupNotableCombatTagRemoveControls(this.sheet, $container, this.combatIndex, {
-      removeTag: (tagType, { customId } = {}) => this.adapter.setTag(
-        tagType,
-        {},
-        { usageId: this._getTagWriteUsageId(tagType), mode: "remove", customId, render: false }
-      ),
+      removeTag: async (tagType, { customId } = {}) => {
+        if (!this._canEdit() || !await this._prepareToLeaveUsage($container)) return { ok: false };
+        return this.adapter.setTag(tagType, {}, {
+          usageId: this._getTagWriteUsageId(tagType), mode: "remove", customId, render: false
+        });
+      },
       onChanged: () => {
         this._renderCurrentTags($container);
         this._syncDescriptionEditorFromData($container);
@@ -753,11 +796,11 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
 
     this._tagSaveControls = setupNotableCombatTagSaveControls(this.sheet, $container, this.combatIndex, {
       tagEditor: this._tagEditor,
+      canSave: () => this._canEditFields(),
       getCombatData: () => this._getSelectedUsageData(),
       saveTag: (tagType, tagData, options) => this._saveTag(tagType, tagData, options),
-      openDescriptionEditor: () => this._showDescriptionTab($container),
       onChanged: () => {
-        this._hideTagDraft($container);
+        if (!this._tagEditor.state.tagType) this._hideTagDraft($container);
         this._renderCurrentTags($container);
       }
     });
@@ -775,10 +818,18 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
       this._onOpenNotableCombatEffectClick(ev);
     });
 
-    $container.on("click", ".pc-notable-combat-description-save", async (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      await this._saveDescription($container);
+    $container.on("change", 'prose-mirror[name="combatDescription"]', () => void this._saveDescription($container));
+    $container.on("input", 'prose-mirror[name="combatDescription"]', () => {
+      if (!this._canEditFields()) return;
+      clearTimeout(this._descriptionSaveTimer);
+      this._descriptionSaveTimer = setTimeout(() => void this._saveDescription($container), 400);
+    });
+    $container.on("focusout", 'prose-mirror[name="combatDescription"]', () => {
+      clearTimeout(this._descriptionSaveTimer);
+      void this._saveDescription($container);
+    });
+    $container.on("input change", "input, select, textarea", ev => {
+      if (this._canEditFields() && getSkillEditorFieldGroup(ev.currentTarget)) this._dirtyMainInputs.add(ev.currentTarget);
     });
 
     $container.on("click", "[data-pc-entry-use]", async (ev) => {
@@ -801,9 +852,11 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
       if (!chooser?.hidden) chooser.querySelector("input")?.focus?.();
     });
 
-    $container.on("keydown", "[data-pc-tag-draft]", (ev) => {
+    $container.on("keydown", "[data-pc-tag-draft]", async (ev) => {
       if (ev.key !== "Escape") return;
       ev.preventDefault();
+      await this._tagSaveControls?.saveCurrent();
+      this._tagSaveControls?.beginDraft();
       this._tagEditor?.reset({ clearForm: true });
       this._hideTagDraft($container);
       const chooser = $container[0]?.querySelector?.("[data-pc-tag-chooser]");
@@ -869,14 +922,15 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
 
     $container.on("click", "[data-pc-notable-combat-image-frame]", (ev) => {
       if (ev.target?.closest?.("[data-pc-notable-combat-image-picker]")) return;
-      if (this._canEdit()) return;
+      if (this._canEditFields()) return;
       ev.preventDefault();
       this._openCombatImagePopout();
     });
   }
 
   async _toggleRollOverride(field) {
-    if (!this._canEdit() || this._selectedUsageId === "base") return;
+    if (!this._canEditFields() || this._selectedUsageId === "base") return;
+    if (!await this._prepareToLeaveUsage()) return;
     if (!["characteristics", "characteristicMode", "tohit", "accuracy"].includes(field)) return;
     const usage = this._getSelectedUsage();
     const entry = this._getCombatData();
@@ -891,7 +945,10 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   async _selectUsage(usageId, $container = $(this.element)) {
     const nextUsageId = normalizeSkillEditorUsageSelection(this._getCombatData(), usageId);
     if (nextUsageId === this._selectedUsageId) return true;
-    if (!await this._prepareToLeaveUsage($container)) return false;
+    if (!await this._prepareToLeaveUsage($container)) {
+      for (const select of $container[0]?.querySelectorAll?.("[data-pc-usage-select]") ?? []) select.value = this._selectedUsageId;
+      return false;
+    }
     this._selectedUsageId = nextUsageId;
     await this.render({ force: true });
     return true;
@@ -903,16 +960,9 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   async _prepareToLeaveUsage($container = $(this.element)) {
-    const tagDirty = this._hasOpenTagDraft($container);
-    if (!tagDirty) return true;
-    const action = await chooseUnsavedUsageAction();
-    if (action === "cancel" || !action) return false;
-    if (action === "discard") {
-      this._tagEditor?.reset({ clearForm: true });
-      this._hideTagDraft($container);
-      return true;
-    }
-    if (tagDirty && !await this._tagSaveControls?.saveCurrent?.()) return false;
+    if (!await this._flushPendingEdits($container)) return false;
+    this._tagEditor?.reset({ clearForm: true });
+    this._hideTagDraft($container);
     return true;
   }
 
@@ -920,7 +970,6 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     if (!this._canEdit() || !await this._prepareToLeaveUsage($container)) return false;
     if (button) button.disabled = true;
     try {
-      if (!await this._saveMainFields($container)) return false;
       const result = await startPeasantEntryUse({
         actor: this.sheet.actor,
         ref: this.ref,
@@ -951,6 +1000,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   async _renameUsage() {
+    if (!await this._prepareToLeaveUsage()) return;
     const usage = this._getSelectedUsage();
     if (!usage) return;
     const name = await promptUsageName({ title: "Rename Usage", label: "Usage Name", value: usage.name, actionLabel: "Rename" });
@@ -968,6 +1018,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   async _makeDefaultUsage() {
+    if (!await this._prepareToLeaveUsage()) return;
     const result = await this.adapter.manageUsage("default", { usageId: this._selectedUsageId, render: false });
     if (result?.ok) await this.render({ force: true });
   }
@@ -1185,52 +1236,60 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
         const isBase = this._selectedUsageId === "base";
         const isDefault = this._getCombatData()?.defaultUsageId === this._selectedUsageId;
         const items = [{
+          group: "usage",
           label: "Add Usage",
           icon: "fa-solid fa-plus",
           onClick: () => this._addUsage()
         }];
-        if (!isDefault) {
-          items.push({
-            label: "Make Default",
-            icon: "fa-solid fa-star",
-            onClick: () => this._makeDefaultUsage()
-          });
-        }
         items.push(
           {
+            group: "usage",
             label: "Rename",
             icon: "fa-solid fa-pen-to-square",
             onClick: () => this._renameUsage()
           },
           {
+            group: "usage",
             label: "Duplicate",
             icon: "fa-solid fa-copy",
             onClick: () => this._duplicateUsage()
-          },
-          {
-            label: "Copy Link",
-            icon: "fa-solid fa-link",
-            onClick: () => this._copySelectedUsageLink()
-          },
-          {
-            label: "Add to Hotbar",
-            icon: "fa-solid fa-thumbtack",
-            onClick: () => this._addSelectedUsageToHotbar()
           }
         );
         if (isBase) {
           items.push({
+            group: "usage",
             label: "Clear",
             icon: "fa-solid fa-eraser",
             onClick: () => this._clearUsage()
           });
         } else {
           items.push({
+            group: "usage",
             label: "Delete",
             icon: "fa-solid fa-trash",
             onClick: () => this._deleteUsage()
           });
         }
+        if (!isDefault) {
+          items.push({
+            group: "shortcut",
+            label: "Make Default",
+            icon: "fa-solid fa-star",
+            onClick: () => this._makeDefaultUsage()
+          });
+        }
+        items.push({
+          group: "shortcut",
+          label: "Copy Link",
+          icon: "fa-solid fa-link",
+          onClick: () => this._copySelectedUsageLink()
+        });
+        items.push({
+          group: "shortcut",
+          label: "Add to Hotbar",
+          icon: "fa-solid fa-thumbtack",
+          onClick: () => this._addSelectedUsageToHotbar()
+        });
         ui.context.menuItems = items;
       }
     });
@@ -1343,7 +1402,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     if (toggle) {
       toggle.classList.toggle("active", grouped);
       toggle.setAttribute("aria-pressed", grouped ? "true" : "false");
-      const label = grouped ? (this.ref.collection === "notableCombats" ? "Grouped by Condition" : "Grouped by Scope") : "Flat List";
+      const label = grouped ? "Grouped by Condition" : "Flat List";
       toggle.dataset.tooltip = label;
       toggle.setAttribute("aria-label", label);
     }
@@ -1433,8 +1492,8 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
 
       const targetRow = getNotableCombatEffectDropTargetRow(event.target, list);
       if (!targetRow || targetRow.dataset.effectScope === "usage" || targetRow.dataset.effectId === this._pcNotableCombatEffectDragState.effectId) return;
-      targetRow.classList.toggle("drag-over-bottom", isNotableCombatEffectDropAfter(targetRow, event.clientY));
-      targetRow.classList.toggle("drag-over-top", !isNotableCombatEffectDropAfter(targetRow, event.clientY));
+      const rows = getNotableCombatEffectRowsInList(list).filter(row => row.dataset.effectScope !== "usage");
+      markVerticalDropBoundary(rows, targetRow, isNotableCombatEffectDropAfter(targetRow, event.clientY));
     });
 
     delegate(browser, "dragleave", ".pc-item-effects-items", () => {
@@ -1554,9 +1613,8 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   async _createNotableCombatEffect($container = $(this.element), { scope = "whole" } = {}) {
-    if (!this._canEdit()) return;
+    if (!this._canEditFields() || !await this._prepareToLeaveUsage($container)) return;
 
-    await this._saveMainFields($container);
     const combatData = this._getCombatData();
     const combatName = String(combatData.name || "").trim() || "Skill";
     const usageDefinition = scope === "usage";
@@ -1658,8 +1716,9 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
 
   async _configureTagCondition(tagKey) {
     if (!this._canEdit()) return;
+    if (!await this._prepareToLeaveUsage()) return;
     const patch = await promptSkillTagCondition(tagKey, this._getSelectedUsage());
-    if (!patch || !await this._saveMainFields($(this.element))) return;
+    if (!patch) return;
     const result = await this.adapter.manageUsage("condition", {
       usageId: this._selectedUsageId, tagKey, ...patch, render: false
     });
@@ -1718,7 +1777,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     ];
     for (const [selector, value] of values) {
       const input = root.querySelector(selector);
-      if (input && document.activeElement !== input) input.value = value ?? 0;
+      if (input && document.activeElement !== input && !this._dirtyMainInputs.has(input)) input.value = value ?? 0;
     }
   }
 
@@ -1732,13 +1791,21 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   _renderCurrentTags($container = $(this.element), { provisionalTag = null } = {}) {
+    const draftOpen = this._hasOpenTagDraft($container);
     this._returnTagDraft($container);
     const $list = $container.find("[data-pc-local-tags-list] > .current-tags-list");
     const usage = this._getSelectedUsage();
     const selectedTags = getActiveNotableCombatEditorTags(this._getSelectedUsageData());
     renderNotableCombatTagList($list, addSkillTagConditionLabels(selectedTags, usage), {
-      editable: this._canEdit(), provisionalTag
+      editable: this._canEditFields(), interactable: this._canEdit(), provisionalTag
     });
+    if (draftOpen) {
+      const state = this._tagEditor?.state;
+      const key = state?.tagType === "custom" ? `custom:${state.customId}` : state?.tagType;
+      const row = Array.from($container[0]?.querySelectorAll?.(".current-tag-item") ?? [])
+        .find(item => item.dataset.tagKey === key);
+      if (row) this._showTagDraft($container, row);
+    }
 
     setupNotableCombatTagEditorDrag(this.sheet, $container, this.combatIndex, {
       reorderTag: (draggedKey, targetKey, options) => this._reorderTag(draggedKey, targetKey, options),
@@ -1791,12 +1858,13 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   async _saveTag(tagType, tagData, { mode = "add", customId = "" } = {}) {
+    if (!this._canEditFields()) return { ok: false, changed: false };
     const result = await this.adapter.setTag(
       tagType,
       tagData,
       { usageId: this._getTagWriteUsageId(tagType), mode, customId, render: false }
     );
-    return result?.ok ? { ...result, changed: true } : result;
+    return result;
   }
 
   async _reorderTag(draggedKey, targetKey, { insertAfter = false } = {}) {
@@ -1862,30 +1930,44 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
     return String(editor.value ?? "");
   }
 
-  async _saveDescription($container = $(this.element)) {
+  _saveDescription($container = $(this.element)) {
+    return this._queueSave(() => this._persistDescription($container));
+  }
+
+  async _persistDescription($container) {
+    if (!this._canEditFields()) return true;
+    const editor = $container[0]?.querySelector?.('prose-mirror[name="combatDescription"]');
+    if (!editor) return true;
     try {
       const description = this._getDescriptionContent($container);
+      if (description === (this._getCombatData()?.description || "")) return true;
       const result = await this.adapter.update({ description }, { render: false });
       if (!result?.ok) throw new Error("The edited entry no longer exists.");
-      const editor = $container[0]?.querySelector?.('prose-mirror[name="combatDescription"]');
       if (editor) {
         editor.dataset.pcSavedDescription = description;
         editor.dataset.pcDescriptionReady = "true";
       }
-      this._renderCurrentTags($container);
-      ui.notifications?.info?.("Description saved.");
+      return true;
     } catch (err) {
       console.error("Failed to save combat description:", err);
       ui.notifications?.error?.("Failed to save combat description. See console for details.");
+      return false;
     }
   }
 
-  async _saveMainFields($container = $(this.element), target = null) {
+  _saveMainFields($container = $(this.element), target = null) {
+    return this._queueSave(() => this._persistMainFields($container, target));
+  }
+
+  async _persistMainFields($container, target = null) {
+    if (!this._canEditFields()) return true;
     const root = $container[0];
     const previous = this._getCombatData();
     if (!previous) return;
     const previousRollData = this._getSelectedUsageData() ?? previous;
     const fieldGroup = getSkillEditorFieldGroup(target);
+    const dirtyInputs = [...this._dirtyMainInputs].filter(input => !fieldGroup || getSkillEditorFieldGroup(input) === fieldGroup);
+    for (const input of dirtyInputs) this._dirtyMainInputs.delete(input);
     const nameEl = root?.querySelector?.(".pc-entry-name-input, .pc-notable-combat-name-input");
     const classEl = root?.querySelector?.(".pc-entry-class-input, .pc-notable-combat-class-input");
     const rankEl = root?.querySelector?.(".pc-entry-rank-input, .pc-notable-combat-rank-input");
@@ -1986,33 +2068,38 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
       }
       const savedCombat = this._getCombatData() ?? result.entry;
       const savedRollData = this._getSelectedUsageData() ?? savedCombat;
-      if ((!fieldGroup || fieldGroup === "name") && nameEl) nameEl.value = savedCombat.name || "";
-      if ((!fieldGroup || fieldGroup === "class") && classEl) classEl.value = Number.parseInt(savedCombat.class, 10) || 1;
-      if ((!fieldGroup || fieldGroup === "rank") && rankEl) rankEl.value = String(savedCombat.rank ?? "0");
-      if ((!fieldGroup || fieldGroup === "tohit") && tohitEl) tohitEl.value = formatOptionalIntegerInput(savedRollData.tohit);
-      if ((!fieldGroup || fieldGroup === "accuracy") && accuracyEl) accuracyEl.value = formatOptionalIntegerInput(savedRollData.accuracy, { showPlus: true });
-      if ((!fieldGroup || fieldGroup === "specialGrade") && specialGradeEl) specialGradeEl.value = Number.parseInt(savedCombat.specialGrade, 10) || "";
+      const syncInput = (input, value) => {
+        if (input && !this._dirtyMainInputs.has(input)) input.value = value;
+      };
+      if (!fieldGroup || fieldGroup === "name") syncInput(nameEl, savedCombat.name || "");
+      if (!fieldGroup || fieldGroup === "class") syncInput(classEl, Number.parseInt(savedCombat.class, 10) || 1);
+      if (!fieldGroup || fieldGroup === "rank") syncInput(rankEl, String(savedCombat.rank ?? "0"));
+      if (!fieldGroup || fieldGroup === "tohit") syncInput(tohitEl, formatOptionalIntegerInput(savedRollData.tohit));
+      if (!fieldGroup || fieldGroup === "accuracy") syncInput(accuracyEl, formatOptionalIntegerInput(savedRollData.accuracy, { showPlus: true }));
+      if (!fieldGroup || fieldGroup === "specialGrade") syncInput(specialGradeEl, Number.parseInt(savedCombat.specialGrade, 10) || "");
       if (!fieldGroup || fieldGroup === "primaryUses") {
         const currentEl = root?.querySelector?.(".pc-entry-signature-current");
         const maxEl = root?.querySelector?.(".pc-entry-signature-max");
-        if (currentEl) currentEl.value = savedCombat.usesCurrent ?? 0;
-        if (maxEl) maxEl.value = savedCombat.usesMax ?? 0;
+        syncInput(currentEl, savedCombat.usesCurrent ?? 0);
+        syncInput(maxEl, savedCombat.usesMax ?? 0);
       }
       if (!fieldGroup || fieldGroup === "duressUseCounts") {
         const currentEl = root?.querySelector?.(".pc-entry-duress-current");
         const maxEl = root?.querySelector?.(".pc-entry-duress-max");
-        if (currentEl) currentEl.value = savedCombat.signatureUsage?.duressCurrent ?? 0;
-        if (maxEl) maxEl.value = savedCombat.signatureUsage?.duressMax ?? 0;
+        syncInput(currentEl, savedCombat.signatureUsage?.duressCurrent ?? 0);
+        syncInput(maxEl, savedCombat.signatureUsage?.duressMax ?? 0);
       }
       return true;
     } catch (err) {
+      for (const input of dirtyInputs) this._dirtyMainInputs.add(input);
       console.warn("Failed to persist combat field change:", err);
+      ui.notifications?.error?.("Could not save the field. Your edit has been kept.");
       return false;
     }
   }
 
   async _switchToSpecialType() {
-    if (!this._canEdit()) return;
+    if (!this._canEditFields()) return;
     try {
       await this.adapter.update({ type: "Custom" }, { render: false });
       await this.render({ force: true });
@@ -2022,7 +2109,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   async _setCombatType(type) {
-    if (!this._canEdit()) return;
+    if (!this._canEditFields()) return;
     const nextType = String(type || "skill");
     try {
       await this.adapter.update({ type: nextType }, { render: false });
@@ -2035,7 +2122,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   async _openCombatImagePicker(event, $container = $(this.element)) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    if (!this._canEdit()) return;
+    if (!this._canEditFields()) return;
     if (!FilePickerClass) return;
 
     const picker = new FilePickerClass({
@@ -2067,7 +2154,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
 
   async _setCombatImage(path, $container = $(this.element)) {
     const nextPath = String(path ?? "").trim();
-    if (!nextPath || !this._canEdit()) return;
+    if (!nextPath || !this._canEditFields()) return;
 
     await this.adapter.update({ img: nextPath }, { render: false });
     const image = $container[0]?.querySelector?.(".pc-notable-combat-image-frame .pc-item-image");
@@ -2075,14 +2162,16 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   _showDescriptionTab($container = $(this.element)) {
-    this._setActiveTab("description", $container);
-    const editor = $container[0]?.querySelector?.('prose-mirror[name="combatDescription"]');
-    editor?.focus?.();
+    void this._setActiveTab("description", $container).then(() => {
+      const editor = $container[0]?.querySelector?.('prose-mirror[name="combatDescription"]');
+      editor?.focus?.();
+    });
   }
 
-  _setActiveTab(tab, $container = $(this.element)) {
+  async _setActiveTab(tab, $container = $(this.element)) {
     const normalized = String(tab ?? "").trim();
     if (!TAG_EDITOR_TABS.has(normalized)) return;
+    if (!await this._flushPendingEdits($container)) return;
     const leavingProvisionalTag = this._activeTab === "details"
       && normalized !== "details"
       && !!$container[0]?.querySelector?.("[data-pc-tag-provisional]");
@@ -2113,9 +2202,6 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
       panel.setAttribute("aria-hidden", active ? "false" : "true");
     }
 
-    for (const footerControl of root.querySelectorAll("[data-pc-notable-combat-footer]")) {
-      footerControl.toggleAttribute("hidden", footerControl.dataset.pcNotableCombatFooter !== activeTab);
-    }
     const footer = root.querySelector(".pc-skill-editor-footer");
     if (footer) {
       const hasVisibleControl = Array.from(footer.querySelectorAll("button")).some(control => !control.hidden);
@@ -2124,6 +2210,7 @@ class PeasantNotableCombatTagEditorApp extends NotableCombatTagEditorBase {
   }
 
   _onClose(options) {
+    clearTimeout(this._descriptionSaveTimer);
     if (this._actorUpdateHookId != null) Hooks.off("updateActor", this._actorUpdateHookId);
     this._actorUpdateHookId = null;
     if (typeof super._onClose === "function") super._onClose(options);

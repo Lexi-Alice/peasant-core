@@ -1,3 +1,5 @@
+import { isOverchargedEffect } from "../data/active-effect/overcharged.mjs";
+
 const PC_SYSTEM_ID = "peasant-core";
 const PC_ROLL_UNDO_FLAG = "rollUndo";
 const PC_EDGE_CHAIN_FLAG = "edgeChain";
@@ -32,6 +34,7 @@ function getActorSpellEffectSources(actor) {
   return Array.from(actor?.effects || [])
     .filter((effect) => (
       effect?.type === "spellEffect"
+      || isOverchargedEffect(effect)
       || effect?.flags?.["peasant-core"]?.guardBroken === true
       || effect?.getFlag?.("peasant-core", "guardBroken") === true
     ))

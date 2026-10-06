@@ -1,4 +1,5 @@
 import { buildAutomatedCombatDamageData } from "../../data/actor/combat-damage.mjs";
+import { getDamageScaleResult } from "../../data/actor/damage.mjs";
 import { getManifestSpellDefinition } from "../../data/active-effect/spell-effects.mjs";
 import { applyMessageMode, escapeHtml } from "../../utils/chat.mjs";
 import { getActorRollSpeaker } from "./actor-targets.mjs";
@@ -82,7 +83,9 @@ export async function rollAutomatedCombatDamage(actor, combat, {
   deferChatMessage = false,
   diceOverride = null,
   chatMessage = null,
-  combatMods = null
+  combatMods = null,
+  targetActor = null,
+  attackScale = 0
 } = {}) {
   if (!actor || !combat?.damage) return null;
 
@@ -132,9 +135,13 @@ export async function rollAutomatedCombatDamage(actor, combat, {
     ? aoeReflexSaveResult
     : null;
   const reflexSavePassed = !!reflexSaveResult?.passed;
-  let displayTotal = total;
+  const scale = targetActor ? getDamageScaleResult(total, targetActor, attackScale) : null;
+  let displayTotal = scale?.damage ?? total;
   if (halveDamageForGlance) displayTotal = Math.floor(displayTotal / 2);
   if (reflexSaveResult && reflexSavePassed) displayTotal = Math.floor(displayTotal / 2);
+  let chatTotal = total;
+  if (halveDamageForGlance) chatTotal = Math.floor(chatTotal / 2);
+  if (reflexSaveResult && reflexSavePassed) chatTotal = Math.floor(chatTotal / 2);
   const damageDetailsHtml = `${diceDetailLine}${flat !== 0 ? `
         <div>Flat Modifier: ${flat > 0 ? '+' : ''}${flat}</div>` : ''}${halveDamageForGlance ? `
         <div>Damage Halved Due to Glance</div>` : ''}${reflexSavePassed ? `
@@ -154,7 +161,7 @@ export async function rollAutomatedCombatDamage(actor, combat, {
           <span style="color: #ffffff; font-weight: bold; font-size: 11px;">Damage:</span>
           <div style="display: flex; align-items: center; gap: 6px;">
             <button class="mos-toggle" data-roll-id="${rollId}" style="cursor: pointer; padding: 4px 8px; background: #2a2a2a; border-radius: 3px; font-size: 14px; font-weight: bold; color: #4ade80; border: 2px solid #22c55e;">
-              ${displayTotal}
+              ${chatTotal}
             </button>${typeDisplay}
           </div>
         </div>
@@ -178,6 +185,7 @@ export async function rollAutomatedCombatDamage(actor, combat, {
     allDice,
     adjustedDiceTotal,
     displayTotal,
+    scale,
     chatHtml,
     speaker,
     barrierMessages: []

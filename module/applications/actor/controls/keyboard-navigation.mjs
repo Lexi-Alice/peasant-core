@@ -15,7 +15,7 @@ export function setupSheetKeyboardNavigation(sheet, html, { sheetDocument } = {}
         if (el.classList.contains("skill-select")) return false;
 
         const name = el.getAttribute("name") || "";
-        if (name === "system.race" || name === "system.origin" || name === "system.specificOrigin") return false;
+        if (["system.majorHeraldry", "system.minorHeraldry", "system.finalHeraldry", "system.origin", "system.specificOrigin"].includes(name)) return false;
 
         if (el.classList.contains("edge-base-label-mode") || el.classList.contains("edge-resource-label-mode") || el.classList.contains("edge-label-mode")) return false;
 

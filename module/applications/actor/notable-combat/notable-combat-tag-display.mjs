@@ -77,6 +77,7 @@ export function getNotableCombatTagLabel(tagType) {
     desperate: "Desperate",
     overkill: "Overkill",
     magnetism: "Magnetism",
+    tippingScales: "Tipping Scales",
     heal: "Heal",
     manifest: "Manifest",
     manifestDome: "Manifest Dome",
@@ -180,6 +181,10 @@ export function formatNotableCombatEditorTagValue(tagType, combatData = {}) {
       return combatData.stability ? "Stability" : null;
     case "overkill":
       return combatData.overkill ? "Overkill" : null;
+    case "tippingScales": {
+      const penetration = Number.parseInt(combatData.tippingScales, 10) || 0;
+      return penetration > 0 ? `Tipping Scales: ${penetration}` : null;
+    }
     case "magnetism": {
       const grade = Number.parseInt(combatData.magnetism?.grade, 10) || 0;
       return grade > 0 ? `Magnetism: Grade ${grade}` : null;

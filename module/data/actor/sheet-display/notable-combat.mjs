@@ -44,21 +44,13 @@ import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, formatCombatDiceDisplay, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 import { getNotableCombatImage } from "../notable-combat-image.mjs";
-import { isRollableSkillType, isSkillProgressionType, isSignatureSkillType, normalizeSkillTypeForCategory } from "../skill-entry-types.mjs";
+import { getNotableCombatTreeRows, isNotableCombatDisplayable } from "../notable-combat-tree.mjs";
+import { SKILL_TYPE_OPTIONS, getFixedSkillTypeValue, getSkillTypeOptionsForCategory, isRollableSkillType, isSkillProgressionType, isSignatureSkillType, normalizeSkillTypeForCategory } from "../skill-entry-types.mjs";
 import { resolveSkillUsage } from "../skill-entries.mjs";
 
 export function prepareNotableCombatTree(combats, { includeHidden = false } = {}) {
   const prepared = combats.map(combat => ({ ...combat, treeDepth: 0, treeLanes: [], treeHasChildren: false }));
-  const visibleRows = [];
-
-  for (const [index, combat] of prepared.entries()) {
-    if (!includeHidden && !combat.isDisplayable) continue;
-
-    const requestedDepth = Math.max(0, Number.parseInt(combat.indent, 10) || 0);
-    const previousDepth = visibleRows.at(-1)?.depth ?? -1;
-    const depth = Math.min(requestedDepth, previousDepth + 1);
-    visibleRows.push({ index, depth });
-  }
+  const visibleRows = getNotableCombatTreeRows(prepared, { includeHidden });
 
   for (const [index, row] of visibleRows.entries()) {
     prepared[row.index].treeDepth = row.depth;
@@ -77,8 +69,8 @@ export function prepareNotableCombatTree(combats, { includeHidden = false } = {}
   return prepared;
 }
 
-export function prepareActorNotableCombatContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
-  const sourceNotableCombats = ((isEditMode ? sourceSystem : actor.system)?.notableCombats || []);
+export function prepareActorNotableCombatContext(data, actor, { isEditMode = false, sourceSystem = null, collection = "notableCombats" } = {}) {
+  const sourceNotableCombats = ((isEditMode ? sourceSystem : actor.system)?.[collection] || []);
   const combatMods = getEffectiveSkillCombatModifiers(actor);
   const toHitMod = parseInt(combatMods.toHit) || 0;
   const accuracyMod = parseInt(combatMods.accuracy) || 0;
@@ -91,6 +83,8 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
     const combat = resolved.ok ? resolved.data : sourceCombat;
     const tohitValue = parseOptionalInteger(combat.tohit, { min: 1 });
     const accuracyValue = parseOptionalInteger(combat.accuracy, { allowSign: true });
+    const apValue = parseOptionalInteger(combat.ap, { min: 0 });
+    const spValue = parseOptionalInteger(combat.sp, { min: 0 });
     const hasBaseTohit = hasOptionalInteger(tohitValue);
     const hasBaseAccuracy = hasOptionalInteger(accuracyValue);
     const baseAccuracy = accuracyValue ?? 0;
@@ -102,20 +96,24 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
     const combatTypeKey = combatType.toLowerCase();
     const isSignature = isSignatureSkillType(combatType);
     const isSkillType = isSkillProgressionType(combatType);
+    const typeIsCustom = !getFixedSkillTypeValue(combatType);
+    const options = isSkillType
+      ? getSkillTypeOptionsForCategory(combat.category, { currentType: combatType })
+      : SKILL_TYPE_OPTIONS.filter(option => option.value === "skill"
+        || (option.value !== "custom" && !isSkillProgressionType(option.value)));
+    const typeOptions = options.map(option => ({
+      ...option,
+      value: option.value === "custom" && typeIsCustom ? combatType : option.value,
+      selected: option.value === "custom" ? typeIsCustom : option.value === combatType
+    }));
     const allowToHitAcc = isRollableSkillType(combatType);
-    let isDisplayable = false;
+    const isDisplayable = isNotableCombatDisplayable(combat);
     const specialGradeRaw = parseInt(combat.specialGrade);
     const specialGrade = Number.isFinite(specialGradeRaw) ? Math.max(0, specialGradeRaw) : 0;
     const hasSpecialGrade = Number.isFinite(specialGradeRaw) && specialGrade > 0;
     const rankStr = String(combat.rank ?? "").trim().toLowerCase();
     const isUntrainedRank = (rankStr === "u");
     const hasValidRank = isUntrainedRank || combat.rank === 0 || Number.isFinite(parseInt(combat.rank));
-
-    if (isSkillType) {
-      isDisplayable = combat.class && hasValidRank && combat.name && hasBaseTohit;
-    } else {
-      isDisplayable = combat.name;
-    }
 
     const descriptionRaw = combat.description || "";
     const descriptionText = descriptionRaw.replace(/<[^>]*>/g, "").trim();
@@ -264,6 +262,7 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
     const hasReach = combat.reach > 0;
     const hasStability = !!combat.stability;
     const hasOverkill = !!combat.overkill;
+    const tippingScales = Math.max(0, Number.parseInt(combat.tippingScales, 10) || 0);
     const magnetismGrade = getCombatMagnetismGrade(combat);
     const hasMagnetism = magnetismGrade > 0;
     const hasDesperate = desperate.value !== 0;
@@ -302,6 +301,7 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
       stability: { has: hasStability, label: "Stability", value: "" },
       overkill: { has: hasOverkill, label: "Overkill", value: "" },
       magnetism: { has: hasMagnetism, label: "Magnetism", value: `Grade ${magnetismGrade}` },
+      tippingScales: { has: tippingScales > 0, label: "Tipping Scales", value: tippingScales },
       strengthen: { has: hasStrengthen, label: "Strengthen", value: "" },
       custom: { has: hasCustom, tags: customTags },
       self: { has: combat.self, label: "Self", value: "" }
@@ -326,11 +326,15 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
 
     return {
       ...combat,
+      isSkillEntry: collection === "skills",
+      showInList: isEditMode || isDisplayable,
       usageId: resolved.ok ? resolved.usageId : "base",
       type: combatType,
       isSignature,
       imageSrc: getNotableCombatImage(combat),
       isSkillType,
+      typeIsCustom,
+      typeOptions,
       allowToHitAcc,
       classRankDisplay,
       specialTypeDisplay,
@@ -338,6 +342,10 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
       specialGradeInput: hasSpecialGrade ? specialGrade : "",
       tohit: formatOptionalIntegerInput(tohitValue),
       accuracy: formatOptionalIntegerInput(accuracyValue, { showPlus: true }),
+      ap: formatOptionalIntegerInput(apValue),
+      sp: formatOptionalIntegerInput(spValue),
+      hasAp: hasOptionalInteger(apValue),
+      hasSp: hasOptionalInteger(spValue),
       accuracyNum,
       hasToHit: allowToHitAcc && hasBaseTohit,
       hasAccuracy: allowToHitAcc && (accuracyNum !== 0 || hasBaseAccuracy),
@@ -401,11 +409,11 @@ export function prepareActorNotableCombatContext(data, actor, { isEditMode = fal
       activeTags,
       customTags,
       tagOrder: combat.tagOrder || [],
-      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasDesperate || hasOverkill || hasMagnetism || hasHeal || hasManifest || hasManifestDome || hasManifestResistance || hasTagUses || hasSections || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
+      hasTags: hasResourceCosts || hasSpeed || hasRange || hasRangeRate || hasDamage || hasDesperate || hasOverkill || hasMagnetism || tippingScales > 0 || hasHeal || hasManifest || hasManifestDome || hasManifestResistance || hasTagUses || hasSections || hasTargetingType || hasDefense || hasReach || hasStability || hasStrengthen || hasCustom || combat.self
     };
   });
 
-  data.notableCombats = prepareNotableCombatTree(notableCombats, { includeHidden: isEditMode });
+  data[collection] = prepareNotableCombatTree(notableCombats, { includeHidden: isEditMode });
 }
 
 function formatDesperateTagValue(desperate) {

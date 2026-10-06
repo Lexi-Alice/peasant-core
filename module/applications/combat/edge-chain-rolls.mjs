@@ -7,6 +7,7 @@ import {
   markRollUndoChatMessageEffectsUndone
 } from "../chat-undo.mjs";
 import { computeBaseAttrToHits } from "../../data/actor/attributes.mjs";
+import { actorUsesWinterEdge } from "../../data/actor/edge-resources.mjs";
 import { getDevastatingWoundAccuracyModifier, getEffectiveSkillCombatModifiers } from "../../data/actor/combat-modifiers.mjs";
 import { hasOptionalInteger, parseOptionalInteger } from "../../data/actor/helpers.mjs";
 import { withPeasantActorSourceWriteContext } from "../../data/actor/source-system.mjs";
@@ -22,11 +23,13 @@ import {
   refundActorEdge,
   resolveActorFromUuidOrId,
   resolveEdgeLocationRollSpender,
-  spendActorEdge
+  spendActorEdge,
+  withWinterEdgeTransaction
 } from "./edge-location-rolls.mjs";
 import { maybeForcePassFailedRoll, PC_STRESS_ROLL_FLAG } from "./force-pass.mjs";
 import { hasUnsettledAutomaticSkillEffects, offerSkillEntryEffects } from "./skill-entry-effects.mjs";
 import { updateSkillRollChatCardFromResult } from "./roll-chat-updates.mjs";
+import { getPreferredActiveGM } from "../../socket/remote-prompts.mjs";
 
 const PC_SYSTEM_ID = "peasant-core";
 export const PC_EDGE_CHAIN_FLAG = "edgeChain";
@@ -50,6 +53,7 @@ const EDGE_CHAIN_STATUSES = new Set([
 
 const EDGE_CHAIN_BLOCK_CRITICAL = "critical-roll";
 const FALL_BLESSING_UNDO_LABEL = "Blessing of Fall Accuracy Uses";
+const fallAccuracyTransactions = new WeakMap();
 
 const EDGE_EXPLODE_STATUSES = new Set([
   EDGE_EXPLODE_STATUS_CURRENT,
@@ -85,7 +89,7 @@ function sanitizeEdgeExplodeStatus(status, fallback = EDGE_EXPLODE_STATUS_CURREN
 }
 
 function normalizeEdgeBlockOptions(options = {}, fallbackFlag = null) {
-  const edgeBlockedReason = String(options?.edgeBlockedReason || fallbackFlag?.edgeBlockedReason || "").trim();
+  const edgeBlockedReason = String(Object.hasOwn(options, "edgeBlockedReason") ? options.edgeBlockedReason : fallbackFlag?.edgeBlockedReason || "").trim();
   return {
     edgeBlockedReason,
     edgeBlockedLabel: edgeBlockedReason
@@ -245,12 +249,25 @@ export function getEdgeIndividualDieFlag(message) {
   return normalizeEdgeIndividualDieFlag(message?.getFlag?.(PC_SYSTEM_ID, PC_EDGE_INDIVIDUAL_DIE_FLAG));
 }
 
-export function getEdgeIndividualDieTitle(flag) {
+export function getEdgeIndividualDieTitle(flag, { winter = false } = {}) {
   const normalized = normalizeEdgeIndividualDieFlag(flag) || createEdgeIndividualDieFlag();
   const suffix = normalized.kind === "damage"
     ? " Damage Value"
     : (normalized.kind === "heal" ? " Healing Value" : (normalized.kind === "manifest" ? " Manifest Value" : ""));
-  return `Edge Individual Die On ${normalized.label}${suffix}`;
+  return `${winter ? "Winter's Edge" : "Edge Individual Die"} On ${normalized.label}${suffix}`;
+}
+
+function getWinterEdgeIndividualDieFlag(message) {
+  const existing = getEdgeIndividualDieFlag(message);
+  if (existing) return existing;
+  const explosion = getEdgeExplodeFlag(message);
+  const chain = getEdgeChainFlag(message);
+  if (!explosion || explosion.status !== EDGE_EXPLODE_STATUS_CURRENT || explosion.processing) return null;
+  return createEdgeIndividualDieFlag({
+    chainId: chain?.chainId, kind: "skill", label: explosion.rollRef.skillName || chain?.label,
+    dice: explosion.trained ? explosion.initialDice : explosion.allDice,
+    trained: explosion.trained, toHit: explosion.toHit, accuracy: explosion.accuracy, checkpoint: explosion.checkpoint
+  });
 }
 
 export function createEdgeIndividualValueRollKey(kind, {
@@ -345,12 +362,13 @@ export function createSkillResultFromIndividualDice({
   };
 }
 
-export async function showEdgeIndividualDiePrompt(flag) {
+export async function showEdgeIndividualDiePrompt(flag, { winter = false, explosionDice = [], diceFacesByIndex = [] } = {}) {
   const normalized = normalizeEdgeIndividualDieFlag(flag);
   if (!normalized?.dice.length) return { dieIndex: null, cancelled: true };
-  const optionsHtml = normalized.dice
+  let optionsHtml = normalized.dice
     .map((die, index) => `<option value="${index}">Die ${index + 1}: ${escapeHtml(die)}</option>`)
     .join("");
+  if (winter) optionsHtml += explosionDice.map((die, index) => `<option value="explosion:${index}">Critical Die ${index + 1}: ${escapeHtml(die)}</option>`).join("");
   const content = `
     <form class="pc-edge-individual-die-form">
       <div class="form-group" style="margin-bottom: 10px;">
@@ -359,6 +377,12 @@ export async function showEdgeIndividualDiePrompt(flag) {
           ${optionsHtml}
         </select>
       </div>
+      ${winter ? `<div class="form-group" style="margin-bottom: 10px;">
+        <label style="display:block; margin-bottom:5px; color:#b0b0b0;">Desired Face:</label>
+        <select class="pc-defense-prompt-select pc-select pc-dialog-field-full" name="winterEdgeValue">
+          ${Array.from({ length: normalized.diceFaces }, (_, index) => `<option value="${index + 1}"${index + 1 === normalized.dice[0] ? " selected" : ""}>${index + 1}</option>`).join("")}
+        </select>
+      </div>` : ""}
     </form>
   `;
 
@@ -375,15 +399,21 @@ export async function showEdgeIndividualDiePrompt(flag) {
     };
 
     renderDialogV2({
-      title: getEdgeIndividualDieTitle(normalized),
+      title: getEdgeIndividualDieTitle(normalized, { winter }),
       content,
       buttons: {
         select: {
           label: "Select",
           callback: async (html) => {
-            const dieIndex = Number.parseInt(qs(html, '[name="edgeIndividualDieChoice"]')?.value, 10);
-            if (!Number.isInteger(dieIndex) || dieIndex < 0 || dieIndex >= normalized.dice.length) return false;
-            finalize({ dieIndex, cancelled: false });
+            const choice = String(qs(html, '[name="edgeIndividualDieChoice"]')?.value || "");
+            const dieType = choice.startsWith("explosion:") ? "explosion" : "base";
+            const dieIndex = Number(dieType === "explosion" ? choice.slice(10) : choice);
+            const dice = dieType === "explosion" ? explosionDice : normalized.dice;
+            if (!Number.isInteger(dieIndex) || dieIndex < 0 || dieIndex >= dice.length) return false;
+            const newValue = winter ? Number(qs(html, '[name="winterEdgeValue"]')?.value) : null;
+            const faces = dieType === "explosion" ? 6 : diceFacesByIndex[dieIndex] || normalized.diceFaces;
+            if (winter && (!Number.isInteger(newValue) || newValue < 1 || newValue > faces)) return false;
+            finalize({ dieIndex, cancelled: false, ...(winter ? { newValue, dieType } : {}) });
             return true;
           }
         }
@@ -392,6 +422,17 @@ export async function showEdgeIndividualDiePrompt(flag) {
       render: (html) => {
         const dialogElement = toElement(html);
         if (!dialogElement) return;
+        if (winter) {
+          const choice = qs(dialogElement, '[name="edgeIndividualDieChoice"]');
+          const desired = qs(dialogElement, '[name="winterEdgeValue"]');
+          choice?.addEventListener?.("change", () => {
+            const explosion = choice.value.startsWith("explosion:");
+            const index = Number(explosion ? choice.value.slice(10) : choice.value);
+            const faces = explosion ? 6 : diceFacesByIndex[index] || normalized.diceFaces;
+            const current = (explosion ? explosionDice : normalized.dice)[index];
+            desired.innerHTML = Array.from({ length: faces }, (_, face) => `<option value="${face + 1}"${face + 1 === current ? " selected" : ""}>${face + 1}</option>`).join("");
+          });
+        }
         const viewportWidth = Number(globalThis.window?.innerWidth) || 480;
         const stableDialogWidth = Math.max(340, Math.min(400, viewportWidth - 32));
         dialogElement.style.width = `${stableDialogWidth}px`;
@@ -1067,7 +1108,6 @@ export async function attachEdgeIndividualDieToChatMessage(message, rollResult, 
 } = {}) {
   if (!message?.setFlag) return null;
   const chainFlag = getEdgeChainFlag(message);
-  if (chainFlag?.edgeBlockedReason) return null;
 
   const dice = kind === "skill"
     ? normalizeDiceArray(trained ? rollResult?.initialDice : rollResult?.allDice)
@@ -1269,13 +1309,15 @@ async function clearStressRollRetry(message) {
   });
 }
 
-export function canEdgeIndividualDieMessage(message) {
+export function canEdgeIndividualDieMessage(message, { winter = false } = {}) {
   if (message?.getFlag?.(PC_SYSTEM_ID, PC_STRESS_ROLL_FLAG)?.processing) return false;
-  const flag = getEdgeIndividualDieFlag(message);
+  const flag = winter ? getWinterEdgeIndividualDieFlag(message) : getEdgeIndividualDieFlag(message);
   if (!flag || flag.status !== EDGE_CHAIN_STATUS_CURRENT || flag.processing || flag.dice.length === 0) return false;
 
   const chainFlag = getEdgeChainFlag(message);
-  if (!canEdgeChainFlag(chainFlag)) return false;
+  if (winter) {
+    if (!canRerunChainForEdgeExplode(chainFlag) || (chainFlag.edgeBlockedReason && chainFlag.edgeBlockedReason !== EDGE_CHAIN_BLOCK_CRITICAL)) return false;
+  } else if (!canEdgeChainFlag(chainFlag)) return false;
   if (flag.chainId && chainFlag.chainId && flag.chainId !== chainFlag.chainId) return false;
 
   const rollUndoFlag = message?.getFlag?.(PC_SYSTEM_ID, "rollUndo");
@@ -1296,9 +1338,15 @@ function canOfferEdgeExplode(message) {
   return true;
 }
 
-function resolveFallBlessingActorSync(chainFlag) {
-  const rerun = chainFlag?.rerun || {};
-  const actorUuid = String(rerun.actorUuid || "").trim();
+export function getFallBlessingRollActorRef(message) {
+  const checkpoint = getEdgeIndividualDieFlag(message)?.checkpoint;
+  if (checkpoint?.stage === "defense") return cloneData(checkpoint.defenseTargetRef || {});
+  const rerun = getEdgeChainFlag(message)?.rerun || {};
+  return { ...cloneData(rerun), actorId: rerun.actorId || rerun.speaker?.actor || "" };
+}
+
+function resolveFallBlessingActorSync(actorRef) {
+  const actorUuid = String(actorRef?.actorUuid || actorRef?.tokenUuid || "").trim();
   if (actorUuid && typeof fromUuidSync === "function") {
     try {
       const resolved = fromUuidSync(actorUuid);
@@ -1306,7 +1354,7 @@ function resolveFallBlessingActorSync(chainFlag) {
       if (resolved?.actor) return resolved.actor;
     } catch (_) {}
   }
-  const actorId = String(rerun.actorId || rerun.speaker?.actor || "").trim();
+  const actorId = String(actorRef?.actorId || "").trim();
   if (actorId) {
     const actor = game.actors?.get(actorId) || null;
     if (actor) return actor;
@@ -1326,7 +1374,7 @@ function isFallEligibleSkillChain(chainFlag) {
   return false;
 }
 
-function getFallBlessingEligibility(message, { user = game.user } = {}) {
+function getFallBlessingEligibility(message, { user = game.user, resolvedActor = null } = {}) {
   if (message?.getFlag?.(PC_SYSTEM_ID, PC_STRESS_ROLL_FLAG)?.processing) return { ok: false };
   const chainFlag = getEdgeChainFlag(message);
   const rollFlag = getEdgeIndividualDieFlag(message);
@@ -1346,10 +1394,12 @@ function getFallBlessingEligibility(message, { user = game.user } = {}) {
   const rollUndoFlag = message?.getFlag?.(PC_SYSTEM_ID, "rollUndo");
   if (rollUndoFlag?.status === "undone") return { ok: false };
 
-  const actor = resolveFallBlessingActorSync(chainFlag);
+  const actorRef = getFallBlessingRollActorRef(message);
+  const actor = resolvedActor || resolveFallBlessingActorSync(actorRef);
   const currentUses = Number(actor?.system?.fallBlessingUses?.value);
   if (
     !actor
+    || (actorRef.actorUuid ? actorRef.actorUuid !== actor.uuid : actorRef.actorId !== actor.id)
     || String(actor.system?.blessing?.type || "").trim().toLowerCase() !== "fall"
     || !Number.isInteger(currentUses)
     || currentUses < 1
@@ -1607,6 +1657,45 @@ function getMessagesByIds(messageIds = []) {
   return messages;
 }
 
+async function getReplayProgressMessages(progress) {
+  const { collectIncomingResolutionChatMessages } = await import("./notable-combat-workflow.mjs");
+  return progress.flatMap(collectIncomingResolutionChatMessages);
+}
+
+async function refreshPlannedAttackRollCard(checkpoint, replayPlan, { clearForcePassNote = false } = {}) {
+  if (checkpoint?.multiTarget || !replayPlan?.attackRollResult) return;
+  const attackMessage = game.messages?.get(checkpoint?.attackMessageId);
+  if (attackMessage) await updateSkillRollChatCardFromResult({
+    ...replayPlan.attackRollResult, chatMessage: attackMessage, clearForcePassNote
+  });
+}
+
+async function synchronizeCombatReplayCheckpoints({ checkpoint, rollResult, originalMessages, replayResult, replayMessageIds = [] }) {
+  if (checkpoint?.type !== "notableCombatPostRoll") return;
+  const { serializeRollResult, createNotableCombatDefenseReplayCheckpoint } = await import("./notable-combat-workflow.mjs");
+  const refreshedCheckpoint = replayResult?.checkpoint || checkpoint;
+  const updatedDefense = checkpoint.stage === "defense"
+    ? createNotableCombatDefenseReplayCheckpoint({ ...checkpoint, targets: refreshedCheckpoint.targets }, rollResult)
+    : null;
+  for (const candidate of new Set([...originalMessages, ...getMessagesByIds(replayMessageIds)])) {
+    for (const key of [PC_EDGE_INDIVIDUAL_DIE_FLAG, PC_EDGE_EXPLODE_FLAG]) {
+      const current = candidate.getFlag?.(PC_SYSTEM_ID, key);
+      if (current?.checkpoint?.type !== "notableCombatPostRoll") continue;
+      const nextCheckpoint = cloneData(current.checkpoint);
+      if (replayResult?.checkpoint) nextCheckpoint.targets = cloneData(refreshedCheckpoint.targets || []);
+      if (checkpoint.stage === "attack") nextCheckpoint.attackRollResult = serializeRollResult(rollResult);
+      else if (updatedDefense) {
+        nextCheckpoint.targets = (nextCheckpoint.targets || []).map(entry => {
+          const updated = updatedDefense.targets.find(updated => createEdgeIndividualValueRollKey("damage", { targetRef: updated.targetRef })
+            === createEdgeIndividualValueRollKey("damage", { targetRef: entry.targetRef }));
+          return updated ? { ...entry, defensePromptResult: cloneData(updated.defensePromptResult) } : entry;
+        });
+      }
+      await candidate.setFlag(PC_SYSTEM_ID, key, { ...current, checkpoint: nextCheckpoint });
+    }
+  }
+}
+
 function getRollUndoRecordsFromMessage(message) {
   const flag = message?.getFlag?.(PC_SYSTEM_ID, "rollUndo");
   return Array.isArray(flag?.records) ? flag.records.filter(canUndoRecord) : [];
@@ -1657,7 +1746,7 @@ async function refreshEdgeChainMessagesForEdgeExplode({
   });
 }
 
-async function prepareRerun(flag, { edgeExplodeReroll = null } = {}) {
+async function prepareRerun(flag, { edgeExplodeReroll = null, onSaveReplayProgress = null } = {}) {
   const rerun = flag?.rerun || {};
   const fallEdgeChainContext = flag?.fallAccuracyApplied ? createEdgeChainContextFromFlag(flag) : null;
   if (rerun.type === "savingRoll" || rerun.type === "consciousnessCheck") {
@@ -1707,7 +1796,8 @@ async function prepareRerun(flag, { edgeExplodeReroll = null } = {}) {
         rollMode: rerun.rollMode,
         usageContext: cloneData(rerun.usageContext),
         ...(fallEdgeChainContext ? { edgeChainContext: fallEdgeChainContext } : {}),
-        edgeExplodeReroll
+        edgeExplodeReroll,
+        onSaveReplayProgress
       })
     };
   }
@@ -1774,7 +1864,8 @@ async function prepareRerun(flag, { edgeExplodeReroll = null } = {}) {
         cardClass: rerun.cardClass,
         rollMode: rerun.rollMode,
         ...(fallEdgeChainContext ? { edgeChainContext: fallEdgeChainContext } : {}),
-        edgeExplodeReroll
+        edgeExplodeReroll,
+        onSaveReplayProgress
       })
     };
   }
@@ -2003,10 +2094,11 @@ async function createFallBlessingSummary({ actor, rollLabel, originalMoS, newMoS
 export function renderEdgeIndividualDieSummary({
   flag = null,
   originalDie = null,
-  newDie = null
+  newDie = null,
+  winter = false
 } = {}) {
   return `<fieldset class="skill-roll-card pc-edge-individual-die-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <legend>${escapeHtml(getEdgeIndividualDieTitle(flag))}</legend>
+    <legend>${escapeHtml(getEdgeIndividualDieTitle(flag, { winter }))}</legend>
     <div class="roll-details" style="display: block; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 12px; line-height: 1.55;">
       <div>Original Die: ${escapeHtml(originalDie)}</div>
       <div>New Die: ${escapeHtml(newDie)}</div>
@@ -2065,7 +2157,7 @@ async function rollEdgeIndividualDie(faces) {
   return Math.floor(value);
 }
 
-async function createIndividualSkillRollResult(message, flag, dice) {
+async function createIndividualSkillRollResult(message, flag, dice, { explosionDice = null } = {}) {
   const trained = flag?.trained !== false;
   let criticalDice = dice.slice(0, 2);
   if (!trained) {
@@ -2073,7 +2165,7 @@ async function createIndividualSkillRollResult(message, flag, dice) {
     const maxIndex = dice.indexOf(maxValue);
     criticalDice = dice.filter((_, index) => index !== maxIndex).slice(0, 2);
   }
-  const critical = await rollPeasantCriticalExplosion(criticalDice);
+  const critical = await rollPeasantCriticalExplosion(criticalDice, { explosionDice });
   return {
     ...createSkillResultFromIndividualDice({
       trained,
@@ -2157,7 +2249,7 @@ async function replayManualEdgeIndividualValue({ flag, chainFlag, replacement })
   };
 }
 
-async function applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, requester, dieIndex = null }) {
+async function applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, requester, dieIndex = null, winter = false, newValue = null }) {
   const flag = getEdgeIndividualDieFlag(message);
   const individual = dieIndex !== null;
   const prepared = await prepareRerun(chainFlag);
@@ -2166,7 +2258,7 @@ async function applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, reques
   try {
     if (individual) {
       replaceEdgeIndividualDie(flag, dieIndex, flag?.dice?.[dieIndex]);
-      replacement = replaceEdgeIndividualDie(flag, dieIndex, await rollEdgeIndividualDie(6));
+      replacement = replaceEdgeIndividualDie(flag, dieIndex, winter ? newValue : await rollEdgeIndividualDie(6));
     }
   } catch (error) {
     return { ok: false, error: getResultError(error) };
@@ -2175,7 +2267,7 @@ async function applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, reques
   const combatSave = checkpoint?.stage === "save" && checkpoint?.type === "notableCombatPostRoll";
   const parentFlag = combatSave ? getEdgeChainFlag(game.messages?.get(checkpoint.attackMessageId)) : null;
   const records = getSaveCheckUndoRecords(message, chainFlag);
-  const permissionError = getUndoPermissionError(requester, records);
+  const permissionError = getUndoPermissionError(winter && game.user?.isGM ? game.user : requester, records);
   if (permissionError) return { ok: false, error: permissionError };
   const snapshots = getMessagesForChain(chainFlag.chainId).map(candidate => ({
     message: candidate,
@@ -2199,7 +2291,7 @@ async function applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, reques
     edgeSpend = await spendActorEdge(spenderActor);
     if (!edgeSpend.ok) throw new Error(edgeSpend.error);
     summary = individual
-      ? await createEdgeIndividualDieSummary({ flag, spenderActor, ...replacement })
+      ? await createEdgeIndividualDieSummary({ flag, spenderActor, ...replacement, winter })
       : await createEdgeChainSummary({ flag: chainFlag, spenderActor });
     if (individual) await message.setFlag(PC_SYSTEM_ID, "rollUndo", { status: "available", records: [] });
     rollResult = await prepared.run({
@@ -2315,17 +2407,24 @@ async function applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, reques
 }
 
 export async function applyEdgeIndividualDieRoll(payload = {}) {
+  if (payload.winter !== true) return applyEdgeIndividualDieTransaction(payload);
+  const actor = await resolveActorFromUuidOrId({ actorUuid: payload.spenderActorUuid, actorId: payload.spenderActorId, tokenUuid: payload.spenderTokenUuid });
+  return withWinterEdgeTransaction(actor, () => applyEdgeIndividualDieTransaction(payload), game.messages?.get(String(payload.messageId || "").trim()));
+}
+
+async function applyEdgeIndividualDieTransaction(payload) {
+  const winter = payload.winter === true;
   const messageId = String(payload.messageId || "").trim();
   const message = messageId ? game.messages?.get(messageId) || null : null;
   if (!message) return { ok: false, error: "Roll message was not found." };
-  if (!canEdgeIndividualDieMessage(message)) {
+  if (!canEdgeIndividualDieMessage(message, { winter })) {
     return { ok: false, error: "This roll cannot use Edge Individual Die." };
   }
 
-  const flag = getEdgeIndividualDieFlag(message);
+  const flag = winter ? getWinterEdgeIndividualDieFlag(message) : getEdgeIndividualDieFlag(message);
   const chainFlag = getEdgeChainFlag(message);
   const requester = game.users?.get(payload.requesterUserId || payload.userId) || game.user;
-  if (!await canUserRerollMessage(requester, message, chainFlag)) {
+  if (!(winter && game.user?.isGM) && !await canUserRerollMessage(requester, message, chainFlag)) {
     return { ok: false, error: "You cannot update this chat message." };
   }
 
@@ -2336,6 +2435,11 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
   });
   const permissionError = getActorUpdatePermissionError(requester, spenderActor);
   if (permissionError) return { ok: false, error: permissionError };
+  if (actorUsesWinterEdge(spenderActor) !== winter) return { ok: false, error: "Use Winter's Edge to choose a face, or regular Edge to reroll." };
+  if (winter && (!Number.isInteger(payload.newValue) || payload.newValue < 1 || payload.newValue > flag.diceFaces
+    || !Number.isInteger(payload.dieIndex) || ![undefined, "base", "explosion"].includes(payload.dieType))) {
+    return { ok: false, error: "The chosen die or face was invalid." };
+  }
   if (!actorHasCurrentEdge(spenderActor)) {
     return { ok: false, error: `${spenderActor?.name || "Actor"} has no current Edge.` };
   }
@@ -2356,6 +2460,7 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
   if (!usageValidation.ok) return usageValidation;
 
   if (flag.kind === "save" || flag.kind === "check") {
+    if (payload.dieType === "explosion") return { ok: false, error: "The selected critical die was unavailable." };
     if (!Number.isInteger(Number.parseInt(payload.dieIndex, 10))) return { ok: false, error: "The selected die was unavailable." };
     if (!game.user?.isGM && flag.checkpoint?.stage === "save") {
       const request = game.peasantCore?.requestEdgeSaveCheckRollFromGM;
@@ -2363,16 +2468,22 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
         ? request({ ...payload, individual: true })
         : { ok: false, error: "Combat save rerolls require an active GM connection." };
     }
-    return applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, requester, dieIndex: payload.dieIndex });
+    return applyEdgeSaveCheckRoll({ message, chainFlag, spenderActor, requester, dieIndex: payload.dieIndex, winter, newValue: payload.newValue });
   }
 
   let replacement;
   let rollResult = null;
   try {
-    const newDie = await rollEdgeIndividualDie(flag.diceFaces);
-    replacement = replaceEdgeIndividualDie(flag, payload.dieIndex, newDie);
+    const newDie = winter ? payload.newValue : await rollEdgeIndividualDie(flag.diceFaces);
+    let explosionDice = winter ? getEdgeExplodeFlag(message)?.explosionDice || null : null;
+    if (winter && payload.dieType === "explosion") {
+      if (flag.kind !== "skill" || !explosionDice?.length) throw new Error("The selected critical die was unavailable.");
+      replacement = replaceEdgeIndividualDie({ ...flag, dice: explosionDice, diceFaces: 6 }, payload.dieIndex, newDie);
+      explosionDice = replacement.dice;
+      replacement.dice = flag.dice.slice();
+    } else replacement = replaceEdgeIndividualDie(flag, payload.dieIndex, newDie);
     if (flag.kind === "skill") {
-      rollResult = await createIndividualSkillRollResult(message, flag, replacement.dice);
+      rollResult = await createIndividualSkillRollResult(message, flag, replacement.dice, { explosionDice });
     } else if (
       flag.checkpoint?.type !== "notableCombatPostRoll"
       && flag.checkpoint?.type !== "manualCombatValue"
@@ -2384,17 +2495,15 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
   }
 
   const originalChainMessages = getMessagesForChain(chainFlag.chainId);
-  const originalOfferFlags = originalChainMessages.map(candidate => ({
-    message: candidate,
-    offers: cloneData(candidate.getFlag?.(PC_SYSTEM_ID, "skillEffectOffers")),
-    rollUndo: cloneData(candidate.getFlag?.(PC_SYSTEM_ID, "rollUndo"))
-  }));
+  const snapshots = snapshotReplayMessageState(originalChainMessages, flag.checkpoint);
+  const originalIds = new Set(snapshots.map(snapshot => snapshot.message.id));
   const originalStressFlag = getStressRollFlag(message);
   const edgeIndividualDieReplay = createEdgeIndividualValueReplay(
     originalChainMessages,
     flag,
     replacement.dice
   );
+  if (winter && !getEdgeIndividualDieFlag(message)) await message.setFlag(PC_SYSTEM_ID, PC_EDGE_INDIVIDUAL_DIE_FLAG, flag);
   await markEdgeChainMessagesProcessing(originalChainMessages, requester?.id || null);
   await setEdgeIndividualDieFlagOnMessage(message, {
     status: EDGE_CHAIN_STATUS_PROCESSING,
@@ -2409,6 +2518,7 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
   let summaryMessage = null;
   let replayMessageIds = [];
   let undoneRecords = [];
+  const replayProgress = [];
   try {
     await clearStressRollRetry(message);
     const checkpoint = flag.checkpoint;
@@ -2429,7 +2539,7 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
     const appliedOfferRecords = postRollRecords.filter(record => record.skillEffects);
     const recordsToUndo = replayRequired ? postRollRecords : appliedOfferRecords;
     if (recordsToUndo.length) {
-      const undoPermissionError = getUndoPermissionError(requester, recordsToUndo);
+      const undoPermissionError = getUndoPermissionError(winter && game.user?.isGM ? game.user : requester, recordsToUndo);
       if (undoPermissionError) throw new Error(undoPermissionError);
       const undoResult = await applyRollUndoRecords(recordsToUndo);
       if (!undoResult.ok) throw new Error(undoResult.error || "Could not undo the original post-roll effects.");
@@ -2446,10 +2556,12 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
       flag,
       spenderActor,
       originalDie: replacement.originalDie,
-      newDie: replacement.newDie
+      newDie: replacement.newDie,
+      winter
     });
     if (flag.kind === "skill") {
       await updateSkillRollChatCardFromResult(rollResult, { label: rollResult.resultText });
+      if (!replayRequired) await refreshPlannedAttackRollCard(checkpoint, replayPlan);
     }
 
     if (replayRequired) {
@@ -2458,7 +2570,7 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
       } else {
         const replay = game.peasantCore?.replayNotableCombatPostRollEffects;
         if (typeof replay !== "function") throw new Error("Notable combat Edge replay is unavailable.");
-        replayResult = await replay({ checkpoint, rollResult, edgeIndividualDieReplay });
+        replayResult = await replay({ checkpoint, rollResult, edgeIndividualDieReplay, onSaveReplayProgress: resolution => { replayProgress.push(resolution); } });
       }
       if (!replayResult?.ok) throw new Error(replayResult?.error || "Could not replay downstream roll effects.");
       replayMessageIds = Array.from(replayResult?.messageIds || []);
@@ -2475,7 +2587,18 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
       ? dedupeUndoRecords(replayResult?.postRollRecords)
       : postRollRecords.filter(record => !appliedOfferRecords.includes(record));
     const nextPreRollRecords = getEdgeExplodePreRollRecords(chainFlag, flag);
-    const nextEdgeBlock = getCriticalEdgeBlockFromRollResult(rollResult);
+    let nextEdgeBlock = { edgeBlockedReason: chainFlag.edgeBlockedReason, edgeBlockedLabel: chainFlag.edgeBlockedLabel };
+    if (flag.kind === "skill") {
+      nextEdgeBlock = { edgeBlockedReason: "", edgeBlockedLabel: "", ...getCriticalEdgeBlockFromRollResult(rollResult) };
+      for (const candidate of originalChainMessages) {
+        if (candidate.id === message.id) continue;
+        const critical = getEdgeExplodeFlag(candidate);
+        if (critical?.status === EDGE_EXPLODE_STATUS_CURRENT && hasCurrentFallExplosionDice(getWinterEdgeIndividualDieFlag(candidate), critical)) {
+          nextEdgeBlock = getCriticalEdgeBlockFromRollResult(critical);
+          break;
+        }
+      }
+    }
     if (chainFlag.fallAccuracyApplied && replayRequired) {
       const existingUndo = message.getFlag?.(PC_SYSTEM_ID, "rollUndo") || {};
       await replaceRollUndoRecords(message, collectRollUndoRecords(nextPreRollRecords, nextPostRollRecords), existingUndo.label || "Undo Roll Effects");
@@ -2491,6 +2614,9 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
     if (appliedOfferRecords.length && !replayRequired) {
       await replaceRollUndoRecords(message, collectRollUndoRecords(nextPreRollRecords, nextPostRollRecords));
     }
+    if (flag.kind === "skill") await synchronizeCombatReplayCheckpoints({
+      checkpoint, rollResult, originalMessages: originalChainMessages, replayResult, replayMessageIds
+    });
     await setEdgeIndividualDieFlagOnMessage(message, {
       status: EDGE_CHAIN_STATUS_CURRENT,
       processing: false,
@@ -2502,35 +2628,36 @@ export async function applyEdgeIndividualDieRoll(payload = {}) {
       edgeSpentByActorUuid: spenderActor?.uuid || null
     });
     if (flag.kind === "skill") {
+      if (winter && !rollResult.criticalType) await message.unsetFlag?.(PC_SYSTEM_ID, PC_EDGE_EXPLODE_FLAG);
       await attachEdgeExplodeToChatMessage(message, rollResult, {
         trained: flag.trained,
         skillName: flag.label,
         stage: flag.checkpoint?.stage || "",
-        checkpoint: flag.checkpoint,
+        checkpoint: getEdgeIndividualDieFlag(message)?.checkpoint || flag.checkpoint,
         preRollRecords: nextPreRollRecords,
         postRollRecords: nextPostRollRecords
       });
     }
     await refreshSkillEntryOffers(message, chainFlag, flag.checkpoint, rollResult, replayResult, replayPlan);
   } catch (error) {
-    if (replayResult?.postRollRecords?.length) await applyRollUndoRecords(replayResult.postRollRecords);
+    const partialRecords = dedupeUndoRecords(collectRollUndoRecords(replayResult?.postRollRecords,
+      ...replayProgress.map(resolution => resolution?.application?.undoRecords)));
+    if (partialRecords.length) await applyRollUndoRecords(partialRecords);
     if (undoneRecords.length) await applyRollUndoRecords(invertUndoRecords(undoneRecords));
     await refundActorEdge(spenderActor, edgeSpend);
     await restoreEdgeChainMessagesCurrent(originalChainMessages);
     await restoreEdgeIndividualDieCurrent(message);
-    for (const snapshot of originalOfferFlags) {
-      for (const [key, value] of [["skillEffectOffers", snapshot.offers], ["rollUndo", snapshot.rollUndo]]) {
-        if (value === undefined) await snapshot.message.unsetFlag?.(PC_SYSTEM_ID, key);
-        else await snapshot.message.setFlag?.(PC_SYSTEM_ID, key, value);
-      }
-    }
+    await restoreReplayMessageState(snapshots);
     if (originalStressFlag) await message.setFlag?.(PC_SYSTEM_ID, PC_STRESS_ROLL_FLAG, originalStressFlag);
     if (oldContent && message?.update) {
       try { await message.update({ content: oldContent }); } catch (_) {}
     }
     try { await summaryMessage?.delete?.(); } catch (_) {}
     for (const candidate of getMessagesByIds(replayMessageIds)) {
-      if (!originalChainMessages.some(original => original.id === candidate.id)) await candidate.delete?.();
+      if (!originalIds.has(candidate.id)) await candidate.delete?.();
+    }
+    for (const candidate of new Set(await getReplayProgressMessages(replayProgress))) {
+      if (!originalIds.has(candidate.id)) await candidate.delete?.();
     }
     console.error("Peasant Core | Edge Individual Die failed", error);
     return { ok: false, error: getResultError(error) };
@@ -2578,6 +2705,7 @@ export async function applyEdgeChainRoll(payload = {}) {
   });
   const permissionError = getActorUpdatePermissionError(requester, spenderActor);
   if (permissionError) return { ok: false, error: permissionError };
+  if (actorUsesWinterEdge(spenderActor)) return { ok: false, error: "Winter's Edge cannot reroll an entire chain." };
   if (!actorHasCurrentEdge(spenderActor)) {
     return { ok: false, error: `${spenderActor?.name || "Actor"} has no current Edge.` };
   }
@@ -2601,10 +2729,12 @@ export async function applyEdgeChainRoll(payload = {}) {
     ? dedupeUndoRecords(flag.undoRecords.filter(record => !isFallBlessingAccuracyUndoRecord(record)))
     : flag.undoRecords;
 
-  const preparedRerun = await prepareRerun(flag);
+  const replayProgress = [];
+  const preparedRerun = await prepareRerun(flag, { onSaveReplayProgress: resolution => { replayProgress.push(resolution); } });
   if (!preparedRerun.ok) return preparedRerun;
 
   const originalChainMessages = getMessagesForChain(flag.chainId);
+  const originalIds = new Set(getAllChatMessages().map(candidate => candidate.id));
   const originalOfferFlags = originalChainMessages.map(candidate => ({
     message: candidate,
     offers: cloneData(candidate.getFlag?.(PC_SYSTEM_ID, "skillEffectOffers")),
@@ -2626,6 +2756,10 @@ export async function applyEdgeChainRoll(payload = {}) {
 
     summaryMessage = await createEdgeChainSummary({ flag, spenderActor });
     rerunResult = await preparedRerun.run();
+    if (!rerunResult || (rerunResult.rolled === false || rerunResult.ok === false || rerunResult.error)
+      && !rerunResult.chainCancelled && !rerunResult.cancelled) {
+      throw new Error(rerunResult?.error ? getResultError(rerunResult.error) : "Could not rerun the roll chain.");
+    }
     if (rerunResult?.chainCancelled || rerunResult?.cancelled) {
       await summaryMessage?.update?.({ content: renderEdgeChainSummary({ flag, spenderActor, rerunResult }) });
     }
@@ -2635,6 +2769,9 @@ export async function applyEdgeChainRoll(payload = {}) {
       edgeSpentByActorUuid: spenderActor?.uuid || null
     });
   } catch (error) {
+    const partialRecords = dedupeUndoRecords(collectRollUndoRecords(rerunResult?.undoRecords,
+      ...replayProgress.map(resolution => resolution?.application?.undoRecords)));
+    if (partialRecords.length) await applyRollUndoRecords(partialRecords);
     await refundActorEdge(spenderActor, edgeSpend);
     if (originalUndone) await applyRollUndoRecords(invertUndoRecords(rerunUndoRecords));
     await restoreEdgeChainMessagesCurrent(originalChainMessages);
@@ -2643,6 +2780,9 @@ export async function applyEdgeChainRoll(payload = {}) {
         if (value === undefined) await snapshot.message.unsetFlag?.(PC_SYSTEM_ID, key);
         else await snapshot.message.setFlag?.(PC_SYSTEM_ID, key, value);
       }
+    }
+    for (const candidate of new Set([...getMessagesByIds(rerunResult?.messageIds || []), ...await getReplayProgressMessages(replayProgress)])) {
+      if (!originalIds.has(candidate.id)) await candidate.delete?.();
     }
     try {
       await summaryMessage?.delete?.();
@@ -2696,6 +2836,7 @@ export async function applyEdgeExplodeRoll(payload = {}) {
   });
   const permissionError = getActorUpdatePermissionError(requester, spenderActor);
   if (permissionError) return { ok: false, error: permissionError };
+  if (actorUsesWinterEdge(spenderActor)) return { ok: false, error: "Use Winter's Edge to choose a critical die face." };
   if (!actorHasCurrentEdge(spenderActor)) {
     return { ok: false, error: `${spenderActor?.name || "Actor"} has no current Edge.` };
   }
@@ -2703,14 +2844,8 @@ export async function applyEdgeExplodeRoll(payload = {}) {
   if (automaticBlock) return automaticBlock;
 
   const originalChainMessages = getMessagesForChain(chainFlag.chainId);
-  const originalOfferFlags = originalChainMessages.map(candidate => ({
-    message: candidate,
-    offers: cloneData(candidate.getFlag?.(PC_SYSTEM_ID, "skillEffectOffers")),
-    rollUndo: cloneData(candidate.getFlag?.(PC_SYSTEM_ID, "rollUndo"))
-  }));
-  const originalStressFlag = getStressRollFlag(message);
-  await markEdgeChainMessagesProcessing(originalChainMessages, requester?.id || null);
-  await markEdgeExplodeProcessing(message, requester?.id || null);
+  const snapshots = snapshotReplayMessageState(originalChainMessages, explodeFlag.checkpoint);
+  const originalIds = new Set(snapshots.map(snapshot => snapshot.message.id));
 
   let edgeSpend = null;
   let rollResult = null;
@@ -2718,7 +2853,10 @@ export async function applyEdgeExplodeRoll(payload = {}) {
   let replayResult = null;
   let summaryMessage = null;
   let undoneRecords = [];
+  const replayProgress = [];
   try {
+    await markEdgeChainMessagesProcessing(originalChainMessages, requester?.id || null);
+    await markEdgeExplodeProcessing(message, requester?.id || null);
     await clearStressRollRetry(message);
     const postRollRecords = getEdgeExplodePostRollRecords(chainFlag, explodeFlag);
     rollResult = await rerollEdgeExplosionForMessage(message, explodeFlag, { updateChat: false });
@@ -2757,7 +2895,8 @@ export async function applyEdgeExplodeRoll(payload = {}) {
       if (typeof replay !== "function") throw new Error("Notable combat Edge Explode replay is unavailable.");
       replayResult = await replay({
         checkpoint: explodeFlag.checkpoint,
-        rollResult
+        rollResult,
+        onSaveReplayProgress: resolution => { replayProgress.push(resolution); }
       });
       if (!replayResult?.ok) throw new Error(replayResult?.error || "Could not replay downstream roll effects.");
     }
@@ -2771,6 +2910,7 @@ export async function applyEdgeExplodeRoll(payload = {}) {
     if (!replayUpdatedClickedAttackCard) {
       await updateSkillRollChatCardFromResult(rollResult, { label: rollResult.resultText });
     }
+    if (!replayRequired) await refreshPlannedAttackRollCard(explodeFlag.checkpoint, replayPlan);
 
     const nextPostRollRecords = replayRequired
       ? dedupeUndoRecords(replayResult?.postRollRecords)
@@ -2792,6 +2932,10 @@ export async function applyEdgeExplodeRoll(payload = {}) {
     if (appliedOfferRecords.length && !replayRequired) {
       await replaceRollUndoRecords(message, collectRollUndoRecords(nextPreRollRecords, nextPostRollRecords));
     }
+    await synchronizeCombatReplayCheckpoints({
+      checkpoint: explodeFlag.checkpoint, rollResult, originalMessages: originalChainMessages,
+      replayResult, replayMessageIds: replayResult?.messageIds || []
+    });
     await setEdgeExplodeFlagOnMessage(message, {
       status: EDGE_EXPLODE_STATUS_CURRENT,
       processing: false,
@@ -2813,18 +2957,16 @@ export async function applyEdgeExplodeRoll(payload = {}) {
     });
     await refreshSkillEntryOffers(message, chainFlag, explodeFlag.checkpoint, rollResult, replayResult, replayPlan);
   } catch (error) {
-    if (replayResult?.postRollRecords?.length) await applyRollUndoRecords(replayResult.postRollRecords);
+    const partialRecords = dedupeUndoRecords(collectRollUndoRecords(replayResult?.postRollRecords,
+      ...replayProgress.map(resolution => resolution?.application?.undoRecords)));
+    if (partialRecords.length) await applyRollUndoRecords(partialRecords);
     if (undoneRecords.length) await applyRollUndoRecords(invertUndoRecords(undoneRecords));
     await refundActorEdge(spenderActor, edgeSpend);
-    await restoreEdgeChainMessagesCurrent(originalChainMessages);
-    await restoreEdgeExplodeCurrent(message);
-    for (const snapshot of originalOfferFlags) {
-      for (const [key, value] of [["skillEffectOffers", snapshot.offers], ["rollUndo", snapshot.rollUndo]]) {
-        if (value === undefined) await snapshot.message.unsetFlag?.(PC_SYSTEM_ID, key);
-        else await snapshot.message.setFlag?.(PC_SYSTEM_ID, key, value);
-      }
+    await restoreReplayMessageState(snapshots);
+    for (const candidate of new Set([...getMessagesByIds(replayResult?.messageIds || []), ...await getReplayProgressMessages(replayProgress)])) {
+      if (!originalIds.has(candidate.id)) await candidate.delete?.();
     }
-    if (originalStressFlag) await message.setFlag?.(PC_SYSTEM_ID, PC_STRESS_ROLL_FLAG, originalStressFlag);
+    try { await summaryMessage?.delete?.(); } catch (_) {}
     console.error("Peasant Core | Edge Explode failed", error);
     return { ok: false, error: getResultError(error) };
   }
@@ -2969,6 +3111,28 @@ export async function edgeIndividualDieRollFromMessage(messageId) {
     return false;
   }
   return true;
+}
+
+export async function winterEdgeRollFromMessage(messageId) {
+  const message = game.messages?.get(messageId);
+  if (!canEdgeIndividualDieMessage(message, { winter: true })) return false;
+  const spender = resolveEdgeLocationRollSpender({ warn: true, label: "Winter's Edge", winter: true });
+  if (!spender.ok) return false;
+  const selection = await showEdgeIndividualDiePrompt(getWinterEdgeIndividualDieFlag(message), {
+    winter: true, explosionDice: getEdgeExplodeFlag(message)?.explosionDice || []
+  });
+  if (selection.cancelled) return false;
+  const selectedToken = Array.from(globalThis.canvas?.tokens?.controlled || []).find(token => token.actor?.uuid === spender.actor.uuid);
+  const payload = {
+    messageId, spenderActorId: spender.actor.id, spenderActorUuid: spender.actor.uuid,
+    spenderTokenUuid: selectedToken?.document?.uuid || null,
+    requesterUserId: game.user.id, winter: true, edgeRollMode: "winter", ...selection
+  };
+  const result = game.user.isGM
+    ? await applyEdgeIndividualDieRoll(payload)
+    : await game.peasantCore?.requestEdgeLocationRollFromGM?.(payload);
+  if (!result?.ok) ui.notifications?.warn?.(result?.error || "Winter's Edge requires an active GM connection.");
+  return !!result?.ok;
 }
 
 export async function applyStressRoll(payload = {}) {
@@ -3237,16 +3401,17 @@ function isForcePassUndoRecord(record) {
   return /Force Pass Stress$/.test(String(record?.label || ""));
 }
 
-function snapshotFallMessageState(messages) {
-  return messages.map(message => ({
+function snapshotReplayMessageState(messages, checkpoint = null) {
+  const savedLocations = getMessagesByIds((checkpoint?.targets || []).map(entry => entry.locationRoll?.locationMessageId));
+  return [...new Set([...messages, ...savedLocations])].map(message => ({
     message,
     content: String(message.content || ""),
-    flags: Object.fromEntries([PC_STRESS_ROLL_FLAG, PC_EDGE_CHAIN_FLAG, PC_EDGE_INDIVIDUAL_DIE_FLAG, PC_EDGE_EXPLODE_FLAG, "rollUndo", "skillEffectOffers"]
+    flags: Object.fromEntries([PC_STRESS_ROLL_FLAG, PC_EDGE_CHAIN_FLAG, PC_EDGE_INDIVIDUAL_DIE_FLAG, PC_EDGE_EXPLODE_FLAG, "rollUndo", "skillEffectOffers", "locationRoll"]
       .map(key => [key, cloneData(message.getFlag?.(PC_SYSTEM_ID, key))]))
   }));
 }
 
-async function restoreFallMessageState(snapshots) {
+async function restoreReplayMessageState(snapshots) {
   for (const snapshot of snapshots) {
     if (snapshot.message.update) await snapshot.message.update({ content: snapshot.content });
     for (const [key, value] of Object.entries(snapshot.flags)) {
@@ -3257,12 +3422,32 @@ async function restoreFallMessageState(snapshots) {
 }
 
 export async function applyFallBlessingAccuracy(payload = {}) {
+  const message = game.messages?.get(String(payload.messageId || "").trim());
+  if (!message) return { ok: false, error: "Roll message was not found." };
+  const actor = await resolveActorFromUuidOrId(getFallBlessingRollActorRef(message));
+  if (!actor) return { ok: false, error: "The original roll actor was not found." };
+  // Every client uses the same GM boundary; a client-local queue cannot protect shared uses.
+  const authoritativeGM = getPreferredActiveGM();
+  if (!game.user?.isGM || (authoritativeGM && authoritativeGM.id !== game.user.id)) {
+    const request = game.peasantCore?.requestEdgeLocationRollFromGM;
+    return typeof request === "function"
+      ? request({ ...payload, edgeRollMode: "fallBlessing", actorId: actor.id, actorUuid: actor.uuid })
+      : { ok: false, error: "Fall Accuracy requires an active GM connection." };
+  }
+  const previous = fallAccuracyTransactions.get(actor) || Promise.resolve();
+  const current = previous.catch(() => undefined).then(() => applyFallBlessingAccuracyTransaction(payload, actor));
+  fallAccuracyTransactions.set(actor, current);
+  try { return await current; }
+  finally { if (fallAccuracyTransactions.get(actor) === current) fallAccuracyTransactions.delete(actor); }
+}
+
+async function applyFallBlessingAccuracyTransaction(payload, resolvedActor) {
   const messageId = String(payload.messageId || "").trim();
   const message = messageId ? game.messages?.get(messageId) || null : null;
   if (!message) return { ok: false, error: "Roll message was not found." };
 
   const requester = game.users?.get(payload.requesterUserId || payload.userId) || game.user;
-  const eligibility = getFallBlessingEligibility(message, { user: requester });
+  const eligibility = getFallBlessingEligibility(message, { user: requester, resolvedActor });
   if (!eligibility.ok) return { ok: false, error: "This roll cannot use Blessing of Fall." };
   if (!canUserUpdateMessage(game.user, message)) return { ok: false, error: "You cannot update this chat message." };
   const automaticBlock = getAutomaticEffectReplayBlock(message, eligibility.chainFlag);
@@ -3284,7 +3469,8 @@ export async function applyFallBlessingAccuracy(payload = {}) {
   const originalMoS = createFallAccuracyRollResult(message, eligibility, 0).totalMoS;
   const rollResult = createFallAccuracyRollResult(message, eligibility, accuracyBonus);
   const originalChainMessages = getMessagesForChain(chainFlag.chainId);
-  const snapshots = snapshotFallMessageState(originalChainMessages.length ? originalChainMessages : [message]);
+  const originalMessages = originalChainMessages.length ? originalChainMessages : [message];
+  const snapshots = snapshotReplayMessageState(originalMessages, checkpoint);
   const originalIds = new Set(snapshots.map(snapshot => snapshot.message.id));
   const originalStressFlag = getStressRollFlag(message);
   const originalPostRollRecords = getEdgeExplodePostRollRecords(chainFlag, explodeFlag);
@@ -3299,15 +3485,14 @@ export async function applyFallBlessingAccuracy(payload = {}) {
   let downstreamUndone = false;
   const replayProgress = [];
 
-  await markEdgeChainMessagesProcessing(snapshots.map(snapshot => snapshot.message), requester?.id || null);
-  await setEdgeIndividualDieFlagOnMessage(message, {
-    status: EDGE_CHAIN_STATUS_PROCESSING,
-    processing: true,
-    processingUserId: requester?.id || null
-  });
-  if (explodeFlag) await markEdgeExplodeProcessing(message, requester?.id || null);
-
   try {
+    await markEdgeChainMessagesProcessing(snapshots.map(snapshot => snapshot.message), requester?.id || null);
+    await setEdgeIndividualDieFlagOnMessage(message, {
+      status: EDGE_CHAIN_STATUS_PROCESSING,
+      processing: true,
+      processingUserId: requester?.id || null
+    });
+    if (explodeFlag) await markEdgeExplodeProcessing(message, requester?.id || null);
     let replayRequired = false;
     if (notableReplay) {
       const planner = game.peasantCore?.planNotableCombatEdgeExplodeReplay;
@@ -3342,7 +3527,7 @@ export async function applyFallBlessingAccuracy(payload = {}) {
 
     summaryMessage = await createFallBlessingSummary({
       actor,
-      rollLabel: chainFlag.label,
+      rollLabel: checkpoint?.stage === "defense" ? eligibility.rollFlag.label : chainFlag.label,
       originalMoS,
       newMoS: rollResult.totalMoS
     });
@@ -3355,6 +3540,7 @@ export async function applyFallBlessingAccuracy(payload = {}) {
       replayResult = await replay({
         checkpoint,
         rollResult,
+        edgeIndividualDieReplay: createEdgeIndividualValueReplay(snapshots.map(snapshot => snapshot.message), eligibility.rollFlag, eligibility.rollFlag.dice),
         onSaveReplayProgress: resolution => { replayProgress.push(resolution); }
       });
       if (!replayResult?.ok) throw new Error(replayResult?.error || "Could not replay downstream Fall effects.");
@@ -3368,9 +3554,20 @@ export async function applyFallBlessingAccuracy(payload = {}) {
       getEdgeExplodePreRollRecords(chainFlag, explodeFlag),
       fallUseRecords
     ));
+    const nextRerun = checkpoint?.stage === "defense" ? cloneData(chainFlag.rerun) : addFallAccuracyToRerun(chainFlag.rerun, accuracyBonus);
+    if (checkpoint?.stage === "defense") {
+      const targetKey = createEdgeIndividualValueRollKey("damage", { targetRef: checkpoint.defenseTargetRef });
+      const defense = checkpoint.targets?.find(entry => createEdgeIndividualValueRollKey("damage", { targetRef: entry.targetRef }) === targetKey)?.defensePromptResult;
+      nextRerun.fallDefenseAccuracy = {
+        actorUuid: actor.uuid,
+        entryId: defense?.selectedCombatId || null,
+        usageId: defense?.selectedUsageId || "base",
+        accuracyBonus
+      };
+    }
     const nextChainFlag = {
       ...chainFlag,
-      rerun: addFallAccuracyToRerun(chainFlag.rerun, accuracyBonus),
+      rerun: nextRerun,
       preRollRecords: nextPreRollRecords,
       postRollRecords: nextPostRollRecords,
       undoRecords: dedupeUndoRecords(collectRollUndoRecords(nextPreRollRecords, nextPostRollRecords)),
@@ -3388,13 +3585,15 @@ export async function applyFallBlessingAccuracy(payload = {}) {
     );
     if (!replayUpdatedClickedAttackCard || (oldResultNoLongerNeedsStress && forcePassRecords.length)) {
       if (forcePassRecords.length && oldResultNoLongerNeedsStress) rollResult.clearForcePassNote = true;
-      await updateSkillRollChatCardFromResult(rollResult, { label: rollResult.resultText });
+      const displayedResult = replayUpdatedClickedAttackCard ? replayResult.rollOutcome?.rollResult || rollResult : rollResult;
+      await updateSkillRollChatCardFromResult({ ...displayedResult, clearForcePassNote: rollResult.clearForcePassNote }, { label: displayedResult.resultText });
     }
+    if (!replayRequired) await refreshPlannedAttackRollCard(checkpoint, replayPlan, { clearForcePassNote: rollResult.clearForcePassNote });
 
     const replayMessageIds = replayRequired ? (replayResult?.messageIds || []) : [];
     await refreshEdgeChainMessagesForEdgeExplode({
       chainFlag: nextChainFlag,
-      originalMessages: snapshots.map(snapshot => snapshot.message),
+      originalMessages,
       replayMessageIds,
       preRollRecords: nextPreRollRecords,
       postRollRecords: nextPostRollRecords
@@ -3404,6 +3603,9 @@ export async function applyFallBlessingAccuracy(payload = {}) {
       collectRollUndoRecords(nextPreRollRecords, nextPostRollRecords),
       `Undo ${chainFlag.label || "Roll"} Effects`
     );
+    await synchronizeCombatReplayCheckpoints({
+      checkpoint, rollResult, originalMessages, replayResult, replayMessageIds
+    });
     await setEdgeIndividualDieFlagOnMessage(message, {
       status: EDGE_CHAIN_STATUS_CURRENT,
       processing: false,
@@ -3437,27 +3639,21 @@ export async function applyFallBlessingAccuracy(payload = {}) {
       replayResult
     };
   } catch (error) {
-    const newReplayRecords = collectRollUndoRecords(
+    const newReplayRecords = dedupeUndoRecords(collectRollUndoRecords(
       replayResult?.postRollRecords,
       ...replayProgress.map(resolution => resolution?.application?.undoRecords)
-    );
+    ));
     if (newReplayRecords.length) await applyRollUndoRecords(newReplayRecords);
     if (fallUseCapture?.undoRecords?.length) await applyRollUndoRecords(fallUseCapture.undoRecords);
     else if (Number(actor.system?.fallBlessingUses?.value) < eligibility.currentUses) {
       await actor.updatePeasantStateData?.({ "system.fallBlessingUses.value": eligibility.currentUses });
     }
     if (downstreamUndone) await applyRollUndoRecords(invertUndoRecords(recordsUndone));
-    await restoreFallMessageState(snapshots);
+    await restoreReplayMessageState(snapshots);
     for (const candidate of getMessagesByIds(replayResult?.messageIds || [])) {
       if (!originalIds.has(candidate.id)) await candidate.delete?.();
     }
-    const partialMessages = replayProgress.flatMap(resolution => [
-      resolution?.damageRoll?.chatMessage,
-      ...(resolution?.damageRoll?.barrierMessages || []),
-      resolution?.application?.chatMessage,
-      resolution?.application?.applyResult?.chatMessage
-    ]);
-    for (const candidate of new Set(partialMessages.filter(Boolean))) {
+    for (const candidate of new Set(await getReplayProgressMessages(replayProgress))) {
       if (!originalIds.has(candidate.id)) await candidate.delete?.();
     }
     if (originalStressFlag && message.getFlag?.(PC_SYSTEM_ID, PC_STRESS_ROLL_FLAG) === undefined) {
@@ -3558,7 +3754,7 @@ export async function fallBlessingAccuracyFromMessage(messageId) {
   }
 
   const targetRecordsNeedGM = replayRequired && !!getUndoPermissionError(requester, postRollRecords);
-  if (targetRecordsNeedGM || !canUserUpdateMessage(requester, message)) {
+  if (!requester?.isGM || targetRecordsNeedGM || !canUserUpdateMessage(requester, message)) {
     const request = game.peasantCore?.requestEdgeLocationRollFromGM;
     const remoteResult = typeof request === "function"
       ? await request({
@@ -3654,7 +3850,7 @@ export function configureEdgeChainRollChatContext() {
         icon: '<i class="fas fa-dice-d20"></i>',
         condition: element => {
           const message = getMessageFromContextElement(element);
-          return canOfferEdgeChain(message) && getEdgeEntireTitle(getEdgeChainFlag(message)) === name;
+          return resolveEdgeLocationRollSpender().ok && canOfferEdgeChain(message) && getEdgeEntireTitle(getEdgeChainFlag(message)) === name;
         },
         callback: async element => {
           const message = getMessageFromContextElement(element);
@@ -3670,10 +3866,19 @@ export function configureEdgeIndividualDieRollChatContext() {
     menuItems.push({
       name: "Edge Individual Die",
       icon: '<i class="fas fa-dice-one"></i>',
-      condition: element => canEdgeIndividualDieMessage(getMessageFromContextElement(element)),
+      condition: element => resolveEdgeLocationRollSpender().ok && canEdgeIndividualDieMessage(getMessageFromContextElement(element)),
       callback: async element => {
         const message = getMessageFromContextElement(element);
         if (message) await edgeIndividualDieRollFromMessage(message.id);
+      }
+    });
+    menuItems.push({
+      name: "Winter's Edge",
+      icon: '<i class="fas fa-snowflake"></i>',
+      condition: element => resolveEdgeLocationRollSpender({ winter: true }).ok && canEdgeIndividualDieMessage(getMessageFromContextElement(element), { winter: true }),
+      callback: async element => {
+        const message = getMessageFromContextElement(element);
+        if (message) await winterEdgeRollFromMessage(message.id);
       }
     });
   });
@@ -3684,7 +3889,7 @@ export function configureEdgeExplodeRollChatContext() {
     menuItems.push({
       name: "Edge Explode",
       icon: '<i class="fas fa-bolt"></i>',
-      condition: element => canOfferEdgeExplode(getMessageFromContextElement(element)),
+      condition: element => resolveEdgeLocationRollSpender().ok && canOfferEdgeExplode(getMessageFromContextElement(element)),
       callback: async element => {
         const message = getMessageFromContextElement(element);
         if (message) await edgeExplodeRollFromMessage(message.id);

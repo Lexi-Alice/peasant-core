@@ -37,6 +37,7 @@ import {
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
+import { getFlexibleAdvantageDescription } from "../flexible-advantages.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 
@@ -48,7 +49,7 @@ export function prepareActorAdvantageContext(data, actor, { isEditMode = false, 
     const name = (typeof advantage === "string")
       ? advantage
       : String(advantage?.name ?? "");
-    const description = String(advantageDescriptionsRaw[index] ?? (advantage?.description ?? ""));
+    const description = getFlexibleAdvantageDescription(advantageDescriptionsRaw[index] ?? advantage?.description);
     const descriptionText = description.replace(/<[^>]*>/g, "").trim();
     return {
       name,

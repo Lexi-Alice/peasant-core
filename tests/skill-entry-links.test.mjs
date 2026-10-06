@@ -121,6 +121,7 @@ foundry.utils.getProperty = () => null;
 foundry.applications.api = {
   ApplicationV2: class {
     constructor(options) { this.options = options; }
+    _getHeaderControls() { return this.nativeHeaderControls ?? []; }
     render() {}
     close() {}
   },
@@ -141,6 +142,33 @@ const sheet = {
 actor.updatePeasantEntry = async () => ({ ok: true });
 const editor = await openPeasantSkillEditor(sheet, { collection: "skills", entryId: "aid" }, { usageId: "treatment" });
 assert.ok(editor);
+const notableEntry = { ...entry, id: "pistol", name: "Pistol", type: "weapon" };
+actor.system._source.notableCombats = actor.system.notableCombats = [notableEntry];
+const notableEditor = await openPeasantSkillEditor(sheet,
+  { collection: "notableCombats", entryId: "pistol" }, { usageId: "treatment" });
+const detach = { action: "detach", label: "Detach Window" };
+const nativeAction = { action: "nativeAction" };
+const nativeControls = Object.freeze([
+  detach,
+  { action: "otherDetachProvider", label: " detach window " },
+  nativeAction,
+  { action: " NATIVEACTION " }
+]);
+for (const headerEditor of [editor, notableEditor]) {
+  assert.deepEqual(headerEditor._getHeaderControls(), [],
+    "Skills and Notables add no Usage actions to the window header");
+  headerEditor.nativeHeaderControls = nativeControls;
+  for (const usageId of ["base", "treatment"]) {
+    headerEditor._selectedUsageId = usageId;
+    assert.deepEqual(headerEditor._getHeaderControls(), [detach, nativeAction],
+      "The header preserves native controls once, regardless of the selected usage");
+  }
+  actor.isOwner = false;
+  assert.deepEqual(headerEditor._getHeaderControls(), [detach, nativeAction],
+    "Read-only headers also omit duplicate native controls");
+  actor.isOwner = true;
+}
+assert.equal(nativeControls.length, 4, "Inherited header controls are not mutated");
 assert.deepEqual(editor._getNotableCombatEffectContextOptions({
   scope: "usage", linkId: "treatment-link", effect: { id: "definition" }
 }).map(option => option.label), ["Edit", "Duplicate", "Configure Link", "Delete"],
@@ -215,7 +243,7 @@ changeCondition?.();
 assert.deepEqual(passiveSettingRows.map(row => row.hidden), [false, false],
   "On Use restores Recipient and Application when selected");
 const effectRow = prepareNotableCombatEffectContext(actor, entry, { selectedUsageId: "treatment" })
-  .effectSections.find(section => section.type === "usage").effects[0];
+  .effects[0];
 assert.match(effectRow.subtitle, /Offer in Chat/,
   "The usage row displays the effective review mode even when Automatic is stored");
 entry.usages[0].rules[0].note = "";
@@ -225,6 +253,15 @@ assert.match(dialogs[2], /legacy tag requires review/i,
 entry.usages[0].rules[0].note = "Once a day";
 editor._setupUsageContextMenu({});
 usageMenu.onOpen();
+assert.deepEqual(ui.context.menuItems.map(({ label, group }) => [label, group]), [
+  ["Add Usage", "usage"],
+  ["Rename", "usage"],
+  ["Duplicate", "usage"],
+  ["Delete", "usage"],
+  ["Make Default", "shortcut"],
+  ["Copy Link", "shortcut"],
+  ["Add to Hotbar", "shortcut"]
+], "Make Default comes before Copy Link in the bottom menu section");
 const copyAction = ui.context.menuItems.find(item => item.label === "Copy Link");
 const hotbarAction = ui.context.menuItems.find(item => item.label === "Add to Hotbar");
 assert.ok(copyAction, "the Usage Options menu offers a link for the selected usage");
@@ -272,6 +309,7 @@ actor.managePeasantEntryEffectLink = async (_ref, _action, payload) => {
 editor._saveMainFields = async () => true;
 editor.render = async () => {};
 editor._openNotableCombatEffectSheet = () => {};
+sheet.isEditMode = true;
 await editor._createNotableCombatEffect({}, { scope: "usage" });
 assert.deepEqual([createdLink.when, createdLink.application], ["success", "automatic"],
   "A new usage effect starts with Successful Check and Automatic application");

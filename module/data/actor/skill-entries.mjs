@@ -22,6 +22,7 @@ export const SKILL_MECHANIC_DEFAULTS = Object.freeze({
   damage: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
   desperate: 0,
   overkill: false,
+  tippingScales: 0,
   magnetism: { grade: 0 },
   heal: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0, type: "" },
   manifest: { enabled: false, diceCount: 0, diceValue: 0, diceBonus: 0, flat: 0 },
@@ -302,7 +303,7 @@ export function resolveSkillUsage(value, requestedUsageId) {
   }
   for (const key of [
     "id", "type", "specialGrade", "class", "rank", "usesMax", "usesCurrent", "name", "img",
-    "effectIds", "indent", "description", "category", "weaponType", "defenseType", "trickType", "signatureType",
+    "effectIds", "ap", "sp", "indent", "description", "category", "weaponType", "defenseType", "trickType", "signatureType",
     "gateType", "signatureUsage"
   ]) {
     data[key] = clone(entry[key]);
@@ -709,6 +710,7 @@ function resetTag(data, tagType, customId) {
     case "damage": data.damage = clone(SKILL_MECHANIC_DEFAULTS.damage); break;
     case "desperate": data.desperate = 0; break;
     case "overkill": data.overkill = false; break;
+    case "tippingScales": data.tippingScales = 0; break;
     case "magnetism": data.magnetism = clone(SKILL_MECHANIC_DEFAULTS.magnetism); break;
     case "heal": data.heal = clone(SKILL_MECHANIC_DEFAULTS.heal); break;
     case "manifest": data.manifest = clone(SKILL_MECHANIC_DEFAULTS.manifest); break;
@@ -797,6 +799,12 @@ function applyTag(data, tagType, tagData, { mode, customId }) {
     }
     case "desperate": data.desperate = numberValue(tagData.desperate); break;
     case "overkill": data.overkill = true; break;
+    case "tippingScales": {
+      const penetration = Number(tagData.tippingScales);
+      if (!Number.isInteger(penetration) || penetration < 1) return "Tipping Scales requires a positive integer.";
+      data.tippingScales = penetration;
+      break;
+    }
     case "magnetism": data.magnetism = normalizeCombatMagnetism(tagData.magnetism); break;
     case "tagUses":
     case "sections": {

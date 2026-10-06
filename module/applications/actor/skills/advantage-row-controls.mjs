@@ -2,6 +2,7 @@ import { showReadonlyDescriptionDialog } from "../controls/description-dialogs.m
 import { resolveRowIndex } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
+import { getFlexibleAdvantageDescription } from "../../../data/actor/flexible-advantages.mjs";
 
 export function setupAdvantageRowControls(sheet, html, { blurActiveEditableInSheet, collectAdvantagesFromDOM, enqueueSheetUpdate } = {}) {
   const root = toElement(html);
@@ -70,7 +71,7 @@ export function setupAdvantageRowControls(sheet, html, { blurActiveEditableInShe
         ? nameEntry
         : String(nameEntry?.name ?? "")
       ).trim() || "Flexible Advantage";
-      const description = String(descriptions[index] ?? "");
+      const description = getFlexibleAdvantageDescription(descriptions[index]);
 
       await showReadonlyDescriptionDialog(sheet, {
         title: `${advantageName} - Description`,

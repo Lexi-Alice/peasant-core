@@ -45,14 +45,6 @@ import { computeBaseAttrToHits, computeBaseSaves } from "../attributes.mjs";
 
 export function prepareActorAttributeContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
   const editSystem = sourceSystem ?? actor.system;
-  const blessingType = actor.system.blessing?.type || "";
-  const fallUses = actor.system.fallBlessingUses || {};
-  const fallUsesDisplay = `${Math.max(0, Math.floor(Number(fallUses.value) || 0))} / ${Math.max(0, Math.floor(Number(fallUses.max) || 0))}`;
-  const blessing = {
-    type: blessingType,
-    fallUsesDisplay,
-    tooltip: blessingType === "fall" ? `Open Blessing menu. Fall Accuracy Uses: ${fallUsesDisplay}` : "Open Blessing menu"
-  };
   const saveCombatMods = actor.system.combatMods || { toHit: 0, accuracy: 0, diceRate: 0, flatDamage: 0, costMod: 0 };
   const saveToHitMod = parseInt(saveCombatMods.toHit) || 0;
   const saveConfigModRaw = Number(actor?.getFlag?.("peasant-core", PC_SAVE_MODIFIER_FLAG));
@@ -109,13 +101,12 @@ export function prepareActorAttributeContext(data, actor, { isEditMode = false, 
   data.reflexAoeSaveDisplay = equippedArmor.aoeAutoFail
     ? "CS"
     : ((reflexAoeSaveEnabled || armorAoeActive) && Number.isFinite(reflexAoeSaveTn) ? `${reflexAoeSaveTn}+` : "");
-  data.blessing = blessing;
   data.toHitPenaltyTarget = toHitPenaltyTarget;
   data.isBlessed = {
     build: false,
     reflex: false,
     intuition: false,
-    learn: blessing.type === "spring",
+    learn: actor.system.blessing?.type === "spring",
     charisma: false
   };
 }

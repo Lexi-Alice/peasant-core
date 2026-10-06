@@ -1,0 +1,71 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core\\module\\applications\\combat\\attack-locations.mjs||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:peasant-core\\module\\applications\\combat\\attack-locations.mjs||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core\\module\\applications\\combat\\api.mjs||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:peasant-core\\module\\applications\\combat\\api.mjs||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core.mjs||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:peasant-core.mjs||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "attack-locations.mjs",
+              "DocumentMoniker": "C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core\\module\\applications\\combat\\attack-locations.mjs",
+              "RelativeDocumentMoniker": "peasant-core\\module\\applications\\combat\\attack-locations.mjs",
+              "ToolTip": "C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core\\module\\applications\\combat\\attack-locations.mjs",
+              "RelativeToolTip": "peasant-core\\module\\applications\\combat\\attack-locations.mjs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-09-26T14:28:32.284Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "api.mjs",
+              "DocumentMoniker": "C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core\\module\\applications\\combat\\api.mjs",
+              "RelativeDocumentMoniker": "peasant-core\\module\\applications\\combat\\api.mjs",
+              "ToolTip": "C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core\\module\\applications\\combat\\api.mjs",
+              "RelativeToolTip": "peasant-core\\module\\applications\\combat\\api.mjs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-09-26T14:28:31.235Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "peasant-core.mjs",
+              "DocumentMoniker": "C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core.mjs",
+              "RelativeDocumentMoniker": "peasant-core.mjs",
+              "ToolTip": "C:\\Users\\smelo\\AppData\\Local\\FoundryVTT\\Data\\systems\\peasant-core\\peasant-core.mjs",
+              "RelativeToolTip": "peasant-core.mjs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-09-26T14:28:17.665Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

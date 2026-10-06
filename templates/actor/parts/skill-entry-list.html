@@ -1,0 +1,127 @@
+<section class="pc-notable-combat-browser">
+  <header class="pc-inventory-section-header pc-notable-combat-section-header">
+    <h3 class="pc-inventory-section-title">
+      <i class="fa-solid {{#if isSkills}}fa-book{{else}}fa-swords{{/if}}" aria-hidden="true"></i>
+      <span>{{#if isSkills}}Skills{{else}}Combats{{/if}}</span>
+    </h3>
+  </header>
+  <div class="{{#if isSkills}}skills-list-view{{#if @root.editable}} skills-list{{/if}}{{else}}{{#if @root.editable}}notable-combats-list{{/if}}{{/if}} notable-combats-list-view pc-notable-combat-list">
+    <ul class="pc-notable-combat-items">
+      {{#each entries as |combat index|}}
+        {{#if combat.showInList}}
+          <li class="{{#if @root.editable}}combat-item {{#if combat.isSkillEntry}}skill-item {{/if}}{{/if}}combat-view-item{{#if combat.treeHasChildren}} pc-notable-combat-has-children{{/if}}{{#if combat.isSkillEntry}} pc-notable-combat-tags-collapsed{{/if}}"
+              data-combat-index="{{index}}" data-combat-id="{{combat.id}}" {{#if combat.isSkillEntry}}data-skill-index="{{index}}"{{/if}}
+              data-indent="{{combat.indent}}" style="--indent-level: {{combat.treeDepth}}; --indent-offset: {{multiply combat.treeDepth 28}}px;" {{#if @root.editable}}draggable="true"{{/if}}>
+            <div class="combat-view-line">
+              <span class="pc-notable-combat-tree" aria-hidden="true">
+                {{#each combat.treeLanes as |lane|}}<span class="pc-notable-combat-tree-lane pc-notable-combat-tree-lane--{{lane}}"></span>{{/each}}
+              </span>
+              <img class="pc-inventory-item-image pc-notable-combat-image" src="{{combat.imageSrc}}" alt="">
+              <div class="pc-notable-combat-content">
+                {{#if @root.editable}}
+                  <span class="combat-edit-heading">
+                    {{#if combat.isSkillType}}
+                      <input type="number" class="combat-input combat-class{{#if combat.isSkillEntry}} skill-class{{/if}} pc-input" data-field="class" value="{{combat.class}}" min="1" max="10" inputmode="numeric" placeholder="C" aria-label="{{combat.name}} class">
+                      <input type="text" class="combat-input combat-rank{{#if combat.isSkillEntry}} skill-rank{{/if}} pc-input" data-field="rank" value="{{combat.rank}}" placeholder="R" aria-label="{{combat.name}} rank" data-tooltip="Enter 1-4 or U for untrained">
+                      <button type="button" class="combat-toggle-type" data-tooltip="Switch to Special {{#if combat.isSkillEntry}}Skill{{else}}Combat{{/if}}" aria-label="Switch {{combat.name}} to Special Type">&times;</button>
+                      {{#if combat.isSignature}}<span class="combat-sig-label">SIG</span>{{/if}}
+                    {{else}}
+                      <select class="combat-select pc-select" aria-label="{{combat.name}} type">
+                        {{#if combat.typeIsCustom}}<option value="{{combat.type}}" selected disabled hidden>Choose Special Skill Type</option>{{/if}}
+                        {{#each combat.typeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+                      </select>
+                      {{#if (eq combat.type "Spellcraft")}}
+                        <input type="number" class="combat-input combat-class pc-input" data-field="class" value="{{combat.class}}" min="1" max="10" inputmode="numeric" placeholder="C" aria-label="{{combat.name}} class">
+                      {{else if (eq combat.type "Gate")}}
+                        <input type="number" class="combat-input combat-class pc-input" data-field="class" value="{{combat.class}}" min="1" max="10" inputmode="numeric" placeholder="C" aria-label="{{combat.name}} class">
+                      {{else if (eq combat.type "Perk")}}
+                        <input type="number" class="combat-input combat-special-grade pc-input" data-field="specialGrade" value="{{combat.specialGradeInput}}" min="0" inputmode="numeric" placeholder="Grade" aria-label="{{combat.name}} grade">
+                      {{else if (eq combat.type "TM")}}
+                        <input type="number" class="combat-input combat-special-grade pc-input" data-field="specialGrade" value="{{combat.specialGradeInput}}" min="0" inputmode="numeric" placeholder="Grade" aria-label="{{combat.name}} grade">
+                      {{/if}}
+                    {{/if}}
+                    <input type="text" class="combat-input combat-name{{#if combat.isSkillEntry}} skill-name{{/if}} pc-input" data-field="name" value="{{combat.name}}" placeholder="{{#if combat.isSkillEntry}}Skill{{else}}Combat{{/if}} name" aria-label="{{#if combat.isSkillEntry}}Skill{{else}}Notable combat{{/if}} name">
+                    {{#if combat.allowToHitAcc}}
+                      <input type="text" class="combat-input combat-tohit pc-input" data-field="tohit" value="{{combat.tohit}}" inputmode="numeric" placeholder="TH" aria-label="{{combat.name}} To-Hit">
+                      <input type="text" class="combat-input combat-accuracy pc-input" data-field="accuracy" value="{{combat.accuracy}}" inputmode="numeric" placeholder="Acc" aria-label="{{combat.name}} Accuracy">
+                    {{/if}}
+                    {{#if combat.isSkillEntry}}
+                      <input type="text" class="combat-input combat-ap pc-input" data-field="ap" value="{{combat.ap}}" inputmode="numeric" placeholder="AP" aria-label="{{combat.name}} AP">
+                      <input type="text" class="combat-input combat-sp pc-input" data-field="sp" value="{{combat.sp}}" inputmode="numeric" placeholder="SP" aria-label="{{combat.name}} SP">
+                    {{/if}}
+                  </span>
+                {{else}}
+                  <span class="combat-class-rank">{{#if combat.isSkillType}}{{combat.classRankDisplay}}{{else}}{{combat.specialTypeDisplay}}{{/if}}:</span>
+                  {{#if combat.isSignature}}<span class="combat-sig-label">SIG</span>{{/if}}
+                  {{#if combat.hasDescription}}
+                    <span class="combat-name-wrapper{{#if combat.isSkillEntry}} skill-name-wrapper{{/if}}" data-index="{{index}}" tabindex="0" data-tooltip-html="{{combat.descriptionTooltipHtml}}">
+                      <span class="combat-name-view combat-has-desc" data-index="{{index}}">{{combat.name}}{{#if combat.hasToHit}}:{{else}}{{#if combat.hasAccuracy}}:{{/if}}{{/if}}</span>
+                    </span>
+                  {{else}}
+                    <span class="combat-name-view">{{combat.name}}{{#if combat.hasToHit}}:{{else}}{{#if combat.hasAccuracy}}:{{/if}}{{/if}}</span>
+                  {{/if}}
+                  {{#if combat.allowToHitAcc}}
+                    <span class="{{#if combat.isSkillEntry}}skill-roll-clickable{{else}}combat-roll-clickable{{/if}}" data-action="{{#if combat.isSkillEntry}}rollSkill{{else}}rollCombat{{/if}}" data-index="{{index}}" data-usage-id="{{combat.usageId}}" role="button" tabindex="0" data-tooltip="Roll {{combat.name}}" aria-label="Roll {{combat.name}}">{{#if combat.hasToHit}}{{combat.modifiedTohit}}+{{/if}}{{#if combat.hasAccuracy}} {{combat.accuracySign}}{{combat.accuracyNum}} Acc{{/if}}</span>
+                  {{/if}}
+                  {{#if combat.isSkillEntry}}
+                    {{#if combat.hasAp}}<span class="pc-skill-advancement-display">[{{combat.ap}}] AP</span>{{/if}}
+                    {{#if combat.hasSp}}<span class="pc-skill-advancement-display">[{{combat.sp}}] SP</span>{{/if}}
+                  {{/if}}
+                {{/if}}
+                {{#if combat.isSignature}}
+                  <span class="combat-uses-display">
+                    <span class="uses-label">Uses</span>
+                    <span class="combat-uses-box">
+                      <input type="number" class="combat-uses-current pc-input-plain" data-index="{{index}}" value="{{combat.usesCurrent}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                      <span class="uses-separator">/</span>
+                      {{#if @root.editable}}
+                        {{#if combat.isSkillEntry}}
+                          <input type="number" class="combat-uses-current combat-uses-max pc-input-plain" data-index="{{index}}" value="{{combat.usesMax}}" min="0" aria-label="{{combat.name}} maximum uses">
+                        {{else}}<span>{{combat.usesMax}}</span>{{/if}}
+                      {{else}}<span>{{combat.usesMax}}</span>{{/if}}
+                    </span>
+                  </span>
+                {{/if}}
+              </div>
+              {{#if combat.hasTags}}
+                <span class="combat-tags-inline" data-combat-index="{{index}}">
+                  {{#each combat.activeTags as |tag tagIdx|}}
+                    {{#if tag.isUses}}
+                      <span class="combat-uses-display combat-tag-uses-display combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}" data-custom-index="{{tag.customIndex}}" draggable="true">
+                        <span class="uses-label">{{tag.label}}</span>
+                        <span class="combat-uses-box">
+                          <input type="number" class="combat-uses-current combat-tag-uses-current pc-input-plain" data-index="{{@../index}}" value="{{tag.current}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                          <span class="uses-separator">/ {{tag.max}}</span>
+                        </span>
+                      </span>
+                    {{else if tag.isSections}}
+                      <span class="combat-tag combat-tag-compact combat-tag-sections combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}" draggable="true">
+                        {{tag.label}}:
+                        <input type="number" class="combat-tag-sections-current pc-input-plain" data-index="{{@../index}}" value="{{tag.current}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                        <span>/{{tag.max}}</span>
+                      </span>
+                    {{else if tag.isSplitSecond}}
+                      <span class="combat-tag combat-tag-compact combat-tag-speed combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}" draggable="true">
+                        {{tag.value}}:
+                        <input type="number" class="combat-tag-splitsecond-current pc-input-plain" data-index="{{@../index}}" value="{{tag.splitSecondCurrent}}" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*">
+                        <span>/{{tag.splitSecondMax}}</span>
+                      </span>
+                    {{else if tag.rollable}}
+                      <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-rollable" data-action="rollCombatTag" data-combat-index="{{@../index}}" data-roll-type="{{tag.type}}" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tooltip="Click to roll {{tag.label}}" aria-label="Click to roll {{tag.label}}">{{tag.label}}: {{tag.value}}</button>
+                    {{else}}
+                      <button type="button" class="combat-tag combat-tag-compact combat-tag-button combat-tag-draggable" data-tag-type="{{tag.type}}" data-tag-index="{{tagIdx}}" data-tag-key="{{tag.type}}{{#if (eq tag.type 'custom')}}:{{tag.customIndex}}{{/if}}" data-custom-index="{{tag.customIndex}}" draggable="true">{{#if tag.value}}{{#if tag.label}}{{tag.label}}: {{/if}}{{tag.value}}{{else}}{{tag.label}}{{/if}}</button>
+                    {{/if}}
+                  {{/each}}
+                </span>
+              {{/if}}
+                <div class="pc-inventory-row-controls pc-notable-combat-row-controls">
+                  <button type="button" class="pc-inventory-menu-toggle pc-notable-combat-tags-toggle header-control icon fa-solid {{#if combat.isSkillEntry}}fa-expand{{else}}fa-compress{{/if}}" data-tooltip="{{#if combat.isSkillEntry}}Show Skill{{else}}Hide Notable{{/if}} Tags" aria-label="{{#if combat.isSkillEntry}}Show Skill{{else}}Hide Notable{{/if}} Tags" aria-expanded="{{#if combat.isSkillEntry}}false{{else}}true{{/if}}" data-pc-notable-combat-tags-toggle></button>
+                  {{#if @root.owner}}<button type="button" class="pc-inventory-menu-toggle pc-notable-combat-menu-toggle header-control icon fa-solid fa-ellipsis-vertical" data-tooltip="{{#if combat.isSkillEntry}}Skill{{else}}Combat{{/if}} Options" aria-label="{{#if combat.isSkillEntry}}Skill{{else}}Combat{{/if}} Options" data-pc-notable-combat-menu></button>{{/if}}
+                </div>
+            </div>
+          </li>
+        {{/if}}
+      {{/each}}
+    </ul>
+  </div>
+</section>

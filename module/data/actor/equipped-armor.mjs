@@ -54,12 +54,12 @@ export function removeEquippedArmorHalt(values, effects) {
   return normalizeHaltValues(values).map((value, index) => Math.max(0, value - effects.haltValues[index]));
 }
 
-export function getArmorAdjustedMovement(value, effects, trainingPenalty = 0) {
-  return Math.max(0, integer(value) + effects.movementModifier + integer(trainingPenalty));
+export function getArmorAdjustedMovement(value, effects) {
+  return Math.max(0, integer(value) + effects.movementModifier);
 }
 
-export function removeEquippedArmorMovement(value, effects, trainingPenalty = 0) {
-  return Math.max(0, integer(value) - effects.movementModifier - integer(trainingPenalty));
+export function removeEquippedArmorMovement(value, effects) {
+  return Math.max(0, integer(value) - effects.movementModifier);
 }
 
 export function getArmorAdjustedAoeSaveTarget(value, effects) {

@@ -1,4 +1,4 @@
-import { delegate, qsa, toElement } from "../../dom.mjs";
+import { delegate, markVerticalDropBoundary, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
 
 const SKILL_DRAG_PREFIX = "peasant-core.skill-sort";
@@ -32,6 +32,7 @@ export function setupSkillAdvantageDragDropControls(sheet, html, {
 function setupSkillDragDropControls(sheet, root) {
   delegate(root, "dragstart", ".skills-list .skill-item", (ev, item) => {
     try {
+      if (ev.target?.closest?.(".combat-tag-draggable")) return;
       if (ev.target?.closest?.(SKILL_DRAG_BLOCK_SELECTOR)) {
         ev.preventDefault();
         return;
@@ -95,8 +96,7 @@ function setupSkillDragDropControls(sheet, root) {
       const fromIndex = Number.isFinite(Number.parseInt(sheet._skillDragState.fromIndex, 10)) ? Number.parseInt(sheet._skillDragState.fromIndex, 10) : null;
       if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) return;
 
-      targetRow.classList.toggle("drag-over-bottom", dropAfter);
-      targetRow.classList.toggle("drag-over-top", !dropAfter);
+      markVerticalDropBoundary(getSkillRowsInList(list), targetRow, dropAfter);
     } catch (e) {}
   });
 
@@ -206,8 +206,7 @@ function setupAdvantageDragDropControls(sheet, html, {
       const fromIndex = sheet._advDragState.fromIndex;
       if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) return;
 
-      targetRow.classList.toggle("drag-over-bottom", dropAfter);
-      targetRow.classList.toggle("drag-over-top", !dropAfter);
+      markVerticalDropBoundary(getAdvantageRowsInList(list), targetRow, dropAfter);
     } catch (e) {}
   });
 
@@ -314,8 +313,7 @@ function setupAdvantagePointerDragControls(sheet, html, {
               return;
             }
 
-            targetRow.classList.toggle("drag-over-bottom", dropAfter);
-            targetRow.classList.toggle("drag-over-top", !dropAfter);
+            markVerticalDropBoundary(getAdvantageRowsInList(advPointerDragState.list), targetRow, dropAfter);
             advPointerDragState.targetIndex = toIndex;
           } catch (e) {
             /* ignore */

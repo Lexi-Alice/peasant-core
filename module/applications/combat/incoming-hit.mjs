@@ -1,4 +1,4 @@
-import { getActiveArmorTraining, canSpendActiveArmorCharge } from "../../data/actor/active-armor.mjs";
+import { getEquippedArmorGrade, canSpendActiveArmorCharge } from "../../data/actor/active-armor.mjs";
 import { getTargetedDamageLocationDisplay, normalizeAppliedDamageType } from "../../data/actor/targeted-damage.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { renderDialogV2 } from "../dialogs.mjs";
@@ -26,7 +26,7 @@ export async function showIncomingHitPrompt(payload = {}) {
   const locationText = String(payload.locationResultText || locationDisplay).trim() || locationDisplay;
   const normalizedDamageType = normalizeAppliedDamageType(payload.damageType);
   const title = locationText ? `${attackerName} hits you in the ${locationText}!` : `Incoming hit from ${attackerName}`;
-  const armorTraining = getActiveArmorTraining(defenderActor);
+  const armorGrade = getEquippedArmorGrade(defenderActor);
   if (!canSpendActiveArmorCharge(defenderActor)) {
     let appliedType = normalizedDamageType;
     if (appliedType === "flexible") appliedType = "blunt";
@@ -34,7 +34,7 @@ export async function showIncomingHitPrompt(payload = {}) {
       handled: true,
       useArmorCharge: false,
       appliedDamageType: appliedType,
-      armorGrade: armorTraining.grade,
+      armorGrade,
       preventByLuckPenetration: false,
       bySkillPenetrationMosAdjustment: 0,
       ...(location ? { location, isAP: !!payload.isAP } : {}),
@@ -69,15 +69,15 @@ export async function showIncomingHitPrompt(payload = {}) {
       let appliedType = normalizedDamageType;
       if (appliedType === "flexible") appliedType = "blunt";
 
-      const currentArmorTraining = getActiveArmorTraining(defenderActor);
+      const currentArmorGrade = getEquippedArmorGrade(defenderActor);
       const useCharge = !!useArmorCharge && canSpendActiveArmorCharge(defenderActor);
       const result = {
         handled: true,
         useArmorCharge: useCharge,
         appliedDamageType: appliedType,
-        armorGrade: currentArmorTraining.grade,
-        preventByLuckPenetration: useCharge && currentArmorTraining.grade === "light",
-        bySkillPenetrationMosAdjustment: useCharge && currentArmorTraining.grade === "medium" ? 1 : 0,
+        armorGrade: currentArmorGrade,
+        preventByLuckPenetration: useCharge && currentArmorGrade === "light",
+        bySkillPenetrationMosAdjustment: useCharge && currentArmorGrade === "medium" ? 1 : 0,
         ...(location ? { location, isAP: !!payload.isAP } : {}),
         chainCancelled: !!chainCancelled
       };

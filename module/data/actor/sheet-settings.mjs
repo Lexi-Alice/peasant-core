@@ -187,9 +187,55 @@ export const PC_ACTOR_SETTING_DEFINITIONS = Object.freeze([
     allowDecimal: true
   },
   {
+    group: "Blessings",
+    label: "Blessing of Spring",
+    hint: "Improves Learn Saves, and SP gain from multiple sources.",
+    type: "blessing",
+    blessingType: "spring"
+  },
+  {
+    group: "Blessings",
+    label: "Blessing of Summer",
+    hint: "Improves Natural Healing and recovery from healing.",
+    type: "blessing",
+    blessingType: "summer"
+  },
+  {
+    group: "Blessings",
+    label: "Blessing of Fall",
+    hint: "Adds +4 Accuracy per use after rolling. Long Rest restores uses.",
+    type: "blessing",
+    blessingType: "fall"
+  },
+  {
+    group: "Blessings",
+    label: "Uses",
+    hint: "Current Blessing of Fall uses, up to the stored maximum.",
+    type: "number",
+    fallUseField: "value",
+    defaultValue: 0,
+    min: 0
+  },
+  {
+    group: "Blessings",
+    label: "Maximum",
+    hint: "Maximum Blessing of Fall uses. Changes to maximum Edge adjust this value.",
+    type: "number",
+    fallUseField: "max",
+    defaultValue: 1,
+    min: 0
+  },
+  {
+    group: "Blessings",
+    label: "Blessing of Winter",
+    hint: "Alters Edge usage relating to Death's Door events for self, and others. Additionally, Death’s Door for this Character does not force them unconscious, and they may continue to act normally.",
+    type: "blessing",
+    blessingType: "winter"
+  },
+  {
     group: "Miscellaneous",
     label: "Use Winter's Edge?",
-    hint: "If checked, this actor's Edge resource is labeled Winter's Edge.",
+    hint: "If checked, this actor uses Winter's Edge to set an individual die to a chosen face, including on critical results.",
     type: "boolean",
     flagKey: PC_WINTER_EDGE_FLAG
   }
@@ -214,6 +260,8 @@ export function sanitizePeasantCoreSettingNumber(setting, value) {
 }
 
 export function getPeasantCoreSettingValue(actor, setting) {
+  if (setting.blessingType) return actor?.system?.blessing?.type === setting.blessingType;
+  if (setting.fallUseField) return sanitizePeasantCoreSettingNumber(setting, actor?.system?.fallBlessingUses?.[setting.fallUseField]);
   const raw = actor?.getFlag?.("peasant-core", setting.flagKey);
   if (setting.type === "boolean") return !!raw;
   return sanitizePeasantCoreSettingNumber(setting, raw);
@@ -223,6 +271,7 @@ export function getPeasantCoreSettingGroups(actor, editable = true) {
   const groupMap = new Map();
 
   for (const setting of PC_ACTOR_SETTING_DEFINITIONS) {
+    if (setting.fallUseField && actor?.system?.blessing?.type !== "fall") continue;
     const group = setting.group || "Settings";
     if (!groupMap.has(group)) groupMap.set(group, []);
 
@@ -243,8 +292,8 @@ export function getPeasantCoreSettingGroups(actor, editable = true) {
     const hasMin = Number.isFinite(Number(setting.min));
     groupMap.get(group).push({
       ...setting,
-      id: `pc-setting-${setting.flagKey}`,
-      isBoolean: setting.type === "boolean",
+      id: `pc-setting-${setting.flagKey ?? setting.blessingType ?? `fall-${setting.fallUseField}`}`,
+      isBoolean: setting.type === "boolean" || setting.type === "blessing",
       checked: value === true,
       value,
       editable,

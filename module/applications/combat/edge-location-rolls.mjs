@@ -14,9 +14,28 @@ import { escapeHtml } from "../../utils/chat.mjs";
 import { pcLog } from "../../utils/logging.mjs";
 import { drawLocationTableLikeMacro } from "../actor/location-table.mjs";
 import { applyIncomingHit } from "./incoming-hit.mjs";
-import { userOwnsActorOrToken } from "./actor-targets.mjs";
+import { resolveDefensePromptActor, userOwnsActorOrToken } from "./actor-targets.mjs";
+import { actorUsesWinterEdge } from "../../data/actor/edge-resources.mjs";
+import { applyRollUndoRecords, captureActorRollUndo } from "../chat-undo.mjs";
 
 const PC_SYSTEM_ID = "peasant-core";
+const winterEdgeTransactions = new WeakMap();
+const winterEdgeRollTransactions = new Map();
+
+export async function withWinterEdgeTransaction(actor, operation, message = null) {
+  const chainId = message?.getFlag?.(PC_SYSTEM_ID, "edgeChain")?.chainId;
+  const workflowId = message?.getFlag?.(PC_SYSTEM_ID, PC_LOCATION_ROLL_FLAG)?.workflowId;
+  const rollKey = chainId ? `chain:${chainId}` : workflowId ? `location:${workflowId}` : message?.id ? `message:${message.id}` : null;
+  const previous = [actor && winterEdgeTransactions.get(actor), rollKey && winterEdgeRollTransactions.get(rollKey)].filter(Boolean);
+  const pending = Promise.all(previous.map(transaction => transaction.catch(() => {}))).then(operation);
+  if (actor) winterEdgeTransactions.set(actor, pending);
+  if (rollKey) winterEdgeRollTransactions.set(rollKey, pending);
+  try { return await pending; }
+  finally {
+    if (actor && winterEdgeTransactions.get(actor) === pending) winterEdgeTransactions.delete(actor);
+    if (rollKey && winterEdgeRollTransactions.get(rollKey) === pending) winterEdgeRollTransactions.delete(rollKey);
+  }
+}
 
 function createRequestId() {
   try {
@@ -38,7 +57,7 @@ function getLocationRollFlagFromMessage(message) {
 }
 
 function getControlledTokenEntries() {
-  return Array.from(canvas?.tokens?.controlled || [])
+  return Array.from(globalThis.canvas?.tokens?.controlled || [])
     .map((token) => {
       const tokenDocument = token?.document ?? token ?? null;
       const actor = token?.actor || tokenDocument?.actor || null;
@@ -76,7 +95,7 @@ function getOwnedSelectedTokenEntries(user = game.user) {
     .filter(({ actor, tokenDocument }) => userOwnsActorOrToken(user, actor, tokenDocument));
 }
 
-export function resolveEdgeLocationRollSpender({ warn = false, label = "Edge Location Roll" } = {}) {
+export function resolveEdgeLocationRollSpender({ warn = false, label = "Edge Location Roll", winter = false } = {}) {
   const selectedTokens = getControlledTokenEntries();
   const ownedSelectedTokens = getOwnedSelectedTokenEntries(game.user);
   const decision = chooseEdgeLocationRollSpender({
@@ -101,6 +120,11 @@ export function resolveEdgeLocationRollSpender({ warn = false, label = "Edge Loc
   if (!actorHasCurrentEdge(decision.actor)) {
     if (warn) ui.notifications?.warn?.(`${decision.actor?.name || "Actor"} has no current Edge.`);
     return { ok: false, reason: "no-edge", actor: decision.actor };
+  }
+
+  if (getActorUpdatePermissionError(game.user, decision.actor) || actorUsesWinterEdge(decision.actor) !== winter) {
+    if (warn) ui.notifications?.warn?.(`Select an owned actor with ${winter ? "Winter's Edge" : "regular Edge"}.`);
+    return { ok: false, reason: "wrong-edge-type", actor: decision.actor };
   }
 
   return decision;
@@ -163,32 +187,17 @@ export async function refundActorEdge(actor, edgeSpend) {
   }
 }
 
-async function resolveUndoActor(record) {
-  const actorUuid = String(record?.actorUuid || "").trim();
-  if (actorUuid && typeof fromUuid === "function") {
-    try {
-      const actor = await fromUuid(actorUuid);
-      if (actor) return actor;
-    } catch (e) {
-      pcLog.debug("Peasant Core | Failed to resolve Edge location undo actor UUID", e);
-    }
-  }
-
-  const actorId = String(record?.actorId || "").trim();
-  return actorId ? game.actors?.get(actorId) || null : null;
+async function applyUndoRecords(records = []) {
+  return applyRollUndoRecords(records);
 }
 
-async function applyUndoRecords(records = []) {
-  const undoRecords = Array.isArray(records) ? records : [];
-  for (const record of [...undoRecords].reverse()) {
-    if (!record?.before || typeof record.before !== "object") continue;
-    const actor = await resolveUndoActor(record);
-    if (!actor?.update) {
-      return { ok: false, error: `Could not find ${record?.actorName || "actor"} for location reroll undo.` };
-    }
-    await actor.update(record.before);
-  }
-  return { ok: true };
+function invertLocationUndoRecords(records = []) {
+  return [...records].reverse().map(record => ({
+    ...record, before: cloneLocationRollData(record.after), after: cloneLocationRollData(record.before),
+    ...(record.entryCounters ? { entryCounters: record.entryCounters.map(counter => ({ ...counter, before: counter.after, after: counter.before })) } : {}),
+    ...(record.spellEffects ? { spellEffects: { before: cloneLocationRollData(record.spellEffects.after), after: cloneLocationRollData(record.spellEffects.before) } } : {}),
+    ...(record.skillEffects ? { skillEffects: { before: cloneLocationRollData(record.skillEffects.after), after: cloneLocationRollData(record.skillEffects.before) } } : {})
+  }));
 }
 
 function buildReplacementWorkflow(flag) {
@@ -215,7 +224,7 @@ async function markLocationMessageSuperseded(message, {
   return nextFlag;
 }
 
-async function drawReplacementLocation(flag, originalMessageId) {
+async function drawReplacementLocation(flag, originalMessageId, roll = null) {
   const nextRevision = Number(flag?.revision || 0) + 1;
   const drawOptions = {
     source: flag.source,
@@ -225,7 +234,7 @@ async function drawReplacementLocation(flag, originalMessageId) {
     workflow: flag.source === LOCATION_ROLL_SOURCE_WORKFLOW ? buildReplacementWorkflow(flag) : null
   };
 
-  let locationRoll = await drawLocationTableLikeMacro(drawOptions);
+  let locationRoll = await drawLocationTableLikeMacro({ ...drawOptions, roll });
   if (
     flag.source === LOCATION_ROLL_SOURCE_WORKFLOW
     && flag.workflow?.defendedByReflex
@@ -296,14 +305,21 @@ async function applyWorkflowLocationReroll(flag, replacementRoll) {
   if (!undoResult.ok) return undoResult;
 
   const nextPayload = buildEdgeRerolledIncomingHitPayload(oldPayload, replacementRoll);
-  const application = await applyIncomingHit(nextPayload);
-  if (!application?.handled || !application?.applied) {
+  const targetActor = await resolveDefensePromptActor(nextPayload);
+  let applicationError = null;
+  const captured = await captureActorRollUndo(targetActor, "Edge Location Replay", async () => {
+    try { return await applyIncomingHit(nextPayload); }
+    catch (error) { applicationError = error; return null; }
+  }, { includeSpellEffects: true, includeSkillEffects: true });
+  const application = captured.result;
+  if (applicationError || !application?.handled || !application?.applied) {
     try {
-      await applyIncomingHit(oldPayload);
+      await applyUndoRecords(applicationError ? captured.undoRecords : application?.undoRecords || captured.undoRecords);
+      await applyUndoRecords(invertLocationUndoRecords(workflow.undoRecords || []));
     } catch (e) {
       console.error("Peasant Core | Failed to restore original damage after Edge location reroll failure", e);
     }
-    return { ok: false, error: application?.reason || "Could not reapply damage to the new location." };
+    return { ok: false, error: applicationError ? getResultError(applicationError) : application?.reason || "Could not reapply damage to the new location." };
   }
 
   return {
@@ -316,13 +332,14 @@ async function applyWorkflowLocationReroll(flag, replacementRoll) {
 async function createEdgeLocationRollSummary({
   spenderActor = null,
   oldResult = null,
-  newResult = null
+  newResult = null,
+  winter = false
 } = {}) {
   const oldLabel = oldResult?.rawText || oldResult?.locationDisplay || oldResult?.location || "Unknown";
   const newLabel = newResult?.rawText || newResult?.locationDisplay || newResult?.location || "Unknown";
   const speaker = spenderActor ? ChatMessage.getSpeaker({ actor: spenderActor }) : ChatMessage.getSpeaker();
   const content = `<fieldset class="skill-roll-card pc-edge-location-roll-card" style="background: transparent; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #e0e0e0; font-family: var(--font-body, 'Signika', 'Palatino Linotype', sans-serif);">
-    <legend>Edge Location Roll</legend>
+    <legend>${winter ? "Winter's Edge" : "Edge Location Roll"}</legend>
     <div class="roll-details" style="display: block; background-color: transparent; color: #e0e0e0; border-radius: 4px; padding: 6px; border: 1px solid #555; font-size: 12px; line-height: 1.55;">
       <div>Old Location: ${escapeHtml(oldLabel)}</div>
       <div>New Location: ${escapeHtml(newLabel)}</div>
@@ -335,7 +352,35 @@ function getResultError(error) {
   return String(error?.message || error || "Edge Location Roll failed.");
 }
 
+function getLocationDice(message) {
+  return Array.from(message?.rolls?.[0]?.terms || []).flatMap(term => (
+    Array.isArray(term.results) && Number.isInteger(term.faces)
+      ? term.results.map((result, resultIndex) => ({ term, resultIndex, faces: term.faces, value: result.result })) : []
+  ));
+}
+
+export function replaceLocationRollDie(message, dieIndex, newValue) {
+  const selected = getLocationDice(message)[dieIndex];
+  if (!Number.isInteger(dieIndex) || !selected || !Number.isInteger(newValue) || newValue < 1 || newValue > selected.faces) {
+    throw new Error("The chosen location die or face was invalid.");
+  }
+  const sourceRoll = message.rolls[0];
+  const terms = sourceRoll.terms.map(term => {
+    const data = term.toJSON();
+    if (term === selected.term) data.results[selected.resultIndex].result = newValue;
+    return term.constructor.fromData(data);
+  });
+  return Roll.fromTerms(terms);
+}
+
 export async function applyEdgeLocationRoll(payload = {}) {
+  if (payload.winter !== true) return applyEdgeLocationRollTransaction(payload);
+  const actor = await resolveActorFromUuidOrId({ actorUuid: payload.spenderActorUuid, actorId: payload.spenderActorId, tokenUuid: payload.spenderTokenUuid });
+  return withWinterEdgeTransaction(actor, () => applyEdgeLocationRollTransaction(payload), game.messages?.get(String(payload.messageId || "").trim()));
+}
+
+async function applyEdgeLocationRollTransaction(payload) {
+  const winter = payload.winter === true;
   const messageId = String(payload.messageId || "").trim();
   const message = messageId ? game.messages?.get(messageId) || null : null;
   if (!message) return { ok: false, error: "Location message was not found." };
@@ -353,8 +398,14 @@ export async function applyEdgeLocationRoll(payload = {}) {
   });
   const permissionError = getActorUpdatePermissionError(requester, spenderActor);
   if (permissionError) return { ok: false, error: permissionError };
+  if (actorUsesWinterEdge(spenderActor) !== winter) return { ok: false, error: "Use Winter's Edge to choose a face, or regular Edge to reroll." };
   if (!actorHasCurrentEdge(spenderActor)) {
     return { ok: false, error: `${spenderActor?.name || "Actor"} has no current Edge.` };
+  }
+  let chosenRoll = null;
+  if (winter) {
+    try { chosenRoll = replaceLocationRollDie(message, payload.dieIndex, payload.newValue); }
+    catch (error) { return { ok: false, error: getResultError(error) }; }
   }
 
   const processingFlag = buildProcessingLocationRollFlag(flag, { processingUserId: requester?.id || null });
@@ -369,7 +420,7 @@ export async function applyEdgeLocationRoll(payload = {}) {
   let edgeSpend = null;
   let workflowResult = null;
   try {
-    replacementRoll = await drawReplacementLocation(flag, message.id);
+    replacementRoll = await drawReplacementLocation(flag, message.id, chosenRoll);
     if (!replacementRoll?.chatMessage) throw new Error("Could not create replacement location message.");
 
     edgeSpend = await spendActorEdge(spenderActor);
@@ -391,6 +442,14 @@ export async function applyEdgeLocationRoll(payload = {}) {
       supersededReason: "edge"
     });
   } catch (error) {
+    if (workflowResult?.ok) {
+      try {
+        await applyUndoRecords(workflowResult.application?.undoRecords || []);
+        await applyUndoRecords(invertLocationUndoRecords(flag.workflow?.undoRecords || []));
+      } catch (restoreError) {
+        console.error("Peasant Core | Failed to restore original damage after Edge location reroll failure", restoreError);
+      }
+    }
     if (replacementRoll?.chatMessage) {
       try {
         await markLocationMessageSuperseded(replacementRoll.chatMessage, { supersededReason: "edge-failed" });
@@ -412,7 +471,8 @@ export async function applyEdgeLocationRoll(payload = {}) {
     await createEdgeLocationRollSummary({
       spenderActor,
       oldResult: flag.result,
-      newResult: replacementRoll
+      newResult: replacementRoll,
+      winter
     });
   } catch (e) {
     pcLog.debug("Peasant Core | Failed to create Edge Location Roll summary", e);
@@ -428,7 +488,7 @@ export async function applyEdgeLocationRoll(payload = {}) {
   };
 }
 
-export async function edgeLocationRollFromMessage(messageId) {
+export async function edgeLocationRollFromMessage(messageId, { winter = false } = {}) {
   const message = messageId ? game.messages?.get(messageId) || null : null;
   if (!message) {
     ui.notifications?.warn?.("Location message was not found.");
@@ -441,8 +501,19 @@ export async function edgeLocationRollFromMessage(messageId) {
     return false;
   }
 
-  const spender = resolveEdgeLocationRollSpender({ warn: true });
+  const spender = resolveEdgeLocationRollSpender({ warn: true, winter, label: winter ? "Winter's Edge" : "Edge Location Roll" });
   if (!spender.ok) return false;
+
+  let selection = {};
+  if (winter) {
+    const dice = getLocationDice(message);
+    if (!dice.length) return false;
+    const { showEdgeIndividualDiePrompt } = await import("./edge-chain-rolls.mjs");
+    selection = await showEdgeIndividualDiePrompt({ kind: "skill", label: "Location", dice: dice.map(die => die.value), diceFaces: dice[0].faces }, {
+      winter: true, diceFacesByIndex: dice.map(die => die.faces)
+    });
+    if (selection.cancelled) return false;
+  }
 
   const tokenEntry = getOwnedSelectedTokenEntries(game.user).find(entry => entry.actor?.uuid === spender.actor?.uuid) || null;
   const requestPayload = {
@@ -451,7 +522,8 @@ export async function edgeLocationRollFromMessage(messageId) {
     messageId: message.id,
     spenderActorId: spender.actor?.id || null,
     spenderActorUuid: spender.actor?.uuid || null,
-    spenderTokenUuid: tokenEntry?.tokenDocument?.uuid || null
+    spenderTokenUuid: tokenEntry?.tokenDocument?.uuid || null,
+    ...(winter ? { winter: true, edgeRollMode: "winter", ...selection } : {})
   };
 
   let result = null;
@@ -481,10 +553,22 @@ export function configureEdgeLocationRollChatContext() {
     menuItems.push({
       name: "Edge Location Roll",
       icon: '<i class="fas fa-dice-d20"></i>',
-      condition: element => canOfferEdgeLocationRoll(getMessageFromContextElement(element)),
+      condition: element => resolveEdgeLocationRollSpender().ok && canOfferEdgeLocationRoll(getMessageFromContextElement(element)),
       callback: async element => {
         const message = getMessageFromContextElement(element);
         if (message) await edgeLocationRollFromMessage(message.id);
+      }
+    });
+    menuItems.push({
+      name: "Winter's Edge",
+      icon: '<i class="fas fa-snowflake"></i>',
+      condition: element => {
+        const message = getMessageFromContextElement(element);
+        return resolveEdgeLocationRollSpender({ winter: true }).ok && canOfferEdgeLocationRoll(message) && getLocationDice(message).length > 0;
+      },
+      callback: async element => {
+        const message = getMessageFromContextElement(element);
+        if (message) await edgeLocationRollFromMessage(message.id, { winter: true });
       }
     });
   });

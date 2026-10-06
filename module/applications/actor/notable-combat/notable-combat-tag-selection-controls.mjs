@@ -5,7 +5,8 @@ export function setupNotableCombatTagSelectionControls(container, {
   buildTagInputs,
   openDescriptionEditor,
   onBeginEdit,
-  onCancel
+  onCancel,
+  beforeSelect
 } = {}) {
   const root = toElement(container);
   if (!root) return;
@@ -35,7 +36,8 @@ export function setupNotableCombatTagSelectionControls(container, {
     if (empty) empty.hidden = visibleCount > 0;
   };
 
-  const applyTagType = (tagType) => {
+  const applyTagType = async (tagType) => {
+    if (beforeSelect && !await beforeSelect()) return;
     if (!tagType) {
       tagEditor.reset();
       buildTagInputs(tagType);
@@ -49,7 +51,7 @@ export function setupNotableCombatTagSelectionControls(container, {
       )) ?? null;
     if (existing) {
       tagEditor.beginEdit(tagType, -1, "");
-    } else if (!(tagEditorState.mode === "edit" && tagEditorState.tagType === tagType)) {
+    } else if (tagType === "custom" || !(tagEditorState.mode === "edit" && tagEditorState.tagType === tagType)) {
       tagEditor.reset();
       tagEditor.setTagType(tagType);
     }
@@ -142,10 +144,13 @@ export function setupNotableCombatTagSelectionControls(container, {
     }
   });
 
-  const beginTagEdit = (ev, item) => {
+  const beginTagEdit = async (ev, item) => {
     if (ev.target?.closest?.(".remove-tag-btn")) return;
     ev.preventDefault();
     ev.stopPropagation();
+    const tagKey = item?.dataset?.tagKey;
+    if (beforeSelect && !await beforeSelect()) return;
+    item = qsa(root, ".current-tag-item").find(row => row.dataset.tagKey === tagKey) ?? item;
 
     if (ev.type === "click" && item.nextElementSibling?.matches?.("[data-pc-tag-draft]:not([hidden])")) {
       tagEditor.reset({ clearForm: true });
@@ -169,7 +174,7 @@ export function setupNotableCombatTagSelectionControls(container, {
     buildTagInputs(tagType);
     onBeginEdit?.(item);
 
-    const focusTarget = qsa(qs(root, ".tag-input-area"), "input, select, textarea").find(isVisible);
+    const focusTarget = qsa(qs(root, ".tag-input-area"), "input, select, textarea").find(element => !element.disabled && isVisible(element));
     focusTarget?.focus?.();
   };
 

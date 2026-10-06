@@ -2,32 +2,74 @@
   <div class="character-header pc-character-banner{{#if hasCustomIdentitySelection}} has-custom-popovers{{/if}}">
     <div class="pc-banner-identity">
     {{#if @root.editable}}
-      <input type="text" name="name" value="{{actor.name}}" class="character-name pc-banner-name-input pc-input-plain" placeholder="Character Name" />
+      <input type="text" name="name" value="{{actor.name}}" class="character-name pc-banner-name-input pc-input" placeholder="Character Name" />
     {{else}}
       <div class="character-name pc-banner-title">{{actor.name}}</div>
     {{/if}}
 
     <div class="pc-banner-subtitle{{#if @root.editable}} is-editing{{/if}}">
     {{#if @root.editable}}
-      <div class="character-field-popover">
-        <select name="system.race" class="character-field pc-select">
-          <option value="Human" {{#if (eq source.system.race "Human")}} selected{{/if}}>Human</option>
-          <option value="Eve" {{#if (eq source.system.race "Eve")}} selected{{/if}}>Eve</option>
-          <option value="Taru" {{#if (eq source.system.race "Taru")}} selected{{/if}}>Taru</option>
-          <option value="Tarfel" {{#if (eq source.system.race "Tarfel")}} selected{{/if}}>Tarfel</option>
-          <option value="Lupine" {{#if (eq source.system.race "Lupine")}} selected{{/if}}>Lupine</option>
-          <option value="Ursa" {{#if (eq source.system.race "Ursa")}} selected{{/if}}>Ursa</option>
-          <option value="Leon" {{#if (eq source.system.race "Leon")}} selected{{/if}}>Leon</option>
-          <option value="Doomi" {{#if (eq source.system.race "Doomi")}} selected{{/if}}>Doomi</option>
-          <option value="Skeever" {{#if (eq source.system.race "Skeever")}} selected{{/if}}>Skeever</option>
-          <option value="Custom" {{#if customRaceSelected}} selected{{/if}}>Custom</option>
-        </select>
-        {{#if customRaceSelected}}
-          <input type="text" name="system.customRace" class="character-field-popover-input pc-input" value="{{source.system.customRace}}" placeholder="Custom heraldry" />
-        {{/if}}
+      <div class="pc-banner-heraldries">
+        <div class="character-field-popover">
+          <label>Major Heraldry
+            <select name="system.majorHeraldry" class="pc-input pc-heraldry-select" aria-label="Major Heraldry">
+              <option value="" disabled hidden {{#unless source.system.majorHeraldry}}selected{{/unless}}>Select Major Heraldry</option>
+              {{#each majorHeraldryGroups as |group|}}
+                <optgroup label="{{group.label}}">
+                  {{#each group.options as |option|}}
+                    <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+                  {{/each}}
+                </optgroup>
+              {{/each}}
+              <option value="Custom" {{#if customMajorHeraldrySelected}}selected{{/if}}>Custom</option>
+            </select>
+          </label>
+          {{#if customMajorHeraldrySelected}}
+            <input type="text" name="system.customMajorHeraldry" class="character-field-popover-input pc-input" value="{{source.system.customMajorHeraldry}}" placeholder="Custom Major Heraldry" aria-label="Custom Major Heraldry" />
+          {{/if}}
+        </div>
+        <div class="character-field-popover">
+          <label>Minor Heraldry
+            <select name="system.minorHeraldry" class="pc-input pc-heraldry-select" aria-label="Minor Heraldry">
+              <option value="" disabled hidden {{#unless source.system.minorHeraldry}}selected{{/unless}}>Select Minor Heraldry</option>
+              {{#each minorHeraldryGroups as |group|}}
+                <optgroup label="{{group.label}}">
+                  {{#each group.options as |option|}}
+                    <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+                  {{/each}}
+                </optgroup>
+              {{/each}}
+              <option value="Custom" {{#if customMinorHeraldrySelected}}selected{{/if}}>Custom</option>
+            </select>
+          </label>
+          {{#if customMinorHeraldrySelected}}
+            <input type="text" name="system.customMinorHeraldry" class="character-field-popover-input pc-input" value="{{source.system.customMinorHeraldry}}" placeholder="Custom Minor Heraldry" aria-label="Custom Minor Heraldry" />
+          {{/if}}
+        </div>
+        <div class="character-field-popover">
+          <label>Final Heraldry
+            <select name="system.finalHeraldry" class="pc-input pc-heraldry-select" aria-label="Final Heraldry">
+              {{#each finalHeraldryOptions as |option|}}
+                <option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>
+              {{/each}}
+              <option value="Custom" {{#if customFinalHeraldrySelected}}selected{{/if}}>Custom</option>
+            </select>
+          </label>
+          {{#if customFinalHeraldrySelected}}
+            <input type="text" name="system.customFinalHeraldry" class="character-field-popover-input pc-input" value="{{source.system.customFinalHeraldry}}" placeholder="Custom Final Heraldry" aria-label="Custom Final Heraldry" />
+          {{/if}}
+        </div>
       </div>
     {{else}}
-      <span class="pc-banner-meta-item">{{displayRace}}</span>
+      {{#if displayMajorHeraldry}}
+      <span class="pc-banner-meta-item">{{displayMajorHeraldry}}</span>
+      {{/if}}
+      {{#if displayMinorHeraldry}}
+      <span class="pc-banner-meta-item">{{displayMinorHeraldry}}</span>
+      {{/if}}
+      {{#if displayFinalHeraldry}}
+      <span class="pc-banner-meta-item">{{displayFinalHeraldry}}</span>
+      {{/if}}
     {{/if}}
     
     {{#if @root.editable}}
@@ -43,7 +85,9 @@
         {{/if}}
       </div>
     {{else}}
+      {{#if displayOrigin}}
       <span class="pc-banner-meta-item">{{displayOrigin}}</span>
+      {{/if}}
     {{/if}}
     
     {{#if @root.editable}}
@@ -73,23 +117,38 @@
         {{/if}}
       </div>
     {{else}}
+      {{#if displaySpecificOrigin}}
       <span class="pc-banner-meta-item">{{displaySpecificOrigin}}</span>
+      {{/if}}
     {{/if}}
     </div>
     </div>
 
     {{#if canObserve}}
       <div class="pc-banner-rest-actions sheet-header-buttons" aria-label="Rest actions">
-        {{#if owner}}
         <div class="pc-banner-rest-button-row">
+          {{#if @root.editable}}
+          <label class="pc-banner-scale" data-tooltip="Scale {{scaleInput}}">
+            <i class="fa-solid fa-scale-balanced" inert aria-hidden="true"></i>
+            <input type="number" name="system.scale" value="{{scaleInput}}" min="0" step="1" data-dtype="Number" inputmode="numeric" class="pc-input" aria-label="Scale">
+          </label>
+          {{else}}
+          {{#if scaleDisplay}}
+          <span class="pc-banner-scale" data-tooltip="Scale {{scaleDisplay}}" aria-label="Scale {{scaleDisplay}}">
+            <i class="fa-solid fa-scale-balanced" inert aria-hidden="true"></i>
+            <span>{{scaleDisplay}}</span>
+          </span>
+          {{/if}}
+          {{/if}}
+          {{#if owner}}
           <button type="button" class="pc-banner-rest-button short-rest gold-button" data-action="rest" data-type="short" data-rest-type="short" data-tooltip="Short Rest" aria-label="Short Rest">
             <i class="fa-solid fa-utensils" inert aria-hidden="true"></i>
           </button>
           <button type="button" class="pc-banner-rest-button long-rest gold-button" data-action="rest" data-type="long" data-rest-type="long" data-tooltip="Long Rest" aria-label="Long Rest">
             <i class="fa-solid fa-campground" inert aria-hidden="true"></i>
           </button>
+          {{/if}}
         </div>
-        {{/if}}
         <div class="pc-banner-ap-meter" role="meter" aria-label="Action points" aria-valuemin="0" aria-valuenow="{{apBar.value}}" aria-valuemax="{{apBar.max}}">
           <div class="pc-banner-ap-label{{#if @root.editable}} is-editing{{/if}}">
             {{#if @root.editable}}
@@ -153,7 +212,11 @@
                   <span class="pc-portrait-resource-separator">/</span>
                   <span class="pc-portrait-resource-max">{{armorCharge.max}}</span>
                 </span>
-                <input type="number" class="pc-portrait-resource-value-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.valueInput}}" min="0" max="{{armorCharge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge current" hidden>
+                {{#if @root.editable}}
+                  <input type="number" class="pc-portrait-resource-max-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.maxInput}}" min="0" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge maximum" hidden>
+                {{else}}
+                  <input type="number" class="pc-portrait-resource-value-input pc-portrait-armor-charge-input pc-input" data-resource="armorCharge" value="{{armorCharge.valueInput}}" min="0" max="{{armorCharge.max}}" inputmode="numeric" data-dtype="Number" pattern="[+=\-]?\d*" aria-label="Armor Charge current" hidden>
+                {{/if}}
               </div>
               <span class="pc-portrait-lozenge-label">Armor Charge</span>
             </div>
@@ -509,7 +572,7 @@
       <div class="attributes-table pc-hex-attributes">
         <div class="pc-hex-row pc-hex-score-row" aria-label="Attributes">
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="build" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></button>
+            <div class="attr-label pc-attr-hex-name"><span class="{{#if isBlessed.build}}blessed{{/if}}">BLD</span></div>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.build" value="{{source.system.build}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Build score">
@@ -522,7 +585,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="reflex" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></button>
+            <div class="attr-label pc-attr-hex-name"><span class="{{#if isBlessed.reflex}}blessed{{/if}}">REF</span></div>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.reflex" value="{{source.system.reflex}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Reflex score">
@@ -555,7 +618,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="intuition" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></button>
+            <div class="attr-label pc-attr-hex-name"><span class="{{#if isBlessed.intuition}}blessed{{/if}}">INT</span></div>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.intuition" value="{{source.system.intuition}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Intuition score">
@@ -568,7 +631,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="learn" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></button>
+            <div class="attr-label pc-attr-hex-name"><span class="{{#if isBlessed.learn}}blessed{{/if}}">LRN</span></div>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.learn" value="{{source.system.learn}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Learn score">
@@ -581,7 +644,7 @@
           </div>
 
           <div class="pc-attr-hex-card">
-            <button type="button" class="attr-label pc-attr-hex-name" data-attr="charisma" data-tooltip="{{blessing.tooltip}}" aria-label="Open Blessing menu"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></button>
+            <div class="attr-label pc-attr-hex-name"><span class="{{#if isBlessed.charisma}}blessed{{/if}}">CHA</span></div>
             <div class="pc-attr-hex-frame">
               {{#if @root.editable}}
                 <input type="number" name="system.charisma" value="{{source.system.charisma}}" class="attr-input pc-attr-hex-score-input pc-input" min="0" max="9" data-dtype="Number" inputmode="numeric" pattern="[+=\-]?\d*" aria-label="Charisma score">

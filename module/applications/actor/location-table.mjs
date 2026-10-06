@@ -302,7 +302,8 @@ export async function drawLocationTableLikeMacro({
   workflowId = "",
   revision = 0,
   replacementOfMessageId = null,
-  workflow = null
+  workflow = null,
+  roll = null
 } = {}) {
   const table = getLocationRollTable();
   if (!table) {
@@ -313,7 +314,7 @@ export async function drawLocationTableLikeMacro({
   let hookId = registerLocationArmorPenChatHook();
 
   try {
-    const draw = await table.draw({ displayChat: false });
+    const draw = await table.draw({ displayChat: false, ...(roll ? { roll } : {}) });
     const firstResult = Array.isArray(draw?.results) ? draw.results[0] : null;
     const rawText = getTableResultLabel(firstResult);
     if (!rawText) {

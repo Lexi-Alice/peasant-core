@@ -5,7 +5,7 @@ export async function rollExplodingD6() {
   return [value];
 }
 
-export async function rollPeasantCriticalExplosion(dice) {
+export async function rollPeasantCriticalExplosion(dice, { explosionDice = null } = {}) {
   const first = Number(dice?.[0]);
   const second = Number(dice?.[1]);
   const isCriticalSuccess = first === 6 && second === 6;
@@ -22,7 +22,14 @@ export async function rollPeasantCriticalExplosion(dice) {
     };
   }
 
-  const extraDice = await rollExplodingD6();
+  const extraDice = [];
+  if (Array.isArray(explosionDice)) {
+    for (const value of explosionDice) {
+      extraDice.push(value);
+      if (value !== 6) break;
+    }
+  }
+  if (!extraDice.length || extraDice.at(-1) === 6) extraDice.push(...await rollExplodingD6());
   const sign = isCriticalSuccess ? 1 : -1;
   const total = extraDice.reduce((sum, value) => sum + value, 0);
   return {

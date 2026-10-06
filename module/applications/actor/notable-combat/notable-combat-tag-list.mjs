@@ -1,6 +1,6 @@
 import { escapeHtml } from "../../../utils/chat.mjs";
 
-export function renderNotableCombatTagList($list, activeTags, { editable = true, provisionalTag = null } = {}) {
+export function renderNotableCombatTagList($list, activeTags, { editable = true, interactable = editable, provisionalTag = null } = {}) {
   $list.empty();
 
   const rows = provisionalTag ? [...activeTags, provisionalTag] : activeTags;
@@ -22,20 +22,20 @@ export function renderNotableCombatTagList($list, activeTags, { editable = true,
       : "";
 
     const summaryContent = `
-      ${editable ? '<span class="pc-skill-tag-disclosure" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>' : ""}
+      ${interactable ? '<span class="pc-skill-tag-disclosure" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>' : ""}
       <span class="pc-skill-tag-name-line"><span class="pc-skill-tag-name">${escapeHtml(row.label)}</span>${condition}</span>
       ${summary}
     `;
-    const summaryControl = editable
-      ? `<button type="button" class="pc-skill-tag-row-summary" data-pc-tag-edit data-tooltip="Edit ${escapeHtml(row.label)}" aria-label="Edit ${escapeHtml(row.label)}">${summaryContent}</button>`
+    const summaryControl = interactable
+      ? `<button type="button" class="pc-skill-tag-row-summary" data-pc-tag-edit data-tooltip="Expand ${escapeHtml(row.label)}" aria-label="Expand ${escapeHtml(row.label)}">${summaryContent}</button>`
       : `<div class="pc-skill-tag-row-summary">${summaryContent}</div>`;
-    const rowControls = editable && !provisional ? `
+    const rowControls = interactable && !provisional ? `
       <button type="button" class="pc-inventory-menu-toggle header-control icon fa-solid fa-ellipsis-vertical"
         data-pc-tag-menu data-tooltip="Detail Options" aria-label="Detail Options"></button>
     ` : "";
 
     $list.append($(`
-      <div class="current-tag-item${draggable ? " editor-tag-draggable" : ""} pc-skill-tag-row${editable ? "" : " pc-skill-tag-row-readonly"}${provisional ? " pc-skill-tag-row-provisional" : ""}"
+      <div class="current-tag-item${draggable ? " editor-tag-draggable" : ""} pc-skill-tag-row${interactable ? "" : " pc-skill-tag-row-readonly"}${provisional ? " pc-skill-tag-row-provisional" : ""}"
         data-tag-type="${escapeHtml(row.type)}"
         data-tag-key="${escapeHtml(row.key || row.type)}"
         data-tag-index="${index}"${customIndexAttr}${customIdAttr}${provisional ? " data-pc-tag-provisional" : ""}${draggable ? ' draggable="true"' : ""}>

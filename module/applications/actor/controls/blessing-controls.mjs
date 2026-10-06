@@ -1,19 +1,51 @@
 import { pcLog } from "../../../utils/logging.mjs";
-import { delegate, qs, qsa, toElement } from "../../dom.mjs";
-import { renderSheetResourceDialog } from "./resource-dialogs.mjs";
+import { delegate, qsa, toElement } from "../../dom.mjs";
 import { computeBaseAttrToHits } from "../../../data/actor/attributes.mjs";
 import { applyToHitFloor } from "../../../dice/roll-targets.mjs";
+import { createSheetUpdateQueue } from "./sheet-listener-helpers.mjs";
 
 export function setupBlessingControls(sheet, html) {
-  delegate(html, "click", ".attr-label[data-attr] > span, .attr-label[data-attr]", (ev, target) => {
-    ev.preventDefault();
-    ev.stopPropagation();
+  const enqueueSheetUpdate = createSheetUpdateQueue(sheet);
+  for (const input of qsa(html, ".pc-blessing-choice")) {
+    input.addEventListener("change", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!sheet.isEditMode) return;
 
-    if (!sheet.isEditMode) return;
+      const type = input.checked ? input.dataset.blessingType : "";
+      for (const choice of qsa(html, ".pc-blessing-choice")) {
+        choice.checked = choice.dataset.blessingType === type;
+      }
+      try {
+        await enqueueSheetUpdate("_blessingSaveQueue", "Blessing", () => sheet.actor.setPeasantBlessing(type));
+      } catch (err) {
+        console.warn("Failed to save blessing:", err);
+        for (const choice of qsa(html, ".pc-blessing-choice")) {
+          choice.checked = choice.dataset.blessingType === sheet.actor.system.blessing?.type;
+        }
+        globalThis.ui?.notifications?.warn?.("Failed to save blessing. See console for details.");
+      }
+    });
+  }
 
-    const label = target.closest(".attr-label[data-attr]");
-    openBlessingDialog(sheet, label);
-  });
+  for (const input of qsa(html, ".pc-fall-blessing-uses-input")) {
+    input.addEventListener("change", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!sheet.isEditMode || sheet.actor.system.blessing?.type !== "fall") return;
+
+      const field = input.dataset.fallUseField;
+      const value = input.value;
+      try {
+        const uses = await enqueueSheetUpdate("_blessingSaveQueue", "Blessing of Fall uses", () => sheet.actor.setPeasantFallBlessingUses({ [field]: value }));
+        if (input.value === value) input.value = String(uses[field]);
+      } catch (err) {
+        console.warn("Failed to save Blessing of Fall uses:", err);
+        input.value = String(sheet.actor.system.fallBlessingUses?.[field] ?? 0);
+        globalThis.ui?.notifications?.warn?.("Failed to save Blessing of Fall uses. See console for details.");
+      }
+    });
+  }
 
   delegate(html, "click", ".characteristic-label", async (ev, target) => {
     try {
@@ -34,87 +66,6 @@ export function setupBlessingControls(sheet, html) {
     }
   });
 
-}
-
-function openBlessingDialog(sheet, trigger) {
-  const blessing = sheet.actor.system.blessing || { type: "" };
-  const fallUses = sheet.actor.system.fallBlessingUses || { value: 0, max: 1 };
-  return renderSheetResourceDialog(sheet, "blessing", {
-    title: "Blessings",
-    content: `
-      <div class="pc-resource-form pc-blessing-form">
-        <div class="pc-blessing-grid">
-          ${renderBlessingOption("spring", "Blessing of Spring", blessing.type)}
-          ${renderBlessingOption("summer", "Blessing of Summer", blessing.type)}
-          ${renderBlessingOption("fall", "Blessing of Fall", blessing.type)}
-          ${renderBlessingOption("winter", "Blessing of Winter", blessing.type)}
-        </div>
-        <div class="pc-blessing-grid pc-blessing-fall-uses"${blessing.type === "fall" ? "" : " hidden"}>
-          <label><span>Uses</span><input type="number" name="fallBlessingUsesValue" value="${Math.max(0, Number(fallUses.value) || 0)}" min="0" step="1" inputmode="numeric"></label>
-          <label><span>Maximum</span><input type="number" name="fallBlessingUsesMax" value="${Math.max(0, Number(fallUses.max) || 0)}" min="0" step="1" inputmode="numeric"></label>
-        </div>
-      </div>
-    `,
-    buttons: {
-      apply: {
-        icon: "fa-solid fa-check",
-        label: "Apply",
-        default: true,
-        callback: async (html) => {
-          const form = qs(html, ".pc-blessing-form");
-          const chosenType = qs(form, "input[name=blessingType]:checked")?.value || "";
-          await sheet.actor.setPeasantBlessing?.(chosenType);
-          if (chosenType === "fall") {
-            await sheet.actor.setPeasantFallBlessingUses?.({
-              value: qs(form, "input[name=fallBlessingUsesValue]")?.value,
-              max: qs(form, "input[name=fallBlessingUsesMax]")?.value
-            });
-          }
-          return true;
-        }
-      },
-      clear: {
-        icon: "fa-solid fa-eraser",
-        label: "Clear",
-        callback: async () => {
-          try {
-            await sheet.actor.clearPeasantBlessing?.();
-          } catch (err) {
-            console.warn("Failed to clear blessing:", err);
-            return false;
-          }
-          return true;
-        }
-      }
-    },
-    default: "apply",
-    render: (html) => {
-      for (const input of qsa(html, "input[name=blessingType]")) {
-        input.addEventListener("change", (ev) => {
-          if (!ev.currentTarget.checked) return;
-          for (const otherInput of qsa(html, "input[name=blessingType]")) {
-            if (otherInput !== ev.currentTarget) otherInput.checked = false;
-          }
-          const fallFields = qs(html, ".pc-blessing-fall-uses");
-          if (fallFields) fallFields.hidden = ev.currentTarget.value !== "fall";
-        });
-      }
-    }
-  }, trigger, {
-    width: 360,
-    height: 280,
-    classes: ["pc-blessing-dialog"]
-  });
-}
-
-function renderBlessingOption(type, label, selectedType) {
-  const checked = type === selectedType ? " checked" : "";
-  return `
-    <label>
-      <input type="checkbox" name="blessingType" value="${type}"${checked}>
-      <span>${label}</span>
-    </label>
-  `;
 }
 
 function updateCharacteristicToHitDisplay(sheet, html, newTarget) {

@@ -74,17 +74,17 @@ assert.equal(
 const identityData = {};
 prepareActorIdentityContext(identityData, {
   system: {
-    race: "Custom",
-    customRace: "River Clan",
+    finalHeraldry: "Custom",
+    customFinalHeraldry: "River Clan",
     origin: "Grimmstad",
     specificOrigin: "Soldier"
   }
 }, { isEditMode: false });
-assert.equal(identityData.displayRace, "River Clan");
-assert.equal(identityData.customRaceSelected, true);
+assert.equal(identityData.displayFinalHeraldry, "River Clan");
+assert.equal(identityData.customFinalHeraldrySelected, true);
 
 const actorSheetTemplate = readFileSync(new URL("../templates/actor/character-sheet.html", import.meta.url), "utf8");
-assert.match(actorSheetTemplate, /<select name="system\.race"/);
-assert.match(actorSheetTemplate, /name="system\.customRace"[^>]*placeholder="Custom heraldry"/);
+assert.match(actorSheetTemplate, /<select name="system\.finalHeraldry"/);
+assert.match(actorSheetTemplate, /name="system\.customFinalHeraldry"[^>]*placeholder="Custom Final Heraldry"/);
 
 delete globalThis.game;

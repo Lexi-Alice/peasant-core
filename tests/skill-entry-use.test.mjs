@@ -205,7 +205,6 @@ const armorSource = {
   stamina: { value: 3, max: 4 },
   armorCharge: { value: 0, max: 2 }
 };
-let armorRechargeCalls = 0;
 const armorActor = {
   id: "armor-actor",
   uuid: "Actor.armor-actor",
@@ -220,14 +219,6 @@ const armorActor = {
   },
   items: [],
   ensurePeasantEntryIds: async () => ({ ok: true, changed: false }),
-  rechargePeasantArmorCharges: async () => {
-    armorRechargeCalls += 1;
-    const staminaBefore = armorSource.stamina.value;
-    const armorChargeBefore = armorSource.armorCharge.value;
-    armorSource.stamina.value -= 2;
-    armorSource.armorCharge.value = 2;
-    return { ok: true, changed: true, value: 2, capacity: 2, staminaBefore, armorChargeBefore };
-  },
   consumePeasantEntryUses: async () => ({ ok: true, changed: false }),
   update: async (patch) => applyPatch(armorSource, patch),
   canUserModify: () => true
@@ -238,26 +229,21 @@ const armorUse = await startPeasantEntryUse({
   actor: armorActor,
   ref: { collection: "skills", entryId: "armor-skill" }
 });
-assert.equal(armorRechargeCalls, 1, "the base Martial / Defense / Armor use calls the recharge action");
-assert.equal(armorSource.stamina.value, 1);
-assert.equal(armorSource.armorCharge.value, 2);
-assert.equal(skillRollFormulas.length, rollsBeforeArmorUse, "the base Armor skill use does not make a generic Skill check");
-assert.match(armorUse.chatMessage.content, /Armor Charge/);
-const armorUndoRecords = armorUse.chatMessage.getFlag("peasant-core", "rollUndo").records;
-assert.equal(armorUndoRecords.length, 1, "the recharge chat card carries the actor undo record");
+assert.equal(armorUse.rolled, true, "the base Armor skill follows its normal Check resolution");
+assert.equal(skillRollFormulas.length, rollsBeforeArmorUse + 1);
+assert.equal(armorSource.stamina.value, 3, "using Armor does not impose a recharge Stamina cost");
+assert.equal(armorSource.armorCharge.value, 0, "using Armor does not refill manual charges");
+assert.match(armorUse.rollResult.chatMessage.content, /Armor Skill Roll/);
 const { applyRollUndoRecords } = await import("../module/applications/chat-undo.mjs");
-assert.equal((await applyRollUndoRecords(armorUndoRecords)).ok, true);
-assert.equal(armorSource.stamina.value, 3, "chat undo restores the spent Stamina");
-assert.equal(armorSource.armorCharge.value, 0, "chat undo restores the previous Armor Charge value");
 
-const rechargeCallsBeforeCustomUse = armorRechargeCalls;
 const customArmorCheck = await startPeasantEntryUse({
   actor: armorActor,
   ref: { collection: "skills", entryId: "armor-skill" },
   usageId: "custom-check"
 });
 assert.equal(customArmorCheck.rolled, true, "an authored non-base Armor usage keeps its Check resolution");
-assert.equal(armorRechargeCalls, rechargeCallsBeforeCustomUse);
+assert.equal(armorSource.stamina.value, 3);
+assert.equal(armorSource.armorCharge.value, 0);
 
 source.skills[0].rank = "u";
 source.skills[0].usesCurrent = 1;
@@ -864,6 +850,24 @@ const postExplosionAutomatic = criticalAutomaticMessage.getFlag("peasant-core", 
 assert.notEqual(postExplosionAutomatic.operationId, preExplosionAutomaticId);
 assert.equal(postExplosionAutomatic.status, "applied");
 assert.equal(generatedOfferEffects.size, 2, "Successful replay replaces rather than duplicates its copy");
+
+const { getMatchingDefenseNotables, resolveSelectedDefenseCombat } = await import("../module/data/actor/defense-favorites.mjs");
+const usageDefense = {
+  id: "ward",
+  name: "Ward",
+  defense: { responses: ["Projectile"], block: false },
+  usages: [{
+    id: "shield",
+    name: "Shield Block",
+    mechanics: { defense: { responses: ["Melee"], block: true, blockType: "Shield", hardness: 5 } },
+    rollOverrides: {}
+  }]
+};
+const meleeDefenses = getMatchingDefenseNotables({ system: { notableCombats: [usageDefense] } }, "Melee");
+assert.deepEqual(meleeDefenses.map(({ usageId }) => usageId), ["shield"], "alternate defense usages are selectable");
+assert.equal(resolveSelectedDefenseCombat([usageDefense], {
+  selectedCombatId: "ward", selectedUsageId: "shield"
+})?.defense.hardness, 5, "incoming damage resolves the selected usage instead of the base defense");
 
 delete globalThis.ChatMessage;
 delete globalThis.fromUuid;

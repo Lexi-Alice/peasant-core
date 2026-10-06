@@ -2,10 +2,12 @@ import { HPGridModel } from "./hp-model.mjs";
 import { normalizeCustomTagEntry, normalizeRangeRateValue } from "./combat-tags.mjs";
 import { normalizeHaltValues } from "./combat-modifiers.mjs";
 import { parseOptionalInteger } from "./helpers.mjs";
+import { getFlexibleAdvantageDescription } from "./flexible-advantages.mjs";
 import { createSkillEditorFields, createSkillMechanicFields } from "./skill-entry-fields.mjs";
 import {
   DEFAULT_SIR_LOCATIONS,
   getSirLocationEntries,
+  migrateLegacyHeraldryData,
   normalizeSirValue,
   normalizeSirValueMap
 } from "./identity-options.mjs";
@@ -13,7 +15,13 @@ const { fields } = foundry.data;
 
 export class PeasantCharacterModel extends foundry.abstract.DataModel {
   static migrateData(source) {
-    const data = super.migrateData(source);
+    // Foundry's loading hook requires this conversion in place, before schema cleaning.
+    if (Array.isArray(source.flexibleAdvantageDescriptions)) {
+      source.flexibleAdvantageDescriptions = source.flexibleAdvantageDescriptions.map(entry => ({
+        description: getFlexibleAdvantageDescription(entry)
+      }));
+    }
+    const data = migrateLegacyHeraldryData(super.migrateData(source));
     const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object ?? {}, key);
     const migrateOptionalNumbers = (entry) => {
       if (!entry || typeof entry !== "object") return entry;
@@ -154,6 +162,7 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       portraitOffsetX: new fields.NumberField({ initial: 0, integer: true }),
       portraitOffsetY: new fields.NumberField({ initial: 0, integer: true }),
       portraitScale: new fields.NumberField({ initial: 1, min: 0.1, max: 5 }),
+      scale: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
       
       // HALT & Hard Locations
       haltValues: new fields.ArrayField(new fields.NumberField({ integer: true, min: 0, initial: 0 }), { initial: [0, 0, 0, 0] }),
@@ -169,8 +178,12 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       naturalHardLegs: new fields.BooleanField({ initial: false }),
       naturalHardTorso: new fields.BooleanField({ initial: false }),
       
-      race: new fields.StringField({ initial: "Human" }),
-      customRace: new fields.StringField({ initial: "" }),
+      majorHeraldry: new fields.StringField({ initial: "" }),
+      customMajorHeraldry: new fields.StringField({ initial: "" }),
+      minorHeraldry: new fields.StringField({ initial: "" }),
+      customMinorHeraldry: new fields.StringField({ initial: "" }),
+      finalHeraldry: new fields.StringField({ initial: "Human" }),
+      customFinalHeraldry: new fields.StringField({ initial: "" }),
       origin: new fields.StringField({ initial: "Grimmstad" }),
       customOrigin: new fields.StringField({ initial: "" }),
       specificOrigin: new fields.StringField({ initial: "Soldier" }),
@@ -301,7 +314,10 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
       }), { initial: [] }),
       // Flexible Advantages
       flexibleAdvantages: new fields.ArrayField(new fields.StringField(), { initial: [] }),
-      flexibleAdvantageDescriptions: new fields.ArrayField(new fields.HTMLField({ initial: "" }), { initial: [] }),
+      // Foundry 14's server sanitizer requires HTML array entries to be object rows.
+      flexibleAdvantageDescriptions: new fields.ArrayField(new fields.SchemaField({
+        description: new fields.HTMLField({ initial: "" })
+      }), { initial: [] }),
       // Inventory
       currency: new fields.SchemaField({
         gp: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
@@ -392,6 +408,8 @@ export class PeasantCharacterModel extends foundry.abstract.DataModel {
         effectIds: new fields.ArrayField(new fields.StringField({ initial: "" }), { initial: [] }),
         tohit: new fields.NumberField({ integer: true, min: 1, nullable: true, initial: null }),
         accuracy: new fields.NumberField({ integer: true, nullable: true, initial: null }),
+        ap: new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }),
+        sp: new fields.NumberField({ integer: true, min: 0, nullable: true, initial: null }),
         indent: new fields.NumberField({ integer: true, min: 0, initial: 0 }),
         description: new fields.HTMLField({ initial: "" }),
         ...createSkillMechanicFields(fields),

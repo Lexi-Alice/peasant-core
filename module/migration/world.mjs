@@ -1,5 +1,7 @@
 ﻿// Peasant Core world migrations
 import { normalizeHaltValues } from "../data/actor/combat-modifiers.mjs";
+import { applyOverchargedEffect, isOverchargedEffect } from "../data/active-effect/overcharged.mjs";
+import { clonePlainValue, getActorSourceSystem, withPeasantActorStateWriteContext } from "../data/actor/source-system.mjs";
 import {
   MANIFEST_SPELL_EFFECT_CHANGE_KEYS,
   buildManifestSpellEffectChanges,
@@ -18,10 +20,11 @@ import { getNotableCombatEffectImage } from "../data/actor/notable-combat-image.
 import { parseOptionalInteger } from "../data/actor/helpers.mjs";
 import { isSignatureSkillType, normalizeSkillTypeForCategory } from "../data/actor/skill-entry-types.mjs";
 import { normalizeLegacySkillEffectLink } from "../data/actor/skill-entries.mjs";
-import { getActiveArmorChargeCapacity } from "../data/actor/active-armor.mjs";
 import {
   DEFAULT_SIR_LOCATIONS,
   PC_CUSTOM_SIR_LOCATION_VALUES_FLAG,
+  migrateHeraldryEffectChanges,
+  migrateLegacyHeraldryData,
   normalizeSirValue,
   normalizeSirValueMap
 } from "../data/actor/identity-options.mjs";
@@ -53,7 +56,9 @@ const PC_WORLD_MIGRATION_MAGE_BLOCK_SINGLE_EFFECT = 23;
 const PC_WORLD_MIGRATION_MAGE_BLOCK_ZERO_HP_CLEANUP = PC_WORLD_MIGRATION_MAGE_BLOCK_SINGLE_EFFECT + 1;
 const PC_WORLD_MIGRATION_USAGE_EFFECT_AUTOMATION = PC_WORLD_MIGRATION_MAGE_BLOCK_ZERO_HP_CLEANUP + 1;
 const PC_WORLD_MIGRATION_REMOVE_SHARED_TAGS = PC_WORLD_MIGRATION_USAGE_EFFECT_AUTOMATION + 1;
-const PC_WORLD_MIGRATION_LATEST = PC_WORLD_MIGRATION_REMOVE_SHARED_TAGS;
+const PC_WORLD_MIGRATION_HERALDRY = PC_WORLD_MIGRATION_REMOVE_SHARED_TAGS + 1;
+const PC_WORLD_MIGRATION_OVERCHARGED_EFFECT = PC_WORLD_MIGRATION_HERALDRY + 1;
+const PC_WORLD_MIGRATION_LATEST = PC_WORLD_MIGRATION_OVERCHARGED_EFFECT;
 const PC_CHARACTER_TYPES = new Set(["character"]);
 const PC_REMOVED_CHARACTER_EXPERIMENTAL_TYPE = "characterExperimental";
 
@@ -201,14 +206,6 @@ export function getE5CombatStateMigrationUpdate(actorSource, { skills, notableCo
   }
 
   const skillEntries = skills ?? system.skills;
-  const items = Array.isArray(source.items) ? source.items : Array.from(actorSource?.items ?? []);
-  const armorCapacity = getActiveArmorChargeCapacity({ system: { ...system, skills: skillEntries }, items });
-  const armorCharge = {
-    value: Math.min(armorCapacity, normalizeMigrationInteger(system.armorCharge?.value)),
-    max: armorCapacity
-  };
-  if (!valuesEqual(system.armorCharge, armorCharge)) update["system.armorCharge"] = armorCharge;
-
   if (Object.hasOwn(system, "blessing")) {
     const blessing = normalizeBlessingMigrationValue(system.blessing);
     if (!valuesEqual(system.blessing, blessing)) update["system.blessing"] = blessing;
@@ -822,6 +819,154 @@ function migrateNotableCombatDefenseBlockTypes(rawCombats) {
   return { combats, changed };
 }
 
+async function migrateWorldHeraldryData() {
+  let hadFailures = false;
+  const documents = new Set([...(game.actors ?? []), ...(game.items ?? [])]);
+  const actorDeltas = new Map();
+  for (const scene of game.scenes ?? []) {
+    for (const token of scene.tokens ?? []) {
+      if (token.actorLink || !token.actor) continue;
+      if (token.delta && isPeasantCharacterType(token.actor.type)) {
+        try {
+          // A legacy override can be hidden by a canonical field inherited from the base Actor.
+          const rawSystem = token.delta._source?.system ?? {};
+          const system = migrateLegacyHeraldryData(rawSystem);
+          const update = {};
+          for (const [legacy, canonical] of [["race", "finalHeraldry"], ["customRace", "customFinalHeraldry"]]) {
+            if (!Object.hasOwn(rawSystem, legacy) && !Object.hasOwn(rawSystem, canonical)) continue;
+            update[`system.${canonical}`] = system[canonical];
+            update[`system.-=${legacy}`] = null;
+          }
+          if (Object.keys(update).length && !(await token.delta.update(update, { render: false, diff: false }))) {
+            throw new Error("Heraldry token update returned no document");
+          }
+        } catch (err) {
+          hadFailures = true;
+          console.error(`Peasant Core | Failed to migrate Heraldry for token ${token.name}:`, err);
+        }
+        actorDeltas.set(token.actor, token.delta);
+      }
+      documents.add(token.actor);
+    }
+  }
+  for (const document of [...documents]) {
+    const delta = actorDeltas.get(document);
+    for (const item of document.items ?? []) {
+      if (!delta || delta._source?.items?.some(source => !source._tombstone && source._id === (item.id ?? item._id))) {
+        documents.add(item);
+      }
+    }
+  }
+
+  for (const document of documents) {
+    try {
+      if (isPeasantCharacterType(document.type) && !actorDeltas.has(document)) {
+        const rawSystem = document._source?.system ?? document.system ?? {};
+        const defaults = {
+          majorHeraldry: "", customMajorHeraldry: "",
+          minorHeraldry: "", customMinorHeraldry: "",
+          finalHeraldry: "Human", customFinalHeraldry: ""
+        };
+        if (["race", "customRace", ...Object.keys(defaults)].some(key => Object.hasOwn(rawSystem, key))) {
+          const system = migrateLegacyHeraldryData(rawSystem);
+          // Persist canonical fields even when the load-time model migration has already renamed them.
+          const update = Object.fromEntries(Object.entries(defaults).map(([key, initial]) => [`system.${key}`, system[key] ?? initial]));
+          for (const legacy of ["race", "customRace"]) {
+            update[`system.-=${legacy}`] = null;
+          }
+          if (!(await document.update(update, { render: false, diff: false }))) {
+            throw new Error("Heraldry actor update returned no document");
+          }
+        }
+      }
+      const effectSources = actorDeltas.has(document) ? actorDeltas.get(document)._source?.effects ?? [] : getRawActorEffects(document);
+      const effectUpdates = effectSources
+        .filter(effect => (effect.system?.changes ?? effect.changes)?.some(change => /^system\.(?:race|customRace|finalHeraldry|customFinalHeraldry)$/.test(change.key)))
+        .map(effect => ({ _id: effect._id ?? effect.id, "system.changes": migrateHeraldryEffectChanges(effect.system?.changes ?? effect.changes) }));
+      if (effectUpdates.length) {
+        const updated = await document.updateEmbeddedDocuments("ActiveEffect", effectUpdates, { render: false, diff: false });
+        if (effectUpdates.some(update => !updated?.some(effect => (effect.id ?? effect._id) === update._id))) {
+          throw new Error("Heraldry effect update returned missing documents");
+        }
+      }
+    } catch (err) {
+      hadFailures = true;
+      console.error(`Peasant Core | Failed to migrate Heraldry for ${document.name}:`, err);
+    }
+  }
+  return !hadFailures;
+}
+
+function getOverchargedEffectSources(actor) {
+  return Array.from(actor.effects ?? []).filter(isOverchargedEffect)
+    .map(effect => clonePlainValue(effect.toObject?.() ?? effect._source));
+}
+
+async function restoreOverchargedEffects(actor, beforeEffects) {
+  const beforeIds = new Set(beforeEffects.map(source => source._id));
+  const effects = Array.from(actor.effects ?? []).filter(isOverchargedEffect);
+  const newIds = effects.filter(effect => !beforeIds.has(effect.id)).map(effect => effect.id);
+  if (newIds.length) await actor.deleteEmbeddedDocuments("ActiveEffect", newIds);
+  const updates = beforeEffects.filter(source => {
+    const effect = effects.find(effect => effect.id === source._id);
+    return effect && !valuesEqual(source, effect.toObject?.() ?? effect._source);
+  });
+  if (updates.length) {
+    await actor.updateEmbeddedDocuments("ActiveEffect", updates, { render: false, diff: false, recursive: false });
+  }
+}
+
+async function migrateWorldOverchargedEffects() {
+  const actors = new Set(game.actors ?? []);
+  const falseTokenStates = new Map();
+  for (const scene of game.scenes ?? []) {
+    for (const token of scene.tokens ?? []) {
+      const actor = token.actor;
+      if (token.actorLink || !actor || !isPeasantCharacterType(actor.type)) continue;
+      actors.add(actor);
+      if (actor.system?.conditions?.overcharged !== true) {
+        falseTokenStates.set(actor, getOverchargedEffectSources(actor));
+      }
+    }
+  }
+  // Snapshot synthetic actors before clearing a flag inherited from their base Actor.
+  const legacyActorStates = new Map([...actors]
+    .filter(actor => isPeasantCharacterType(actor.type) && getActorSourceSystem(actor).conditions?.overcharged === true)
+    .map(actor => [actor, getOverchargedEffectSources(actor)]));
+  let hadFailures = false;
+  for (const actor of legacyActorStates.keys()) {
+    try {
+      await applyOverchargedEffect(actor);
+    } catch (err) {
+      hadFailures = true;
+      console.error(`Peasant Core | Failed to migrate Overcharged for ${actor.name}:`, err);
+    }
+  }
+  // ActorDelta inherits newly created/enabled base effects, including on tokens with a saved false override.
+  for (const [actor, beforeEffects] of falseTokenStates) {
+    try {
+      await restoreOverchargedEffects(actor, beforeEffects);
+    } catch (err) {
+      hadFailures = true;
+      console.error(`Peasant Core | Failed to preserve Overcharged for token ${actor.name}:`, err);
+    }
+  }
+  if (hadFailures) {
+    // Retain the legacy state on failure so the next attempt can recover the same token overrides.
+    for (const [actor, beforeEffects] of legacyActorStates) {
+      try {
+        await restoreOverchargedEffects(actor, beforeEffects);
+        if (getActorSourceSystem(actor).conditions?.overcharged !== true) {
+          await actor.update({ "system.conditions.overcharged": true }, withPeasantActorStateWriteContext());
+        }
+      } catch (err) {
+        console.error(`Peasant Core | Failed to roll back Overcharged migration for ${actor.name}:`, err);
+      }
+    }
+  }
+  return !hadFailures;
+}
+
 export async function migrateWorldNotableCombatData() {
   if (!game.user?.isGM) return;
 
@@ -1150,6 +1295,14 @@ export async function migrateWorldNotableCombatData() {
       hadFailures = true;
       console.error(`Peasant Core | Failed to migrate actor data for ${actor.name}:`, err);
     }
+  }
+
+  if (currentVersion < PC_WORLD_MIGRATION_HERALDRY) {
+    if (!(await migrateWorldHeraldryData())) hadFailures = true;
+  }
+
+  if (currentVersion < PC_WORLD_MIGRATION_OVERCHARGED_EFFECT) {
+    if (!(await migrateWorldOverchargedEffects())) hadFailures = true;
   }
 
   if (!hadFailures) {

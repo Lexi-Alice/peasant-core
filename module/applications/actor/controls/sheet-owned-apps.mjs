@@ -10,8 +10,9 @@ export function renderSheetOwnedApplication(sheet, key, application, renderOptio
   if (typeof application.close === "function") {
     const closeApplication = application.close.bind(application);
     application.close = async (...args) => {
-      if (sheet[OWNED_APPS_PROPERTY]?.[key] === application) delete sheet[OWNED_APPS_PROPERTY][key];
-      return closeApplication(...args);
+      const result = await closeApplication(...args);
+      if (result !== false && sheet[OWNED_APPS_PROPERTY]?.[key] === application) delete sheet[OWNED_APPS_PROPERTY][key];
+      return result;
     };
   }
 
@@ -23,7 +24,6 @@ export function renderSheetOwnedApplication(sheet, key, application, renderOptio
 export function closeSheetOwnedApplication(sheet, key, closeOptions = {}) {
   const application = sheet?.[OWNED_APPS_PROPERTY]?.[key];
   if (!application) return;
-  delete sheet[OWNED_APPS_PROPERTY][key];
   if (typeof application.close === "function") application.close(closeOptions);
 }
 
@@ -31,8 +31,7 @@ export function closeSheetOwnedApplications(sheet) {
   const applications = sheet?.[OWNED_APPS_PROPERTY];
   if (!applications) return;
 
-  for (const [key, application] of Object.entries(applications)) {
-    delete applications[key];
+  for (const application of Object.values(applications)) {
     if (typeof application?.close === "function") application.close({ ownedSheetClosing: true });
   }
 }

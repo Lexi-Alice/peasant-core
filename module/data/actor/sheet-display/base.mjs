@@ -20,6 +20,7 @@ import {
 } from "../combat-modifiers.mjs";
 import {
   EDGE_LABEL_MODE_CUSTOM,
+  getActorEdgeLabelMode,
   getDefaultEdgeLabelMode,
   normalizeEdgeResourceEntry,
   resolveEdgeLabel,
@@ -28,6 +29,8 @@ import {
 import { getActorBolsteredMax, getActorHealthMax, isSimplifiedHpActor } from "../helpers.mjs";
 import {
   getDefaultNationalOriginLabel,
+  getFinalHeraldryOptions,
+  getHeraldryOptionGroups,
   getNationalOriginOptions,
   getSirLocationRows,
   resolveNationalOriginLabel
@@ -43,11 +46,11 @@ import {
   getPeasantCoreSettingGroups
 } from "../sheet-settings.mjs";
 import { formatOptionalIntegerInput, hasOptionalInteger } from "../helpers.mjs";
+import { normalizeScaleRating } from "../damage.mjs";
 import { getWoundThresholdMultipliers } from "../targeted-damage.mjs";
 import { applyDieRate, hasCombatDice } from "../../../dice/combat-dice.mjs";
 import { applyToHitAccuracy, applyToHitFloor } from "../../../dice/roll-targets.mjs";
 import { addEquippedArmorHalt, getArmorAdjustedMovement, getEquippedArmorEffects } from "../equipped-armor.mjs";
-import { getUntrainedArmorMovementPenalty } from "../active-armor.mjs";
 
 export function prepareActorSheetBaseContext(data, actor, { isEditable = true, isEditMode = false, sourceSystem = null } = {}) {
   const system = actor?.system ?? {};
@@ -69,22 +72,23 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
     : PC_DEFAULT_SPRINT_MULTIPLIER;
 
   const equippedArmor = getEquippedArmorEffects(actor);
-  const armorMovementPenalty = getUntrainedArmorMovementPenalty(actor);
   data.haltValuesInput = normalizeHaltSlashValue(addEquippedArmorHalt(editSystem?.haltValues, equippedArmor));
   data.naturalHaltValuesInput = normalizeHaltSlashValue(editSystem?.naturalHaltValues || [0, 0, 0, 0]);
   data.combatModsInput = normalizeCombatModsForSheet(editSystem?.combatMods);
+  data.scaleInput = normalizeScaleRating(editSystem?.scale);
+  data.scaleDisplay = normalizeScaleRating(system?.scale);
 
   data.runMultiplier = runMultiplier;
   data.sprintMultiplier = sprintMultiplier;
 
-  const portraitMovement = getArmorAdjustedMovement(system?.movement, equippedArmor, armorMovementPenalty);
+  const portraitMovement = getArmorAdjustedMovement(system?.movement, equippedArmor);
   const initiative = system?.initiative;
   const initiativeInput = editSystem?.initiative;
   const initiativeDisplay = hasOptionalInteger(initiative)
     ? formatOptionalIntegerInput(initiative, { showPlus: true })
     : "+0";
   data.initiativeInput = formatOptionalIntegerInput(initiativeInput, { showPlus: true });
-  data.movementInput = getArmorAdjustedMovement(editSystem?.movement, equippedArmor, armorMovementPenalty);
+  data.movementInput = getArmorAdjustedMovement(editSystem?.movement, equippedArmor);
   data.portraitStats = {
     movement: portraitMovement,
     run: portraitMovement * runMultiplier,
@@ -98,32 +102,43 @@ export function prepareActorSheetBaseContext(data, actor, { isEditable = true, i
 export function prepareActorIdentityContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
   const system = actor?.system ?? {};
   const editSystem = sourceSystem ?? system;
-  const editRaceSelection = resolveCustomSelect(editSystem?.race, editSystem?.customRace);
+  const editMajorHeraldry = resolveCustomSelect(editSystem?.majorHeraldry, editSystem?.customMajorHeraldry);
+  const editMinorHeraldry = resolveCustomSelect(editSystem?.minorHeraldry, editSystem?.customMinorHeraldry);
+  const editFinalHeraldry = resolveCustomSelect(editSystem?.finalHeraldry, editSystem?.customFinalHeraldry);
   const editOriginSelection = resolveCustomSelect(editSystem?.origin, editSystem?.customOrigin);
   const editSpecificOriginSelection = resolveCustomSelect(editSystem?.specificOrigin, editSystem?.customSpecificOrigin);
-  const displayRaceSelection = resolveCustomSelect(system?.race, system?.customRace);
+  const displayMajorHeraldry = resolveCustomSelect(system?.majorHeraldry, system?.customMajorHeraldry);
+  const displayMinorHeraldry = resolveCustomSelect(system?.minorHeraldry, system?.customMinorHeraldry);
+  const displayFinalHeraldry = resolveCustomSelect(system?.finalHeraldry, system?.customFinalHeraldry);
   const displayOriginSelection = resolveCustomSelect(system?.origin, system?.customOrigin);
   const displaySpecificOriginSelection = resolveCustomSelect(system?.specificOrigin, system?.customSpecificOrigin);
-  data.customRaceSelected = editRaceSelection.isCustom;
+  data.customMajorHeraldrySelected = editMajorHeraldry.isCustom;
+  data.customMinorHeraldrySelected = editMinorHeraldry.isCustom;
+  data.customFinalHeraldrySelected = editFinalHeraldry.isCustom;
   data.customOriginSelected = editOriginSelection.isCustom;
   data.customSpecificOriginSelected = editSpecificOriginSelection.isCustom;
-  data.hasCustomIdentitySelection = !!isEditMode && (editRaceSelection.isCustom || editOriginSelection.isCustom || editSpecificOriginSelection.isCustom);
+  data.hasCustomIdentitySelection = !!isEditMode && (editMajorHeraldry.isCustom || editMinorHeraldry.isCustom || editFinalHeraldry.isCustom || editOriginSelection.isCustom || editSpecificOriginSelection.isCustom);
+  data.majorHeraldryGroups = getHeraldryOptionGroups("major", editSystem?.majorHeraldry);
+  data.minorHeraldryGroups = getHeraldryOptionGroups("minor", editSystem?.minorHeraldry);
+  data.finalHeraldryOptions = getFinalHeraldryOptions(editSystem?.finalHeraldry || "Human");
   data.originOptions = getNationalOriginOptions(editSystem?.origin);
-  data.displayRace = displayRaceSelection.display || "Human";
+  data.displayMajorHeraldry = displayMajorHeraldry.display || (displayMajorHeraldry.isCustom ? "" : "Major Heraldry");
+  data.displayMinorHeraldry = displayMinorHeraldry.display || (displayMinorHeraldry.isCustom ? "" : "Minor Heraldry");
+  data.displayFinalHeraldry = displayFinalHeraldry.display || (displayFinalHeraldry.isCustom ? "" : "Human");
   data.displayOrigin = displayOriginSelection.isCustom
     ? displayOriginSelection.display
     : resolveNationalOriginLabel(displayOriginSelection.display);
-  if (!data.displayOrigin) data.displayOrigin = getDefaultNationalOriginLabel();
-  data.displaySpecificOrigin = displaySpecificOriginSelection.display || "Soldier";
+  if (!data.displayOrigin && !displayOriginSelection.isCustom) data.displayOrigin = getDefaultNationalOriginLabel();
+  data.displaySpecificOrigin = displaySpecificOriginSelection.display || (displaySpecificOriginSelection.isCustom ? "" : "Soldier");
 }
 
 export function prepareActorEdgeContext(data, actor, { isEditMode = false, sourceSystem = null } = {}) {
   const system = actor?.system ?? {};
   const editSystem = sourceSystem ?? system;
   const defaultEdgeLabelMode = getDefaultEdgeLabelMode(actor);
-  const edgeLabelMode = sanitizeEdgeLabelMode(system?.edgeLabelMode, defaultEdgeLabelMode);
+  const edgeLabelMode = getActorEdgeLabelMode(actor);
   const edgeCustomLabel = String(system?.edgeCustomLabel ?? "");
-  const editEdgeLabelMode = sanitizeEdgeLabelMode(editSystem?.edgeLabelMode, defaultEdgeLabelMode);
+  const editEdgeLabelMode = getActorEdgeLabelMode(actor, editSystem?.edgeLabelMode);
   const editEdgeCustomLabel = String(editSystem?.edgeCustomLabel ?? "");
   data.edgeLabelMode = edgeLabelMode;
   data.edgeLabelModeInput = editEdgeLabelMode;
@@ -201,6 +216,6 @@ function resolveCustomSelect(baseValue, customValue) {
   const normalizedBase = String(baseValue ?? "").trim();
   const isCustom = /^(custom|other)$/i.test(normalizedBase);
   const customText = String(customValue ?? "").trim();
-  const display = isCustom ? (customText || "Custom") : normalizedBase;
+  const display = isCustom ? customText : normalizedBase;
   return { isCustom, display };
 }

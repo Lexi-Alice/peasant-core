@@ -8,6 +8,8 @@ import {
   getSeizeEligibility
 } from "../data/combat-turn-order.mjs";
 import { pcLog } from "../utils/logging.mjs";
+import { getFallBlessingRollActorRef } from "../applications/combat/edge-chain-rolls.mjs";
+import { resolveActorFromUuidOrId } from "../applications/combat/edge-location-rolls.mjs";
 
 export const PC_SOCKET_NAMESPACE = "system.peasant-core";
 const PC_SOCKET_REQUEST_SEIZE_TURN = "requestSeizeTurn";
@@ -154,13 +156,13 @@ function _initializePeasantSocketlib() {
         });
         return _handleEndTurnRequest(payload);
       });
-      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, async (payload = {}) => {
+      _pcSocketlib.register(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, async function (payload = {}) {
         pcLog.debug("Peasant Core | socketlib Edge Location Roll request received", {
           gm: game.user?.name,
           requester: payload.userId,
           messageId: payload.messageId
         });
-        return _handleEdgeLocationRollRequest(payload);
+        return _handleEdgeLocationRollRequest(payload, this?.socketdata?.userId);
       });
       _pcSocketlib.register(PC_SOCKETLIB_HANDLER_APPLY_SKILL_EFFECT_OFFER, async function (payload = {}) {
         if (!game.user?.isGM) return { ok: false, error: "A GM must process this effect offer." };
@@ -475,6 +477,8 @@ function _getPreferredActiveGM() {
   return activeGMs[0] || null;
 }
 
+export { _getPreferredActiveGM as getPreferredActiveGM };
+
 function _userOwnsCombatant(user, combatant) {
   if (!user || !combatant) return false;
   if (user.isGM) return true;
@@ -720,20 +724,25 @@ async function _handleEndTurnRequest(payload = {}) {
   };
 }
 
-async function _handleEdgeLocationRollRequest(payload = {}) {
+async function _handleEdgeLocationRollRequest(payload = {}, authenticatedRequesterUserId = null) {
   const saveCheck = payload.edgeRollMode === "saveCheck";
   const stress = payload.edgeRollMode === "stress";
   const fallBlessing = payload.edgeRollMode === "fallBlessing";
+  const winter = payload.edgeRollMode === "winter";
   const label = stress
     ? _getStressRollLabel(payload)
-    : (saveCheck ? _getEdgeSaveCheckLabel(payload) : (fallBlessing ? "Blessing of Fall" : "Edge Location Roll"));
+    : (winter ? "Winter's Edge" : (saveCheck ? _getEdgeSaveCheckLabel(payload) : (fallBlessing ? "Blessing of Fall" : "Edge Location Roll")));
   if (!game.user?.isGM) {
     return { ok: false, error: `Only an active GM can process ${label} requests.` };
   }
 
-  const requester = game.users?.get(payload.requesterUserId || payload.userId);
+  if (winter && !authenticatedRequesterUserId) return { ok: false, error: "The Winter's Edge requester could not be verified." };
+  const requester = game.users?.get(winter ? authenticatedRequesterUserId : payload.requesterUserId || payload.userId);
   if (!requester) {
     return { ok: false, error: "Requesting user was not found." };
+  }
+  if (winter && (payload.winter !== true || !Number.isInteger(payload.dieIndex) || !Number.isInteger(payload.newValue))) {
+    return { ok: false, error: "The chosen Winter's Edge die or face was invalid." };
   }
 
   if (saveCheck) {
@@ -765,11 +774,7 @@ async function _handleEdgeLocationRollRequest(payload = {}) {
       && ["skillRoll", "untrainedSkillRoll", "actorSkillRoll", "actorAttributeSkillRoll", "peasantEntryUse"].includes(rerun.type);
     const combatKinds = ["attack", "defense", "heal"].includes(chainFlag?.kind)
       && (rerun.type === "notableCombat" || (rerun.type === "peasantEntryUse" && rerun.usageContext?.resolution === "targeted"));
-    const actorId = String(rerun.actorId || rerun.speaker?.actor || "").trim();
-    let actor = actorId ? game.actors?.get(actorId) || null : null;
-    if (!actor && rerun.actorUuid && typeof fromUuid === "function") {
-      try { actor = await fromUuid(rerun.actorUuid); } catch (_) {}
-    }
+    const actor = await resolveActorFromUuidOrId(getFallBlessingRollActorRef(message));
     if (
       !message
       || chainFlag?.status !== "current"
@@ -786,7 +791,6 @@ async function _handleEdgeLocationRollRequest(payload = {}) {
       || String(actor.system?.blessing?.type || "").trim().toLowerCase() !== "fall"
       || !Number.isSafeInteger(payload.usesSpent)
       || payload.usesSpent < 1
-      || payload.usesSpent > Number(actor.system?.fallBlessingUses?.value || 0)
       || (payload.actorId && payload.actorId !== actor.id)
       || (payload.actorUuid && payload.actorUuid !== actor.uuid)
     ) {
@@ -802,25 +806,29 @@ async function _handleEdgeLocationRollRequest(payload = {}) {
       }
     }
   }
-  const handler = _getPeasantCoreApiFunction(stress
+  const handler = _getPeasantCoreApiFunction(winter
+    ? (game.messages?.get(payload.messageId)?.getFlag?.("peasant-core", "locationRoll") ? "applyEdgeLocationRoll" : "applyEdgeIndividualDieRoll")
+    : (stress
     ? "applyStressRoll"
     : (saveCheck
       ? (payload.individual ? "applyEdgeIndividualDieRoll" : "applyEdgeChainRoll")
-      : (fallBlessing ? "applyFallBlessingAccuracy" : "applyEdgeLocationRoll")));
+      : (fallBlessing ? "applyFallBlessingAccuracy" : "applyEdgeLocationRoll"))));
   if (typeof handler !== "function") {
     return { ok: false, error: `${label} workflow is unavailable.` };
   }
 
   const result = await handler({
     ...payload,
-    requesterUserId: requester.id
+    requesterUserId: requester.id,
+    ...(winter ? { userId: requester.id } : {})
   });
-  if (!saveCheck && !stress && !fallBlessing) return result;
+  if (!saveCheck && !stress && !fallBlessing && !winter) return result;
   return {
     ok: !!result?.ok,
     error: result?.error ? String(result.error) : null,
     messageId: result?.messageId || null,
     summaryMessageId: result?.summaryMessageId || null,
+    ...(winter ? { replacementMessageId: result?.replacementMessageId || null } : {}),
     ...(fallBlessing ? {
       usesSpent: Number.isSafeInteger(result?.usesSpent) ? result.usesSpent : null,
       accuracyBonus: Number.isSafeInteger(result?.accuracyBonus) ? result.accuracyBonus : null
@@ -1004,10 +1012,11 @@ export async function requestEdgeLocationRollFromGM(payload = {}) {
   const saveCheck = payload.edgeRollMode === "saveCheck";
   const stress = payload.edgeRollMode === "stress";
   const fallBlessing = payload.edgeRollMode === "fallBlessing";
-  const extendedResult = saveCheck || stress || fallBlessing;
+  const winter = payload.edgeRollMode === "winter";
+  const extendedResult = saveCheck || stress || fallBlessing || winter;
   const label = stress
     ? _getStressRollLabel(payload)
-    : (saveCheck ? _getEdgeSaveCheckLabel(payload) : (fallBlessing ? "Blessing of Fall" : "Edge Location Roll"));
+    : (winter ? "Winter's Edge" : (saveCheck ? _getEdgeSaveCheckLabel(payload) : (fallBlessing ? "Blessing of Fall" : "Edge Location Roll")));
   const gm = _getPreferredActiveGM();
   if (!gm) {
     return { ok: false, error: `A GM must be online to process ${label}.` };
@@ -1022,9 +1031,9 @@ export async function requestEdgeLocationRollFromGM(payload = {}) {
     requesterUserId: game.user.id
   };
 
-  if (_pcSocketlib?.executeAsGM || _pcSocketlib?.executeAsUser) {
+  if (fallBlessing ? _pcSocketlib?.executeAsUser : (_pcSocketlib?.executeAsGM || _pcSocketlib?.executeAsUser)) {
     try {
-      const result = _pcSocketlib.executeAsGM
+      const result = !fallBlessing && _pcSocketlib.executeAsGM
         ? await _pcSocketlib.executeAsGM(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, requestPayload)
         : await _pcSocketlib.executeAsUser(PC_SOCKETLIB_HANDLER_REQUEST_EDGE_LOCATION_ROLL, gm.id, requestPayload);
       if (result && typeof result === "object" && "ok" in result) return result;
@@ -1038,6 +1047,7 @@ export async function requestEdgeLocationRollFromGM(payload = {}) {
     }
   }
 
+  if (winter) return { ok: false, error: "Winter's Edge requires an active socketlib GM connection." };
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       _pcPendingEdgeLocationRollRequests.delete(requestId);

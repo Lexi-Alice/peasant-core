@@ -47,7 +47,6 @@ assert.deepEqual(
       },
       "flags.peasant-core.-=customSirLocationValues": null,
       "system.devastatingWounds": 0,
-      "system.armorCharge": { value: 0, max: 0 },
       "system.fallBlessingUses": { value: 0, max: 1 }
     },
     options: { render: false }
@@ -56,6 +55,6 @@ assert.deepEqual(
 );
 assert.deepEqual(
   settingUpdates,
-  [{ scope: "peasant-core", key: PC_WORLD_MIGRATION_VERSION_SETTING, value: 26 }],
-  "World migration should advance through zero-HP Mage Block cleanup"
+  [{ scope: "peasant-core", key: PC_WORLD_MIGRATION_VERSION_SETTING, value: 28 }],
+  "World migration should advance through Heraldry identity migration"
 );

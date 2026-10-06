@@ -21,9 +21,8 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
         const rcType = fieldValue(row, ".tag-rc-type");
         const rcValue = fieldInt(row, ".tag-rc-value");
         const rcDmgType = fieldValue(row, ".tag-rc-dmgtype");
-        if (rcType && rcValue > 0) {
-          costs.push({ type: rcType, value: rcValue, damageType: rcDmgType });
-        }
+        if (!rcType || !(rcValue > 0)) return invalidTagData("Complete or remove each resource cost row before leaving.");
+        costs.push({ type: rcType, value: rcValue, damageType: rcDmgType });
       }
       return costs.length > 0 ? validTagData({ resourceCosts: costs }) : invalidTagData();
     }
@@ -78,6 +77,12 @@ export function collectNotableCombatTagData(container, tagType, { combatData = {
       return Number.isFinite(value) && value !== 0
         ? validTagData({ desperate: value })
         : invalidTagData("Desperate requires a nonzero positive or negative integer.");
+    }
+    case "tippingScales": {
+      const penetration = Number(fieldValue(root, ".tag-tipping-scales"));
+      return Number.isInteger(penetration) && penetration > 0
+        ? validTagData({ tippingScales: penetration })
+        : invalidTagData("Tipping Scales requires a positive integer.");
     }
     case "heal": {
       const healDice = fieldInt(root, ".tag-heal-dice", Number.NaN);

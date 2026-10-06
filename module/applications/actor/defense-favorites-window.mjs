@@ -6,7 +6,7 @@ import {
   getMatchingDefenseNotables,
   getPreferredDefenseMatch
 } from "../../data/actor/defense-favorites.mjs";
-import { getDefaultEdgeLabelMode, resolveEdgeLabel, sanitizeEdgeLabelMode } from "../../data/actor/edge-resources.mjs";
+import { getActorEdgeLabelMode, getDefaultEdgeLabelMode, resolveEdgeLabel, sanitizeEdgeLabelMode } from "../../data/actor/edge-resources.mjs";
 import { getActorHealthMax } from "../../data/actor/helpers.mjs";
 import { PC_DEFENSE_FAVORITES_FLAG } from "../../data/actor/sheet-settings.mjs";
 
@@ -83,6 +83,7 @@ class PeasantDefenseFavoritesWindow extends DefenseFavoritesWindowBase {
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
+    await this.sheet?.actor?.ensurePeasantEntryIds?.("notableCombats");
     return Object.assign(context, {
       rows: buildDefenseFavoriteRows(this.sheet?.actor)
     });
@@ -246,17 +247,16 @@ class PeasantDefenseFavoritesWindow extends DefenseFavoritesWindowBase {
       const favoriteKey = getDefenseFavoriteKey(targetingKey);
       if (!favoriteKey) continue;
 
-      const defenseIndex = Number.parseInt(row.querySelector("[data-pc-defense-select]")?.value, 10);
-      if (!Number.isFinite(defenseIndex)) continue;
-
+      const selectedKey = String(row.querySelector("[data-pc-defense-select]")?.value || "");
       const match = getMatchingDefenseNotables(this.sheet?.actor, targetingKey)
-        .find(({ index }) => index === defenseIndex);
+        .find(({ key }) => key === selectedKey);
       if (!match) continue;
 
       const mode = normalizeDefenseFavoriteMode(row.querySelector("[data-pc-defense-mode]")?.value);
       const entry = {
-        index: defenseIndex,
+        index: match.index,
         name: String(match.combat?.name || "").trim(),
+        usageId: match.usageId,
         mode
       };
 
@@ -321,7 +321,7 @@ function buildDefenseFavoriteRows(actor) {
     const favorite = favorites[favoriteKey] || {};
     const matchingDefenses = getMatchingDefenseNotables(actor, targeting.key);
     const preferredMatch = getPreferredDefenseMatch(actor, targeting.key, matchingDefenses);
-    const selectedDefenseValue = preferredMatch ? String(preferredMatch.index) : "";
+    const selectedDefenseValue = preferredMatch?.key || "";
     const mode = normalizeDefenseFavoriteMode(favorite.mode);
     const conditions = getFavoriteConditions(favorite, mode);
     const primaryCondition = conditions[0] || {};
@@ -340,10 +340,10 @@ function buildDefenseFavoriteRows(actor) {
     return {
       key: targeting.key,
       label: targeting.label,
-      defenseOptions: matchingDefenses.map(({ combat, index }) => ({
-        value: String(index),
-        label: String(combat?.name || `Defense ${index + 1}`).trim() || `Defense ${index + 1}`,
-        selected: String(index) === selectedDefenseValue
+      defenseOptions: matchingDefenses.map(({ combat, index, key, usageName }) => ({
+        value: key,
+        label: `${String(combat?.name || `Defense ${index + 1}`).trim() || `Defense ${index + 1}`} — ${usageName}`,
+        selected: key === selectedDefenseValue
       })),
       hasDefenseOptions: matchingDefenses.length > 0,
       modeOptions: buildSelectedOptions(DEFENSE_FAVORITE_MODES, mode),
@@ -359,7 +359,7 @@ function buildDefenseFavoriteRows(actor) {
 
 function getActorResourceOptions(actor) {
   const defaultEdgeMode = getDefaultEdgeLabelMode(actor);
-  const edgeMode = sanitizeEdgeLabelMode(actor?.system?.edgeLabelMode, defaultEdgeMode);
+  const edgeMode = getActorEdgeLabelMode(actor);
   const edgeLabel = resolveEdgeLabel(edgeMode, actor?.system?.edgeCustomLabel, defaultEdgeMode);
   const resources = [
     { value: "stamina", label: "Stamina" },

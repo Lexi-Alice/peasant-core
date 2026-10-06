@@ -1,6 +1,7 @@
 import { sanitizeOptionalIntegerInputValue } from "../../../data/actor/helpers.mjs";
 import { normalizeHaltSlashValueEditable } from "../../../data/actor/combat-modifiers.mjs";
 import { getActorSourceSystem } from "../../../data/actor/source-system.mjs";
+import { getFlexibleAdvantageDescription } from "../../../data/actor/flexible-advantages.mjs";
 import { qsa, qs, toElement } from "../../dom.mjs";
 
 export { getActorSourceSystem };
@@ -115,7 +116,7 @@ export function collectAdvantagesFromSheet(sheet) {
     if (typeof entry === "string") return entry;
     return String(entry?.name ?? "");
   });
-  const actorDescriptions = JSON.parse(JSON.stringify(sourceSystem.flexibleAdvantageDescriptions || []));
+  const actorDescriptions = (sourceSystem.flexibleAdvantageDescriptions || []).map(getFlexibleAdvantageDescription);
   if (items.length === 0) {
     return {
       names: actorNames,

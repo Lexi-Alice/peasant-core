@@ -6,20 +6,11 @@ export function createNotableCombatTagEditorState($container) {
     customId: ""
   };
 
-  const syncUi = () => {
-    const isEditing = state.mode === "edit" && !!state.tagType;
-    const $addButton = $container.find("[data-pc-tag-save]");
-    const $addLabel = $addButton.find("span").first();
-    if ($addLabel.length) $addLabel.text(isEditing ? "Save Tag" : "Add Tag");
-    else $addButton.text(isEditing ? "Save Tag" : "Add Tag");
-  };
-
   const reset = ({ clearForm = false } = {}) => {
     state.mode = "add";
     state.tagType = "";
     state.customIndex = -1;
     state.customId = "";
-    syncUi();
     if (clearForm) {
       $container.find(".tag-type-select").val("");
       $container.find("[data-pc-tag-search]").val("");
@@ -33,12 +24,11 @@ export function createNotableCombatTagEditorState($container) {
     state.customIndex = Number.isInteger(customIndex) ? customIndex : parseInt(customIndex, 10);
     if (Number.isNaN(state.customIndex)) state.customIndex = -1;
     state.customId = String(customId ?? "").trim();
-    syncUi();
   };
 
   const setTagType = (tagType) => {
     state.tagType = String(tagType || "");
   };
 
-  return { state, syncUi, reset, beginEdit, setTagType };
+  return { state, reset, beginEdit, setTagType };
 }

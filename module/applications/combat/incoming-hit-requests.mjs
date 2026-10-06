@@ -1,5 +1,6 @@
 import { getAutomatedCombatDamageTypeLabel } from "../../data/actor/combat-damage.mjs";
-import { normalizeCombatDefense, resolveMageBlockDamage, resolveShieldBlockDamage } from "../../data/actor/combat-defense.mjs";
+import { resolveMageBlockDamage, resolveShieldBlockDamage } from "../../data/actor/combat-defense.mjs";
+import { resolveSelectedDefenseCombat } from "../../data/actor/defense-favorites.mjs";
 import {
   deleteMageBlockBarrier,
   getMageBlockBarrierEffect,
@@ -9,11 +10,12 @@ import {
   updateMageBlockBarrierHp
 } from "../../data/active-effect/mage-block-effects.mjs";
 import { getCombatTargetingType } from "../../data/actor/combat-tags.mjs";
+import { getDamageScaleResult } from "../../data/actor/damage.mjs";
 import { isSimplifiedHpActor } from "../../data/actor/helpers.mjs";
 import { createGuardBrokenEffectData } from "../../data/actor/guard-broken.mjs";
 import { withPeasantActorSourceWriteContext } from "../../data/actor/source-system.mjs";
 import { applyCombatStressDamageForActor } from "../../data/actor/stress.mjs";
-import { canSpendActiveArmorCharge, getActiveArmorTraining } from "../../data/actor/active-armor.mjs";
+import { canSpendActiveArmorCharge, getEquippedArmorGrade } from "../../data/actor/active-armor.mjs";
 import {
   getTargetedDamageLocationDisplay,
   isArmorPenLocationLike,
@@ -26,15 +28,6 @@ import { getPreferredDefensePromptRecipientUser, resolveDefensePromptActor } fro
 import { withWaitingForDefenderResponse } from "./prompt-dialogs.mjs";
 import { applyTargetedDamageWorkflow } from "./targeted-damage-workflow.mjs";
 import { showShieldBracePrompt } from "./shield-brace-dialog.mjs";
-
-function resolveSelectedCombatIndex(combats, selection = {}) {
-  const selectedCombatId = String(selection.selectedCombatId || "").trim();
-  if (selectedCombatId) {
-    return combats.findIndex((combat) => String(combat?.id || "") === selectedCombatId);
-  }
-  const selectedCombatIndex = Number.parseInt(selection.selectedCombatIndex, 10);
-  return Number.isFinite(selectedCombatIndex) ? selectedCombatIndex : -1;
-}
 
 async function applyGuardBrokenEffect(actor) {
   const existing = Array.from(actor?.effects || []).find((effect) => (
@@ -64,12 +57,11 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
   const combats = typeof defenderActor.getPeasantNotableCombatsForUpdate === "function"
     ? defenderActor.getPeasantNotableCombatsForUpdate()
     : JSON.parse(JSON.stringify(Array.isArray(defenderActor.system?.notableCombats) ? defenderActor.system.notableCombats : []));
-  const combatIndex = resolveSelectedCombatIndex(combats, shieldBlock);
-  if (!Number.isFinite(combatIndex) || combatIndex < 0) {
+  const selected = resolveSelectedDefenseCombat(combats, shieldBlock);
+  if (!selected) {
     return { handled: false, applied: false, reason: "invalidShieldBlockDefense" };
   }
-  const combat = combats[combatIndex] || null;
-  const defense = normalizeCombatDefense(combat?.defense);
+  const { combat, defense, index: combatIndex, usageId } = selected;
   if (!combat || !defense.block || defense.blockType !== "Shield") {
     return { handled: false, applied: false, reason: "invalidShieldBlockDefense" };
   }
@@ -80,11 +72,8 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
   const choice = replayChoice === "normal" || replayChoice === "braced"
     ? replayChoice
     : await showShieldBracePrompt({
-      actor: defenderActor,
-      defense,
-      damageAmount,
-      normalResult,
-      bracedResult
+      attackCombatName: payload.attackCombatName,
+      defense
     });
   if (choice !== "normal" && choice !== "braced") {
     return { handled: true, applied: false, chainCancelled: true, reason: "shieldBraceCancelled" };
@@ -98,11 +87,10 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
   const shieldHardnessAfter = resolution.shieldHardnessAfter;
   const armDamage = resolution.armDamage;
   if (shieldHpAfter !== shieldHpBefore || shieldHardnessAfter !== defense.hardness) {
-    combat.defense = {
-      ...defense,
-      hp: shieldHpAfter,
-      hardness: shieldHardnessAfter
-    };
+    const defenseSource = usageId === "base"
+      ? combat.defense
+      : combat.usages.find((usage) => usage.id === usageId).mechanics.defense;
+    Object.assign(defenseSource, { hp: shieldHpAfter, hardness: shieldHardnessAfter });
     combats[combatIndex] = combat;
     if (typeof defenderActor.setPeasantNotableCombats === "function") {
       await defenderActor.setPeasantNotableCombats(combats);
@@ -122,6 +110,7 @@ async function applyIncomingShieldBlock(defenderActor, payload = {}) {
       useArmorCharge: false,
       ignoreHaltReduction: true,
       domeAlreadyResolved: !!payload.domeAlreadyResolved,
+      scaleAlreadyResolved: !!payload.scaleAlreadyResolved,
       chatSpeaker: ChatMessage.getSpeaker({ actor: defenderActor })
     });
   }
@@ -164,10 +153,9 @@ async function applyIncomingWeaponBlock(defenderActor, payload = {}) {
   const combats = typeof defenderActor.getPeasantNotableCombatsForUpdate === "function"
     ? defenderActor.getPeasantNotableCombatsForUpdate()
     : JSON.parse(JSON.stringify(Array.isArray(defenderActor.system?.notableCombats) ? defenderActor.system.notableCombats : []));
-  const combatIndex = resolveSelectedCombatIndex(combats, weaponBlock);
-  if (combatIndex < 0) return { handled: false, applied: false, reason: "invalidWeaponBlockDefense" };
-  const combat = combats[combatIndex] || null;
-  const defense = normalizeCombatDefense(combat?.defense);
+  const selected = resolveSelectedDefenseCombat(combats, weaponBlock);
+  if (!selected) return { handled: false, applied: false, reason: "invalidWeaponBlockDefense" };
+  const { combat, defense } = selected;
   if (!combat || !defense.block || defense.blockType !== "Weapon") {
     return { handled: false, applied: false, reason: "invalidWeaponBlockDefense" };
   }
@@ -192,12 +180,14 @@ async function applyIncomingWeaponBlock(defenderActor, payload = {}) {
       type: overflowType,
       location,
       isAP: armorPenHit,
+      preventByLuckPenetration: !!payload.preventByLuckPenetration,
       useArmorCharge: !!payload.useArmorCharge,
       armorGrade: payload.armorGrade || "",
       ignoreHaltReduction: !!payload.ignoreHaltReduction,
       woundLocation: payload.woundLocation || null,
       suppressLocationBreaks: !!payload.suppressLocationBreaks,
       domeAlreadyResolved: !!payload.domeAlreadyResolved,
+      scaleAlreadyResolved: !!payload.scaleAlreadyResolved,
       chatSpeaker: ChatMessage.getSpeaker({ actor: defenderActor })
     });
   }
@@ -250,19 +240,18 @@ async function applyIncomingMageBlock(defenderActor, payload = {}) {
   const combats = typeof defenderActor.getPeasantNotableCombatsForUpdate === "function"
     ? defenderActor.getPeasantNotableCombatsForUpdate()
     : JSON.parse(JSON.stringify(Array.isArray(defenderActor.system?.notableCombats) ? defenderActor.system.notableCombats : []));
-  const combatIndex = resolveSelectedCombatIndex(combats, mageBlock);
-  if (combatIndex < 0) return { handled: false, applied: false, reason: "invalidMageBlockDefense" };
-  const combat = combats[combatIndex] || null;
-  const defense = normalizeCombatDefense(combat?.defense);
-  const identity = getMageBlockDefenseIdentity("notableCombats", combat?.id, "base");
+  const selected = resolveSelectedDefenseCombat(combats, mageBlock);
+  if (!selected) return { handled: false, applied: false, reason: "invalidMageBlockDefense" };
+  const { combat, defense, usageId } = selected;
+  const identity = getMageBlockDefenseIdentity("notableCombats", combat?.id, usageId);
   const duress = getMageBlockDuressEffect(defenderActor, identity);
   if (!combat || !defense.block || defense.blockType !== "Mage" || !duress) {
     return { handled: false, applied: false, reason: "invalidMageBlockDefense" };
   }
 
   const barrier = getMageBlockBarrierEffect(defenderActor, identity);
-  const barrierHp = barrier ? getMageBlockBarrierHp(barrier).value : 0;
-  const resolution = resolveMageBlockDamage({ ...defense, hp: barrierHp }, damageAmount);
+  const barrierHp = barrier ? getMageBlockBarrierHp(barrier) : { value: 0, max: 0 };
+  const resolution = resolveMageBlockDamage({ ...defense, hp: barrierHp.value, maxHp: barrierHp.max }, damageAmount);
   if (barrier) {
     if (resolution.hpAfter <= 0) await deleteMageBlockBarrier(barrier, duress);
     else if (resolution.hpAfter !== resolution.hpBefore) await updateMageBlockBarrierHp(barrier, resolution.hpAfter);
@@ -278,6 +267,7 @@ async function applyIncomingMageBlock(defenderActor, payload = {}) {
       amount: resolution.overflow,
       type: appliedType,
       domeAlreadyResolved: true,
+      scaleAlreadyResolved: true,
       ignoreResistance: true
     });
     guardBrokenEffect = await applyGuardBrokenEffect(defenderActor);
@@ -323,6 +313,17 @@ async function attachIncomingHitUndoToCards(result, undoRecords) {
 }
 
 async function applyIncomingHitToActor(defenderActor, payload = {}) {
+  if (!payload.scaleAlreadyResolved) {
+    const scale = getDamageScaleResult(payload.damageAmount, defenderActor, payload.attackScale);
+    if (scale.originalDamage > 0 && scale.damage === 0) {
+      return { handled: true, applied: true, reason: "scaleAbsorbedAllDamage" };
+    }
+    payload = { ...payload, damageAmount: scale.damage, scaleAlreadyResolved: true };
+    if (payload.weaponBlock) {
+      payload.weaponBlock = { ...payload.weaponBlock,
+        originalDamageAmount: getDamageScaleResult(payload.weaponBlock.originalDamageAmount, defenderActor, payload.attackScale).damage };
+    }
+  }
   if (payload.mageBlock && typeof payload.mageBlock === "object") {
     const mageBlockResult = await applyIncomingMageBlock(defenderActor, payload);
     return { ...mageBlockResult, mageBlockResult };
@@ -344,8 +345,8 @@ async function applyIncomingHitToActor(defenderActor, payload = {}) {
 
   if (payload.locationlessDamage) {
     const applyResult = typeof defenderActor.applyPeasantLocationlessDamage === "function"
-      ? await defenderActor.applyPeasantLocationlessDamage({ amount: damageAmount, type: appliedType, domeAlreadyResolved: !!payload.domeAlreadyResolved })
-      : await defenderActor.applyPeasantDamage?.(damageAmount, appliedType, false, { domeAlreadyResolved: !!payload.domeAlreadyResolved });
+      ? await defenderActor.applyPeasantLocationlessDamage({ amount: damageAmount, type: appliedType, domeAlreadyResolved: !!payload.domeAlreadyResolved, scaleAlreadyResolved: !!payload.scaleAlreadyResolved })
+      : await defenderActor.applyPeasantDamage?.(damageAmount, appliedType, false, { domeAlreadyResolved: !!payload.domeAlreadyResolved, scaleAlreadyResolved: !!payload.scaleAlreadyResolved });
     return {
       handled: true,
       applied: !!applyResult?.ok,
@@ -364,20 +365,21 @@ async function applyIncomingHitToActor(defenderActor, payload = {}) {
     locationResultText: payload.locationDisplay,
     label: payload.location
   });
-  const effectiveArmorPenHit = !payload.preventByLuckPenetration && armorPenHit;
   let applyResult = null;
   try {
     applyResult = await applyTargetedDamageWorkflow(defenderActor, {
       amount: damageAmount,
       type: appliedType,
       location,
-      isAP: effectiveArmorPenHit,
+      isAP: armorPenHit,
+      preventByLuckPenetration: !!payload.preventByLuckPenetration,
       useArmorCharge: !!payload.useArmorCharge,
       armorGrade: payload.armorGrade || "",
       ignoreHaltReduction: !!payload.ignoreHaltReduction,
       woundLocation: payload.woundLocation || null,
       suppressLocationBreaks: !!payload.suppressLocationBreaks,
       domeAlreadyResolved: !!payload.domeAlreadyResolved,
+      scaleAlreadyResolved: !!payload.scaleAlreadyResolved,
       chatSpeaker: ChatMessage.getSpeaker({ actor: defenderActor })
     });
   } catch (error) {
@@ -401,7 +403,7 @@ async function applyIncomingHitToActor(defenderActor, payload = {}) {
     ignoreHaltReduction: !!payload.ignoreHaltReduction,
     appliedDamageType: appliedType,
     location,
-    isAP: effectiveArmorPenHit,
+    isAP: applyResult?.isAP ?? armorPenHit,
     applyResult,
     woundThresholds: applyResult?.woundThresholds,
     devastatingWoundsBefore: applyResult?.devastatingWoundsBefore,
@@ -421,7 +423,8 @@ export async function applyIncomingHeal(payload = {}) {
   const undoCapture = await captureActorRollUndo(
     targetActor,
     `${payload.attackCombatName || "Incoming Heal"} Healing`,
-    () => applyIncomingHealToActor(targetActor, payload)
+    () => applyIncomingHealToActor(targetActor, payload),
+    { includeSpellEffects: true }
   );
   if (!undoCapture.result || typeof undoCapture.result !== "object") return undoCapture.result;
 
@@ -532,7 +535,7 @@ export async function requestIncomingHitResolutionForTarget({
   const targetTokenDocument = target?.tokenDocument || target?.token?.document || target?.token || null;
   if (!targetActor || !combat) return null;
 
-  const armorTraining = getActiveArmorTraining(targetActor);
+  const armorGrade = getEquippedArmorGrade(targetActor);
   if (!canSpendActiveArmorCharge(targetActor)) {
     let appliedDamageType = normalizeAppliedDamageType(damageType, "blunt");
     if (appliedDamageType === "flexible") appliedDamageType = "blunt";
@@ -540,7 +543,7 @@ export async function requestIncomingHitResolutionForTarget({
       handled: true,
       useArmorCharge: false,
       appliedDamageType,
-      armorGrade: armorTraining.grade,
+      armorGrade,
       preventByLuckPenetration: false,
       bySkillPenetrationMosAdjustment: 0,
       armorChargeUnavailable: true
@@ -653,8 +656,8 @@ export async function requestIncomingHitApplicationForTarget({
   );
   if (appliedDamageType === "flexible") appliedDamageType = "blunt";
   const preventByLuckPenetration = !!incomingHitResolution?.preventByLuckPenetration && !locationRoll?.bySkill;
-  const armorPenHit = !preventByLuckPenetration && isArmorPenLocationLike({
-    isAP: locationRoll?.isAP,
+  const armorPenHit = isArmorPenLocationLike({
+    isAP: locationRoll?.originalIsAP ?? locationRoll?.isAP,
     rawText: locationRoll?.rawText,
     locationResultText: locationRoll?.locationDisplay
   });
@@ -691,6 +694,8 @@ export async function requestIncomingHitApplicationForTarget({
     isAP: armorPenHit,
     preventByLuckPenetration,
     damageAmount: resolvedDamageAmount,
+    attackScale: combat.tippingScales || 0,
+    scaleAlreadyResolved: !!damageRoll.scale,
     damageType: appliedDamageType,
     damageTypeLabel: getAutomatedCombatDamageTypeLabel(appliedDamageType),
     useArmorCharge: !!incomingHitResolution?.useArmorCharge,
@@ -716,7 +721,7 @@ export async function requestIncomingHitApplicationForTarget({
   if (canApplyLocally) {
     try {
       const localApplication = await applyIncomingHit(payload);
-      if (localApplication?.handled && localApplication?.applied) {
+      if (localApplication?.handled && (localApplication?.applied || localApplication?.chainCancelled)) {
         return {
           ...localApplication,
           requestPayload: payload

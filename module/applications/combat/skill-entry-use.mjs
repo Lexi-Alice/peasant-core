@@ -102,43 +102,6 @@ async function postPeasantEntryReference({ actor, usageContext }) {
   return { rolled: false, referenced: true, usageContext: cloneData(usageContext), chatMessage };
 }
 
-function isBaseArmorSkillUsage(usageContext) {
-  const skill = usageContext?.data;
-  return usageContext?.ref?.collection === "skills"
-    && String(usageContext.ref.usageId || "base").trim() === "base"
-    && String(skill?.category || "").trim().toLowerCase() === "martial"
-    && String(skill?.type || "").trim().toLowerCase() === "defense"
-    && String(skill?.defenseType || "").trim().toLowerCase() === "armor";
-}
-
-async function rechargePeasantArmorSkill({ actor, usageContext }) {
-  const name = String(usageContext?.data?.name || "Armor").trim();
-  const captured = await captureActorRollUndo(
-    actor,
-    `${name} Armor Recharge`,
-    () => actor.rechargePeasantArmorCharges?.()
-  );
-  const result = captured.result || { ok: false, changed: false };
-  const content = result.ok
-    ? `<p>${escapeHtml(name)} restored Armor Charge to ${Number(result.value) || 0} / ${Number(result.capacity) || 0}. Spent 2 Stamina.</p>`
-    : `<p>${escapeHtml(name)} could not recharge Armor Charge${result.alreadyFull ? "; the pool is already full." : "."}</p>`;
-  const chatMessage = await ChatMessage.create(applyMessageMode({
-    user: game.user?.id,
-    speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<fieldset class="skill-roll-card pc-armor-recharge-card"><legend>${escapeHtml(name)}</legend>${content}</fieldset>`
-  }));
-  const undoRecords = result.changed ? collectRollUndoRecords(captured.undoRecords) : [];
-  await attachRollUndoToChatMessage(chatMessage, undoRecords, { label: `Undo ${name} Armor Recharge` });
-  return {
-    rolled: false,
-    armorRecharge: true,
-    result,
-    usageContext: cloneData(usageContext),
-    undoRecords,
-    chatMessage
-  };
-}
-
 async function chooseSignaturePool(usageContext) {
   if (!isSignatureSkillType(usageContext?.data?.type)) return "primary";
   const primaryConfigured = Number(usageContext.data.usesMax) > 0;
@@ -261,14 +224,14 @@ export async function startPeasantEntryUse({
   targetLabel = "",
   selectedDamageType = null,
   cardClass = "",
-  rollMode = ""
+  rollMode = "",
+  onSaveReplayProgress = null
 } = {}) {
   const usageContext = replayContext?.version === 1
     ? cloneData(replayContext)
     : (await createPeasantEntryUsageContext({ actor, ref, usageId, pool })).usageContext;
   if (!usageContext) return false;
   if (!hasStoredUsageContext(actor, usageContext)) return false;
-  if (isBaseArmorSkillUsage(usageContext)) return rechargePeasantArmorSkill({ actor, usageContext });
   if (usageContext.resolution === "reference") return postPeasantEntryReference({ actor, usageContext });
   if (!usageContext.signaturePool) {
     usageContext.signaturePool = await chooseSignaturePool(usageContext);
@@ -299,6 +262,7 @@ export async function startPeasantEntryUse({
     targetLabel,
     selectedDamageType,
     cardClass,
-    rollMode
+    rollMode,
+    onSaveReplayProgress
   });
 }

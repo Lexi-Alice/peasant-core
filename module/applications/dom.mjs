@@ -16,6 +16,13 @@ export function qsa(root, selector) {
   return Array.from(toElement(root)?.querySelectorAll(selector) ?? []);
 }
 
+export function markVerticalDropBoundary(rows, targetRow, dropAfter) {
+  const index = rows.indexOf(targetRow);
+  if (index < 0) return;
+  const nextRow = dropAfter ? rows[index + 1] : targetRow;
+  (nextRow ?? targetRow).classList.add(nextRow ? "drag-over-top" : "drag-over-bottom");
+}
+
 export function delegate(root, type, selector, handler, options) {
   const element = toElement(root);
   if (!element) return () => {};

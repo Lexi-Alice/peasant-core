@@ -93,48 +93,63 @@ const {
   prepareNotableCombatEffectContext
 } = await import("../module/applications/actor/notable-combat/notable-combat-tag-editor.mjs");
 
-const effectContext = prepareNotableCombatEffectContext({
+const effectActor = {
   effects: { get: id => id === "whole" ? { id, name: "Whole Effect", disabled: false, sort: 10 } : null }
-}, {
+};
+const effectEntry = {
   effectIds: ["whole"],
   baseUsage: {
     name: "Default",
     effectLinks: [{ id: "usage-link", effectId: "missing", when: "success", application: "offer" }]
   }
-}, { entryKindLabel: "Skill", selectedUsageId: "base" });
-assert.deepEqual(effectContext.effectSections.map(section => section.label), ["Whole Skill", "Default"]);
-assert.equal(effectContext.effectSections[0].effects[0].scope, "whole");
-assert.equal(effectContext.effectSections[1].effects[0].status, "Missing");
-assert.equal(effectContext.effectSections[1].effects[0].subtitle, "Successful - Offer in Chat");
-assert.equal(effectContext.effectGroupToggle.label, "Grouped by Scope",
-  "Skill effects retain their existing scope grouping");
-const notableEffectContext = prepareNotableCombatEffectContext({ effects: { get: () => null } }, {
-  effectIds: ["legacy-whole"], baseUsage: { name: "Default", effectLinks: [] }
-}, { entryKindLabel: "Notable", selectedUsageId: "base" });
-assert.deepEqual(notableEffectContext.effectSections, [],
-  "A notable with no current-usage effects has no grouped rows");
-const groupedNotable = prepareNotableCombatEffectContext({ effects: { get: () => null } }, {
+};
+const effectEntryBefore = structuredClone(effectEntry);
+for (const entryKindLabel of ["Skill", "Notable"]) {
+  const effectContext = prepareNotableCombatEffectContext(effectActor, effectEntry, { entryKindLabel });
+  assert.deepEqual(effectContext.effectSections.map(section => section.label), ["Successful Check"],
+    `${entryKindLabel} groups selected-usage effects by condition without a whole-entry section`);
+  assert.equal(effectContext.effectSections[0].effects[0].scope, "usage");
+  assert.equal(effectContext.effectSections[0].effects[0].status, "Missing");
+  assert.equal(effectContext.effectSections[0].effects[0].subtitle, "Successful - Offer in Chat");
+  assert.deepEqual(effectContext.effectFlatSection.effects.map(effect => effect.id), ["missing"],
+    `${entryKindLabel} excludes whole-entry effects from its flat view too`);
+  assert.equal(effectContext.effectGroupToggle.label, "Grouped by Condition");
+  const emptyContext = prepareNotableCombatEffectContext(effectActor, {
+    effectIds: ["whole"], baseUsage: { name: "Default", effectLinks: [] }
+  }, { entryKindLabel });
+  assert.deepEqual(emptyContext.effectSections, [], `${entryKindLabel} omits empty groups`);
+  assert.equal(emptyContext.hasEffects, false, "Hidden whole-entry effects do not suppress the empty state");
+  assert.equal(emptyContext.effectFlatSection.visible, false);
+}
+assert.deepEqual(effectEntry, effectEntryBefore, "Preparing the display leaves whole-entry effect data untouched");
+const groupedEntry = {
   effectIds: ["legacy-whole"],
   baseUsage: { name: "Default", effectLinks: [{ id: "base-link", effectId: "base-effect", when: "passive" }] },
   usages: [
     { id: "treatment", name: "Treatment", effectLinks: [
       { id: "hit-link", effectId: "hit-effect", when: "hit" },
       { id: "success-link", effectId: "success-effect", when: "success" },
-      { id: "use-link", effectId: "use-effect", when: "always" }
+      { id: "use-link", effectId: "use-effect", when: "always" },
+      { id: "passive-link", effectId: "passive-effect", when: "passive" },
+      { id: "failure-link", effectId: "failure-effect", when: "failure" }
     ] },
     { id: "other", name: "Other", effectLinks: [{ id: "other-link", effectId: "other-effect", when: "failure" }] }
   ]
-}, { entryKindLabel: "Notable", selectedUsageId: "treatment" });
-assert.deepEqual(groupedNotable.effectSections.map(section => section.label),
-  ["On Use", "Successful Check", "Hit"],
-  "Notable effects group by condition in condition-menu order");
-assert.deepEqual(groupedNotable.effectSections.map(section => section.effects.map(effect => effect.id)),
-  [["use-effect"], ["success-effect"], ["hit-effect"]],
-  "Each condition contains only effects linked to the selected usage");
-assert.deepEqual(groupedNotable.effectFlatSection.effects.map(effect => effect.id),
-  ["hit-effect", "success-effect", "use-effect"],
-  "The flat view excludes other usages and legacy whole-notable effects too");
-assert.equal(groupedNotable.effectGroupToggle.label, "Grouped by Condition");
+};
+for (const entryKindLabel of ["Skill", "Notable"]) {
+  const groupedContext = prepareNotableCombatEffectContext({ effects: { get: () => null } }, groupedEntry,
+    { entryKindLabel, selectedUsageId: "treatment" });
+  assert.deepEqual(groupedContext.effectSections.map(section => section.label),
+    ["On Use", "Successful Check", "Failed Check", "Hit", "Passive"],
+    `${entryKindLabel} uses the condition-menu order`);
+  assert.deepEqual(groupedContext.effectSections.map(section => section.effects.map(effect => effect.id)),
+    [["use-effect"], ["success-effect"], ["failure-effect"], ["hit-effect"], ["passive-effect"]],
+    "Each condition contains only effects linked to the selected usage");
+  assert.deepEqual(groupedContext.effectFlatSection.effects.map(effect => effect.id),
+    ["hit-effect", "success-effect", "use-effect", "passive-effect", "failure-effect"],
+    "The flat view excludes other usages and legacy whole-entry effects too");
+  assert.equal(groupedContext.effectGroupToggle.label, "Grouped by Condition");
+}
 const notableEntry = { id: "notable-1", name: "Test Notable", baseUsage: { name: "Default", effectLinks: [] } };
 const notableSheet = {
   id: "notable-sheet",
@@ -220,6 +235,18 @@ const sheet = {
   renderChild() {}
 };
 const editor = await openPeasantSkillEditor(sheet, { collection: "skills", entryId: entry.id });
+for (const application of [notableEditor, editor]) {
+  application._applyNotableCombatEffectGroupMode(groupRoot);
+  assert.equal(groupToggle.dataset.tooltip, "Grouped by Condition", "Both editors label their grouped view by Condition");
+  application._pcNotableCombatEffectsGroupedByType = false;
+  application._applyNotableCombatEffectGroupMode(groupRoot);
+  assert.equal(groupToggle.dataset.tooltip, "Flat List");
+  application._pcNotableCombatEffectsGroupedByType = true;
+  application._applyNotableCombatEffectGroupMode(groupRoot);
+  assert.equal(groupToggle.dataset.tooltip, "Grouped by Condition", "Returning from Flat List restores the Condition label");
+}
+globalThis.$ = element => ({ 0: element });
+sheet.isEditMode = true;
 entry.category = "martial";
 entry.type = "Weapon";
 entry.weaponType = "";

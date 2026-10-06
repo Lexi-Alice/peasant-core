@@ -2,6 +2,7 @@ import { renderPeasantDescriptionEditor } from "../controls/description-editor-a
 import { getActorSourceSystem, resolveRowIndex } from "../controls/sheet-listener-helpers.mjs";
 import { delegate, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
+import { getFlexibleAdvantageDescription } from "../../../data/actor/flexible-advantages.mjs";
 
 function syncAdvantageDescriptionHiddenInput(sheet, root, index, description) {
   const value = String(description ?? "");
@@ -88,7 +89,7 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html, { enqueueShee
         ? advantageEntry
         : String(advantageEntry?.name ?? "")
       ).trim() || "Flexible Advantage";
-      const existingDescription = String(sourceSystem.flexibleAdvantageDescriptions?.[index] ?? "");
+      const existingDescription = getFlexibleAdvantageDescription(sourceSystem.flexibleAdvantageDescriptions?.[index]);
 
       renderPeasantDescriptionEditor(sheet, `advantage-desc-${index}`, {
         id: `peasant-adv-desc-${sheet.id}-${index}`,
@@ -97,27 +98,16 @@ export function setupSkillAdvantageDescriptionEditors(sheet, html, { enqueueShee
         existing: existingDescription,
         documentUuid: sheet.actor?.uuid || "",
         errorLogMessage: "Failed to save flexible advantage description:",
-        errorMessage: "Failed to save flexible advantage description. See console for details.",
+        errorMessage: "Description not saved. Your text is still in the editor.",
         save: async (newContent) => {
           const description = String(newContent ?? "");
-          syncAdvantageDescriptionHiddenInput(sheet, root, index, description);
-          const saveDescription = async () => {
-            const result = await sheet.actor.setPeasantFlexibleAdvantageDescription?.(index, description);
-            const current = sheet.actor.getPeasantFlexibleAdvantagesForUpdate?.() ?? null;
-            if (!current) return result;
-            syncAdvantageDescriptionHiddenInput(sheet, root, index, current.descriptions?.[index] ?? description);
-            return result;
-          };
+          const saveDescription = () => sheet.actor.setPeasantFlexibleAdvantageDescription?.(index, description);
           const result = enqueueSheetUpdate
             ? await enqueueSheetUpdate("_advantageSaveQueue", "Advantage description", saveDescription)
             : await saveDescription();
-          const savedDescriptions = Array.isArray(result?.descriptions)
-            ? result.descriptions
-            : getActorSourceSystem(sheet.actor).flexibleAdvantageDescriptions;
-          syncAdvantageDescriptionHiddenInput(sheet, root, index, savedDescriptions?.[index] ?? description);
-          if (savedDescriptions) {
-            sheet._lastFlexibleAdvantageDescriptionsSnapshot = JSON.parse(JSON.stringify(savedDescriptions));
-          }
+          if (!result?.ok) throw new Error("Flexible Advantage description could not be saved.");
+          syncAdvantageDescriptionHiddenInput(sheet, root, index, result.descriptions[index]);
+          sheet._lastFlexibleAdvantageDescriptionsSnapshot = [...result.descriptions];
         }
       });
     } catch (e) {

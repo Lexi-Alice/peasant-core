@@ -36,8 +36,12 @@ for (const key of hiddenKeys) {
 }
 
 for (const key of [
-  "system.race",
-  "system.customRace",
+  "system.majorHeraldry",
+  "system.customMajorHeraldry",
+  "system.minorHeraldry",
+  "system.customMinorHeraldry",
+  "system.finalHeraldry",
+  "system.customFinalHeraldry",
   "system.origin",
   "system.customOrigin",
   "system.specificOrigin",
@@ -176,11 +180,11 @@ const actorConditionPickerKeys = collectPeasantActiveEffectKeys({
   ...collectionOptions,
   effect: { parent: { documentName: "Actor", type: "character" } }
 });
-assert.equal(actorConditionPickerKeys.includes("system.conditions.overcharged"), false, "Overcharged is excluded from the searchable Active Effect keys");
+assert.equal(actorConditionPickerKeys.includes("system.conditions.overcharged"), true, "Overcharged is available as a reversible Active Effect key");
 for (const key of ["system.devastatingWounds", "system.fallBlessingUses.value", "system.fallBlessingUses.max"]) {
   assert.equal(actorConditionPickerKeys.includes(key), false, `${key} is excluded from searchable Active Effect keys`);
 }
-assert.equal(isPeasantActiveEffectUnsupportedKey("system.conditions.overcharged"), true, "Overcharged is classified as a manual unsupported key");
+assert.equal(isPeasantActiveEffectUnsupportedKey("system.conditions.overcharged"), false, "Overcharged is a supported reversible key");
 assert.equal(isPeasantActiveEffectStateKey("system.conditions.overcharged"), false, "Overcharged is not a Peasant Core state operation");
 assert.equal(isPeasantActiveEffectFoundryDynamicKey("system.conditions.overcharged"), true, "Manual Foundry dynamic-key pass-through is preserved");
 

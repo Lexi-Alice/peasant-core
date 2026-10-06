@@ -153,6 +153,8 @@ export async function rollCombatTagFromElement(sheet, event, target) {
     if (Number.isNaN(idx)) idx = readDataInt(el, "index");
 
     const rollType = readDataValue(el, "rollType");
+    const collection = el?.closest?.("[data-entry-collection]")?.dataset.entryCollection || "notableCombats";
+    if (!["skills", "notableCombats"].includes(collection)) return;
     pcLog.debug("combat-tag-rollable action", { idx, rollType, el });
 
     if (Number.isNaN(idx) || !rollType) {
@@ -160,14 +162,14 @@ export async function rollCombatTagFromElement(sheet, event, target) {
       return;
     }
 
-    await sheet.actor.ensurePeasantEntryIds?.("notableCombats");
-    const combats = sheet.actor.system.notableCombats || [];
+    await sheet.actor.ensurePeasantEntryIds?.(collection);
+    const combats = sheet.actor.system[collection] || [];
     const combat = combats[idx] || {};
     const entryId = String(combat.id || "").trim();
     if (!entryId) return;
     const { usageContext } = await createPeasantEntryUsageContext({
       actor: sheet.actor,
-      ref: { collection: "notableCombats", entryId }
+      ref: { collection, entryId }
     });
     if (!usageContext) return;
 

@@ -1,5 +1,6 @@
-import { delegate, qsa, toElement } from "../../dom.mjs";
+import { delegate, markVerticalDropBoundary, qsa, toElement } from "../../dom.mjs";
 import { pcLog } from "../../../utils/logging.mjs";
+import { getActorSourceSystem } from "../../../data/actor/source-system.mjs";
 
 const COMBAT_ROW_DRAG_BLOCK_SELECTOR = "button, input, select, textarea, a, .combat-tag-draggable, .combat-roll-clickable, .combat-actions";
 const COMBAT_ROW_DRAG_PREFIX = "peasant-core.notable-combat-sort";
@@ -98,6 +99,8 @@ function setupCombatTagDragDrop(sheet, root) {
       const tagData = getTagDescriptor(tag);
       const container = tag.closest(".combat-tags-inline");
       const combatIndex = Number.parseInt(container?.dataset.combatIndex, 10);
+      const row = tag.closest(".combat-view-item");
+      const collection = row?.closest?.("[data-entry-collection]")?.dataset.entryCollection || "notableCombats";
 
       if (!tagData.type || !tagData.key || Number.isNaN(combatIndex)) return;
 
@@ -109,6 +112,8 @@ function setupCombatTagDragDrop(sheet, root) {
 
       sheet._tagDragState = {
         combatIndex,
+        collection,
+        entryId: row?.dataset.combatId,
         tagType: tagData.type,
         tagKey: tagData.key,
         customIndex: Number.isNaN(tagData.customIndex) ? -1 : tagData.customIndex
@@ -134,6 +139,8 @@ function setupCombatTagDragDrop(sheet, root) {
 
       const container = tag.closest(".combat-tags-inline");
       const combatIndex = Number.parseInt(container?.dataset.combatIndex, 10);
+      const collection = tag.closest(".combat-view-item")?.closest?.("[data-entry-collection]")?.dataset.entryCollection || "notableCombats";
+      if (collection !== sheet._tagDragState.collection) return;
       if (combatIndex !== sheet._tagDragState.combatIndex) return;
 
       const target = getTagDescriptor(tag);
@@ -157,24 +164,30 @@ function setupCombatTagDragDrop(sheet, root) {
       if (!sheet._tagDragState) return;
 
       const container = tag.closest(".combat-tags-inline");
-      const combatIndex = Number.parseInt(container?.dataset.combatIndex, 10);
+      const collection = tag.closest(".combat-view-item")?.closest?.("[data-entry-collection]")?.dataset.entryCollection || "notableCombats";
+      if (collection !== sheet._tagDragState.collection) return;
+      const entries = getActorSourceSystem(sheet.actor)[collection] ?? [];
+      const combatIndex = sheet._tagDragState.entryId
+        ? entries.findIndex(entry => entry?.id === sheet._tagDragState.entryId)
+        : Number.parseInt(container?.dataset.combatIndex, 10);
+      if (combatIndex < 0) return;
       const target = getTagDescriptor(tag);
       const { tagType: draggedType, tagKey: draggedKey, customIndex: draggedCustomIndex } = sheet._tagDragState;
 
-      if (combatIndex !== sheet._tagDragState.combatIndex) return;
+      if (Number.parseInt(container?.dataset.combatIndex, 10) !== sheet._tagDragState.combatIndex) return;
       if (target.key === draggedKey) return;
 
       const insertAfter = isDropAfter(tag, event.clientX);
       if (draggedType === "custom" && target.type === "custom" && !Number.isNaN(draggedCustomIndex) && !Number.isNaN(target.customIndex)) {
         await sheet.actor.reorderPeasantNotableCombatCustomTag?.(combatIndex, draggedCustomIndex, target.customIndex, {
-          insertAfter
+          insertAfter, collection, usageId: entries[combatIndex]?.defaultUsageId || "base"
         });
         sheet._tagDragState = null;
         return;
       }
 
       await sheet.actor.reorderPeasantNotableCombatTag?.(combatIndex, draggedType, target.type, {
-        insertAfter
+        insertAfter, collection, usageId: entries[combatIndex]?.defaultUsageId || "base"
       });
 
       sheet._tagDragState = null;
@@ -187,6 +200,7 @@ function setupCombatTagDragDrop(sheet, root) {
 function setupCombatRowDragDrop(sheet, root) {
   delegate(root, "dragstart", ".notable-combats-list .combat-item", (event, item) => {
     try {
+      if (event.target?.closest?.(".combat-tag-draggable")) return;
       if (event.target?.closest?.(COMBAT_ROW_DRAG_BLOCK_SELECTOR)) return;
 
       const index = resolveElementIndex(item, "data-combat-index");
@@ -244,8 +258,7 @@ function setupCombatRowDragDrop(sheet, root) {
       const fromIndex = sheet._combatDragState.fromIndex;
       if (fromIndex !== null && (toIndex === fromIndex || toIndex === fromIndex + 1)) return;
 
-      const nextRow = getCombatRowsInList(list).find(row => resolveElementIndex(row, "data-combat-index") === toIndex);
-      (nextRow ?? targetRow).classList.add(nextRow ? "drag-over-top" : "drag-over-bottom");
+      markVerticalDropBoundary(getCombatRowsInList(list), targetRow, dropAfter);
     } catch (e) {}
   });
 

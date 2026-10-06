@@ -3,6 +3,22 @@ export const PC_DAMAGE_RESISTANCE_LETHAL_MULTIPLIER_FLAG = "damageResistanceLeth
 export const PC_DAMAGE_RESISTANCE_CRITICAL_MULTIPLIER_FLAG = "damageResistanceCriticalMultiplier";
 export const PC_DEFAULT_DAMAGE_RESISTANCE_MULTIPLIER = 1;
 
+export function normalizeScaleRating(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
+}
+
+export function getDamageScaleResult(amount, actor, attackScale = 0) {
+  const originalDamage = Math.max(0, Number(amount) || 0);
+  const targetScale = normalizeScaleRating(actor?.system?.scale);
+  const penetration = normalizeScaleRating(attackScale);
+  const missingScale = Math.max(0, targetScale - penetration);
+  return {
+    originalDamage, targetScale, attackScale: penetration, missingScale,
+    damage: missingScale > 0 ? Math.floor(originalDamage / (2 ** missingScale)) : originalDamage
+  };
+}
+
 export const PC_DAMAGE_RESISTANCE_MULTIPLIER_FLAGS = Object.freeze({
   blunt: PC_DAMAGE_RESISTANCE_BLUNT_MULTIPLIER_FLAG,
   lethal: PC_DAMAGE_RESISTANCE_LETHAL_MULTIPLIER_FLAG,
@@ -61,10 +77,14 @@ export function getDamageResistanceMultipliers(actor) {
 
 export function applyDamageResistanceToCounts(counts, actor) {
   const multipliers = getDamageResistanceMultipliers(actor);
+  const resist = (type) => {
+    const count = Math.max(0, Number(counts?.[type]) || 0);
+    return count > 0 && multipliers[type] > 0 ? Math.max(1, Math.floor(count * multipliers[type])) : 0;
+  };
   return {
-    critical: Math.floor(Math.max(0, Number(counts?.critical) || 0) * multipliers.critical),
-    lethal: Math.floor(Math.max(0, Number(counts?.lethal) || 0) * multipliers.lethal),
-    blunt: Math.floor(Math.max(0, Number(counts?.blunt) || 0) * multipliers.blunt)
+    critical: resist("critical"),
+    lethal: resist("lethal"),
+    blunt: resist("blunt")
   };
 }
 
@@ -84,23 +104,7 @@ export function toSimplifiedHpDamageFromCounts(counts, hardLocation = false) {
 }
 
 export function toSimplifiedHpDamageFromCountsWithResistance(counts, actor, hardLocation = false) {
-  counts = {
-    blunt: Math.max(0, Math.floor(Number(counts?.blunt) || 0)),
-    lethal: Math.max(0, Math.floor(Number(counts?.lethal) || 0)),
-    critical: Math.max(0, Math.floor(Number(counts?.critical) || 0))
-  };
-  if (hardLocation && counts.lethal > 0) {
-    const convertedToBlunt = Math.floor(counts.lethal / 2);
-    counts.lethal -= convertedToBlunt;
-    counts.blunt += convertedToBlunt;
-  }
-
-  const multipliers = getDamageResistanceMultipliers(actor);
-  const damage =
-    (counts.blunt * multipliers.blunt) +
-    (counts.lethal * 2 * multipliers.lethal) +
-    (counts.critical * 4 * multipliers.critical);
-  return Math.max(0, Math.floor(damage));
+  return toSimplifiedHpDamageFromCounts(applyDamageResistanceToCounts(counts, actor), hardLocation);
 }
 
 export function toSimplifiedHpDamage(amount, type, hardLocation = false) {

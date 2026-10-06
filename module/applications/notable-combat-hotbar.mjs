@@ -2,6 +2,7 @@ import { applyToHitAccuracy } from "../dice/roll-targets.mjs";
 import { formatOptionalIntegerInput, parseOptionalInteger } from "../data/actor/helpers.mjs";
 import { getEffectiveSkillCombatModifiers } from "../data/actor/combat-modifiers.mjs";
 import { isRollableSkillType } from "../data/actor/skill-entry-types.mjs";
+import { resolveSkillUsage } from "../data/actor/skill-entries.mjs";
 import { withPeasantActorSourceWriteContext } from "../data/actor/source-system.mjs";
 import { registerPeasantCoreApi } from "../utils/api.mjs";
 import { pcLog } from "../utils/logging.mjs";
@@ -129,8 +130,8 @@ async function createNotableCombatMacroData(data) {
     return null;
   }
 
-  const combatIndex = Number.parseInt(data.combatIndex, 10);
-  if (!Number.isInteger(combatIndex) || combatIndex < 0) {
+  const combatIndex = resolveNotableCombatIndex(actor, data);
+  if (combatIndex < 0) {
     ui.notifications?.warn?.("That notable combat could not be found on the actor.");
     return null;
   }
@@ -142,12 +143,17 @@ async function createNotableCombatMacroData(data) {
     return null;
   }
 
+  const resolved = resolveSkillUsage(combat, data.usageId ?? combat.defaultUsageId ?? "base");
+  if (!resolved.ok) {
+    ui.notifications?.warn?.("That notable combat usage is unavailable.");
+    return null;
+  }
   const combatId = String(data.combatId || await ensureNotableCombatId(actor, combatIndex)).trim();
   const flagData = {
     actorUuid: actor.uuid,
     combatId,
     combatIndex,
-    usageId: combat.defaultUsageId || "base"
+    usageId: resolved.usageId
   };
   const command = `await game.peasantCore.rollNotableCombatHotbarMacro(${JSON.stringify(flagData)});`;
   return {
@@ -173,7 +179,8 @@ async function createOrUpdateNotableCombatMacro(data, slot) {
     if (candidate?.type !== "script" || !candidate?.isAuthor) return false;
     const flags = candidate.getFlag?.("peasant-core", HOTBAR_FLAG);
     return candidate.command === macroData.command
-      || (flags?.actorUuid === flagData.actorUuid && flags?.combatId === flagData.combatId);
+      || (flags?.actorUuid === flagData.actorUuid && flags?.combatId === flagData.combatId
+        && flags?.usageId === flagData.usageId);
   });
 
   if (macro) {
@@ -276,28 +283,33 @@ export async function addSkillUsageToHotbar({ actorUuid, collection, entryId, us
   }
 }
 
-function getNotableCombatFlagData(macro) {
+function getHotbarEntryFlagData(macro) {
+  const usageData = macro?.getFlag?.("peasant-core", USAGE_HOTBAR_FLAG);
+  if (usageData && ["skills", "notableCombats"].includes(usageData.collection)) return usageData;
   const data = macro?.getFlag?.("peasant-core", HOTBAR_FLAG);
   return data && typeof data === "object" ? data : null;
 }
 
 async function getHotbarDisplayData(macro, flagData) {
   const actor = await resolveActor(flagData?.actorUuid);
-  const combatIndex = actor ? resolveNotableCombatIndex(actor, flagData) : -1;
-  const combat = combatIndex >= 0 ? getActorNotableCombats(actor)[combatIndex] : null;
-  if (!actor || !combat) {
+  const entry = flagData.collection
+    ? actor?.system?.[flagData.collection]?.find(candidate => String(candidate?.id ?? "") === flagData.entryId)
+    : getActorNotableCombats(actor)[resolveNotableCombatIndex(actor, flagData)];
+  const resolved = entry ? resolveSkillUsage(entry, flagData.usageId) : null;
+  if (!actor || !resolved?.ok) {
     return {
-      name: macro?.name || "Notable Combat",
+      name: macro?.name || "Skill or Notable",
       img: macro?.img || getDefaultCombatImage(),
       stats: EMPTY_COMBAT_STATS,
       missing: true
     };
   }
 
+  const name = entry.name || macro?.name || "Skill or Notable";
   return {
-    name: combat.name || macro?.name || "Notable Combat",
-    img: getCombatImage(combat),
-    stats: formatCombatStats(actor, combat),
+    name: flagData.collection && resolved.usageId !== "base" ? `${name}: ${resolved.usage.name || "Usage"}` : name,
+    img: getCombatImage(entry),
+    stats: formatCombatStats(actor, resolved.data),
     missing: false
   };
 }
@@ -382,7 +394,7 @@ async function decorateNotableCombatHotbar(app, html) {
   const slots = Array.isArray(app?.slots) ? app.slots : [];
 
   await Promise.all(slots.map(async (slotData) => {
-    const flagData = getNotableCombatFlagData(slotData?.macro);
+    const flagData = getHotbarEntryFlagData(slotData?.macro);
     if (!flagData) return;
     const slot = root.querySelector(`.slot[data-slot="${slotData.slot}"]`);
     if (!slot) return;
@@ -404,7 +416,7 @@ function getAssignedNotableCombatMacroFlagData() {
   });
   const macros = [...slotMacros, ...userMacros].filter((macro) => macro);
   return macros
-    .map((macro) => getNotableCombatFlagData(macro))
+    .map((macro) => getHotbarEntryFlagData(macro))
     .filter((data) => data);
 }
 
@@ -427,6 +439,7 @@ function isNotableCombatHotbarActorUpdate(changes) {
     if (key === "name" || key === "img") return true;
     if (key === "system.combatMods" || key.startsWith("system.combatMods.")) return true;
     if (key === "system.notableCombats" || key.startsWith("system.notableCombats.")) return true;
+    if (key === "system.skills" || key.startsWith("system.skills.")) return true;
   }
   return false;
 }

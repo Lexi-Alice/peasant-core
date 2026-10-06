@@ -174,7 +174,7 @@ function bindWoundsDialog(sheet, html, { readOnly = !!sheet?.isReadOnlyObserver 
 
   if (readOnly) return;
 
-  for (const button of qsa(html, ".pc-remove-condition")) {
+  for (const button of qsa(html, ".pc-remove-condition[data-condition]")) {
     button.addEventListener("click", async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -304,7 +304,7 @@ function renderActiveWounds(actor, { readOnly = false } = {}) {
     </div>
   ` : "";
 
-  if (!entries.length) return `${countRow}<div class="pc-resource-empty">No active wounds</div>`;
+  if (!entries.length && !devastatingWoundCount) return `<div class="pc-resource-empty">No active wounds</div>`;
 
   return countRow + entries.map((entry) => `
     <div class="pc-wound-tag"${readOnly ? ` tabindex="0"` : ""}>

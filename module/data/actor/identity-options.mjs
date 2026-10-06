@@ -9,6 +9,62 @@ export const PC_CUSTOM_SIR_LOCATION_VALUES_FLAG = "customSirLocationValues";
 const NATIONAL_ORIGIN_SETTINGS_VERSION = 2;
 const SIR_LOCATION_SETTINGS_VERSION = 2;
 
+// E5 Heraldry selections, pp. 26-29 and the detailed Heraldry sections.
+export const HERALDRIES = Object.freeze([
+  { name: "Human", major: ["Generalist", "All Kin"], minor: ["Friend Shaped", "Most Common Tool", "Ubiquitous"] },
+  { name: "Eve", major: ["Old Mark", "New Blood"], minor: ["Uncanny Grace", "Extended Commons", "Natural Reserves"] },
+  { name: "Taru", major: ["Legacy Magician", "Secret Holder"], minor: ["Magic Fundamentals", "Natural Apprentice", "Skykeeper"] },
+  { name: "Tarfel", major: ["Invasion Line", "Sol Saran"], minor: ["High Power", "Vita", "War Paced"] },
+  { name: "Lupine", major: ["Wolf Ominous", "Feralus"], minor: ["Ever Eye", "Watchman", "Night Peril"] },
+  { name: "Ursa", major: ["Ursa Saltus", "Ursa Polaris"], minor: ["Aware Bear", "Iron Hide", "Ursa Imperial"] },
+  { name: "Leon", major: ["Feline Soft-step", "Callus Executioner"], minor: ["Silent Haste", "Night Eye", "Many Lives"] },
+  { name: "Doomi", major: ["First Among Equals", "Ironfist Charmer"], minor: ["Those with the need", "Pacer", "Backstabber"] },
+  { name: "Skeever", major: ["Else Above All Else", "South Paw Blackhand"], minor: ["Natural Caster", "Black Shadow", "Arbiter"] }
+]);
+
+export function getHeraldryOptionGroups(kind, selectedValue) {
+  const groups = HERALDRIES.map(heraldry => ({
+    label: heraldry.name,
+    options: buildHeraldryOptions(heraldry[kind], selectedValue)
+  }));
+  const selected = String(selectedValue ?? "").trim();
+  if (selected && !/^(custom|other)$/i.test(selected) && !groups.some(group => group.options.some(option => option.selected))) {
+    groups.push({ label: "Saved selection", options: buildHeraldryOptions([selected], selected) });
+  }
+  return groups;
+}
+
+export function getFinalHeraldryOptions(selectedValue) {
+  const options = buildHeraldryOptions(HERALDRIES.map(heraldry => heraldry.name), selectedValue);
+  const selected = String(selectedValue ?? "").trim();
+  if (selected && !/^(custom|other)$/i.test(selected) && !options.some(option => option.selected)) {
+    options.push(...buildHeraldryOptions([selected], selected));
+  }
+  return options;
+}
+
+function buildHeraldryOptions(values, selectedValue) {
+  return values.map(value => ({ value, label: value, selected: value === selectedValue }));
+}
+
+export function migrateLegacyHeraldryData(source) {
+  const data = { ...source };
+  for (const [legacy, current] of [["race", "finalHeraldry"], ["customRace", "customFinalHeraldry"]]) {
+    if (Object.hasOwn(data, legacy) && !Object.hasOwn(data, current)) data[current] = data[legacy];
+    delete data[legacy];
+  }
+  return data;
+}
+
+export function migrateHeraldryEffectChanges(changes) {
+  if (!Array.isArray(changes)) return changes;
+  return changes.map(change => {
+    const key = change?.key === "system.race" ? "system.finalHeraldry"
+      : change?.key === "system.customRace" ? "system.customFinalHeraldry" : null;
+    return key ? { ...change, key } : change;
+  });
+}
+
 export const DEFAULT_NATIONAL_ORIGINS = Object.freeze([
   Object.freeze({ key: "grimmstad", label: "Grimmstad" }),
   Object.freeze({ key: "savonia", label: "Savonia" }),

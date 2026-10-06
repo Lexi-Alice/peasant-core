@@ -1,0 +1,11 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\peasant-core",
+    "\\peasant-core\\module",
+    "\\peasant-core\\module\\applications",
+    "\\peasant-core\\module\\applications\\combat"
+  ],
+  "SelectedNode": "\\peasant-core\\module\\applications\\combat\\attack-locations.mjs",
+  "PreviewInSolutionExplorer": false
+}

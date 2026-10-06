@@ -87,7 +87,7 @@
           "inventory",
           "skills.*.description",
           "notableCombats.*.description",
-          "flexibleAdvantageDescriptions.*"
+          "flexibleAdvantageDescriptions.*.description"
         ]
       }
     },

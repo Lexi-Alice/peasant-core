@@ -143,7 +143,8 @@ async function publishDomeDamageRoll(damageRoll, domeStage) {
   await attachDamageRollUndo(damageRoll, domeStage?.domeResult);
 }
 
-async function finalizeDamageApplication(damageRoll, domeStage, application) {
+async function finalizeDamageApplication(damageRoll, domeStage, application, onSaveReplayProgress) {
+  onSaveReplayProgress?.({ damageRoll, application });
   await publishAutomatedCombatDamageRoll(damageRoll);
   await attachDamageRollUndo(damageRoll, application);
   await createAutomatedDamageBarrierMessages(damageRoll, {
@@ -165,7 +166,7 @@ export function applyArmorChargeLocationEffects(locationRoll, resolution) {
     && !locationRoll.bySkill
     && locationRoll.isAP
   ) {
-    return { ...locationRoll, isAP: false };
+    return { ...locationRoll, originalIsAP: locationRoll.originalIsAP ?? locationRoll.isAP, isAP: false };
   }
   return locationRoll;
 }
@@ -325,6 +326,10 @@ export async function resolveSuccessfulAttackDamageForTarget({
 
   const targetLabel = target?.targetName || target?.actor?.name || "";
   const targetActor = target?.actor || null;
+  const attackScale = isSkillTagAutoEligible(combat, "tippingScales", {
+    success: attackRoll?.rollResult?.isSuccess === true,
+    hit: attackRoll?.rollResult?.isSuccess === true
+  }) ? combat.tippingScales : 0;
   const targetTokenDocument = target?.tokenDocument || target?.token?.document || target?.token || null;
   const damageRollKey = createEdgeIndividualValueRollKey("damage", {
     targetRef: {
@@ -347,6 +352,8 @@ export async function resolveSuccessfulAttackDamageForTarget({
     const resolvedDamageType = normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt");
 
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+      targetActor,
+      attackScale,
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
@@ -355,6 +362,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       diceOverride: individualDamageDice,
       combatMods
     });
+    onSaveReplayProgress?.({ damageRoll });
     const damageAmount = getAppliedDamageRollTotal(damageRoll);
     if (!damageRoll || damageAmount <= 0) {
       await publishAutomatedCombatDamageRoll(damageRoll);
@@ -395,12 +403,13 @@ export async function resolveSuccessfulAttackDamageForTarget({
       shieldBlock: {
         selectedCombatId: defensePromptResult?.selectedCombatId || null,
         selectedCombatIndex: defensePromptResult?.selectedCombatIndex,
+        selectedUsageId: defensePromptResult?.selectedUsageId || "base",
         ...(replayShieldBlockChoice === "normal" || replayShieldBlockChoice === "braced"
           ? { replayBraceChoice: replayShieldBlockChoice }
           : {})
       }
     });
-    application = await finalizeDamageApplication(damageRoll, domeStage, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application, onSaveReplayProgress);
 
     return {
       handled: !application?.chainCancelled,
@@ -418,6 +427,8 @@ export async function resolveSuccessfulAttackDamageForTarget({
     const resolvedDamageType = normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt");
 
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+      targetActor,
+      attackScale,
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
@@ -426,6 +437,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       diceOverride: individualDamageDice,
       combatMods
     });
+    onSaveReplayProgress?.({ damageRoll });
     const damageAmount = getAppliedDamageRollTotal(damageRoll);
     if (!damageRoll || damageAmount <= 0) {
       await publishAutomatedCombatDamageRoll(damageRoll);
@@ -469,6 +481,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
             defensePromptResult,
             magnetismGrade
           });
+      onSaveReplayProgress?.({ damageRoll, locationRoll });
       if (isChainCancelledResult(locationRoll)) {
         await publishDomeDamageRoll(damageRoll, domeStage);
         await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage?.domeResult || null });
@@ -500,13 +513,14 @@ export async function resolveSuccessfulAttackDamageForTarget({
       weaponBlock: {
         selectedCombatId: defensePromptResult?.selectedCombatId || null,
         selectedCombatIndex: defensePromptResult?.selectedCombatIndex,
+        selectedUsageId: defensePromptResult?.selectedUsageId || "base",
         selectedDefense: weaponDefense,
         originalDamageAmount,
         masteryBonus: !!weaponDefense.masteryBonus,
         magnetismGrade
       }
     });
-    application = await finalizeDamageApplication(damageRoll, domeStage, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application, onSaveReplayProgress);
     await attachLocationRollWorkflowData(locationRoll, {
       application,
       target,
@@ -541,6 +555,8 @@ export async function resolveSuccessfulAttackDamageForTarget({
     const resolvedDamageType = normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt");
 
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+      targetActor,
+      attackScale,
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
@@ -549,6 +565,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       diceOverride: individualDamageDice,
       combatMods
     });
+    onSaveReplayProgress?.({ damageRoll });
     const damageAmount = getAppliedDamageRollTotal(damageRoll);
     if (!damageRoll || damageAmount <= 0) {
       await publishAutomatedCombatDamageRoll(damageRoll);
@@ -607,11 +624,12 @@ export async function resolveSuccessfulAttackDamageForTarget({
       mageBlock: {
         selectedCombatId: defensePromptResult?.selectedCombatId || null,
         selectedCombatIndex: defensePromptResult?.selectedCombatIndex ?? null,
+        selectedUsageId: defensePromptResult?.selectedUsageId || "base",
         mageBarrierAction: defensePromptResult?.mageBarrierAction || null
       },
       domeAlreadyResolved: true
     });
-    application = await finalizeDamageApplication(damageRoll, domeStage, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application, onSaveReplayProgress);
     const mageBlockResult = application?.mageBlockResult || application || {};
     const absorbedByMage = Math.max(0, Number(mageBlockResult.absorbed) || 0);
     const redirectedDamage = Math.max(0, Number(mageBlockResult.overflow) || 0);
@@ -636,6 +654,8 @@ export async function resolveSuccessfulAttackDamageForTarget({
       ? (defensePromptResult?.selection === "reflexSave" ? defensePromptResult.reflexSaveResult : null)
       : await rollAoeReflexSaveForTarget({ target, targetingType }));
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+      targetActor,
+      attackScale,
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
@@ -711,7 +731,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       domeAlreadyResolved
     });
     onSaveReplayProgress?.({ damageRoll, reflexSaveResult, application });
-    application = await finalizeDamageApplication(damageRoll, domeStage, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application, onSaveReplayProgress);
 
     return {
       handled: true,
@@ -730,6 +750,8 @@ export async function resolveSuccessfulAttackDamageForTarget({
     let resolvedDamageType = normalizeAppliedDamageType(appliedDamageType || combat?.damage?.type, "blunt");
     if (resolvedDamageType === "flexible") resolvedDamageType = "blunt";
     const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+      targetActor,
+      attackScale,
       targetLabel,
       attackerToken,
       appliedDamageType: resolvedDamageType,
@@ -738,6 +760,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       diceOverride: individualDamageDice,
       combatMods
     });
+    onSaveReplayProgress?.({ damageRoll });
     const damageAmount = getAppliedDamageRollTotal(damageRoll);
     if (!damageRoll || damageAmount <= 0) {
       await publishAutomatedCombatDamageRoll(damageRoll);
@@ -785,6 +808,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       resolveLocation: workflowDependencies.resolveLocation || resolveAttackLocationForTarget
     });
     const { locationRoll, resolution } = armorChargeLocation || {};
+    onSaveReplayProgress?.({ damageRoll, locationRoll });
     if (isChainCancelledResult(armorChargeLocation)) {
       await publishDomeDamageRoll(damageRoll, domeStage);
       await createAutomatedDamageBarrierMessages(damageRoll, { dome: domeStage.domeResult });
@@ -823,7 +847,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
       ignoreHaltReduction: overkill,
       domeAlreadyResolved: true
     });
-    application = await finalizeDamageApplication(damageRoll, domeStage, application);
+    application = await finalizeDamageApplication(damageRoll, domeStage, application, onSaveReplayProgress);
     await attachLocationRollWorkflowData(locationRoll, {
       application,
       target,
@@ -877,11 +901,14 @@ export async function resolveSuccessfulAttackDamageForTarget({
     };
   }
   const { locationRoll, resolution } = armorChargeLocation || {};
+  onSaveReplayProgress?.({ locationRoll });
   if (!locationRoll) return { handled: false, reason: "locationUnavailable" };
 
   const resolvedDamageType = normalizeAppliedDamageType(resolution?.appliedDamageType || appliedDamageType || combat?.damage?.type, "blunt");
 
   const damageRoll = await rollAutomatedCombatDamage(actor, combat, {
+    targetActor,
+    attackScale,
     targetLabel,
     attackerToken,
     appliedDamageType: resolvedDamageType,
@@ -889,6 +916,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
     diceOverride: individualDamageDice,
     combatMods
   });
+  onSaveReplayProgress?.({ damageRoll });
   const damageAmount = getAppliedDamageRollTotal(damageRoll);
   if (!damageRoll || damageAmount <= 0) {
     return { handled: false, reason: "noDamageRolled", locationRoll, damageRoll, resolution };
@@ -906,7 +934,7 @@ export async function resolveSuccessfulAttackDamageForTarget({
     ignoreHaltReduction: overkill,
     domeAlreadyResolved
   });
-  application = await finalizeDamageApplication(damageRoll, null, application);
+  application = await finalizeDamageApplication(damageRoll, null, application, onSaveReplayProgress);
   await attachLocationRollWorkflowData(locationRoll, {
     application,
     target,

@@ -1,7 +1,15 @@
 import { migrateLegacyManifestSpellEffectSystemData } from "./spell-effect-change-keys.mjs";
+import { migrateHeraldryEffectChanges } from "../actor/identity-options.mjs";
 import { hasExpiringSkillEffectDuration, isPassiveSkillEffectDefinition, isSkillEditorDefinition } from "../actor/skill-entry-conditions.mjs";
 
 export class PeasantActiveEffect extends ActiveEffect {
+  static migrateData(source, options) {
+    const data = super.migrateData(source, options);
+    if (!Array.isArray(data.system?.changes)) return data;
+    data.system.changes = migrateHeraldryEffectChanges(data.system.changes);
+    return data;
+  }
+
   async _preUpdate(changed, options, user) {
     if (changed?.disabled === false && isSkillEditorDefinition(this)
       && !isPassiveSkillEffectDefinition(this)) return false;

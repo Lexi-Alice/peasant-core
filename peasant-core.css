@@ -6,9 +6,17 @@
 }
 
 .peasant-core.sheet.actor.character.peasant-actor-sheet:not(.minimized, .minimizing, .maximizing) {
-    min-width: 800px;
+    min-width: 900px;
     min-height: 700px;
     overflow: visible !important;
+}
+
+/* Fill the primary popup without changing the sheet's stored application size. */
+body.detached .peasant-core.sheet.actor.character.peasant-actor-sheet.pc-primary-detached-sheet:not(.minimized, .minimizing, .maximizing) {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0;
+    min-height: 0;
 }
 
 /* Shared section-border accents */
@@ -1635,12 +1643,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     width: 180px;
 }
 
-.pc-defense-prompt-select {
-    min-height: 38px !important;
-    padding: 8px 10px !important;
-    font-size: 14px !important;
-}
-
 .pc-tag-field-row,
 .pc-tag-field-stack {
     display: flex;
@@ -1760,6 +1762,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .peasant-core.peasant-item-sheet:not(.minimized) > header > slide-toggle.mode-slider,
 .application.peasant-core.peasant-item-sheet:not(.minimized) > header > slide-toggle.mode-slider,
 .window-app.peasant-core.peasant-item-sheet:not(.minimized) > header > slide-toggle.mode-slider,
+.peasant-core.pc-skill-editor:not(.minimized) > header > slide-toggle.mode-slider,
 .peasant-core.pc-hp-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
 .application.peasant-core.pc-hp-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
 .window-app.peasant-core.pc-hp-grid-dialog:not(.minimized) > header > slide-toggle.mode-slider,
@@ -1776,6 +1779,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .peasant-core.peasant-item-sheet.minimized slide-toggle.mode-slider,
 .application.peasant-core.peasant-item-sheet.minimized slide-toggle.mode-slider,
 .window-app.peasant-core.peasant-item-sheet.minimized slide-toggle.mode-slider,
+.peasant-core.pc-skill-editor.minimized slide-toggle.mode-slider,
 .peasant-core.pc-hp-grid-dialog.minimized slide-toggle.mode-slider,
 .application.peasant-core.pc-hp-grid-dialog.minimized slide-toggle.mode-slider,
 .window-app.peasant-core.pc-hp-grid-dialog.minimized slide-toggle.mode-slider,
@@ -1898,6 +1902,12 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     margin-bottom: 62px;
 }
 
+.actor-sheet > .character-header:has(.pc-banner-subtitle.is-editing),
+.window-app.peasant-core .actor-sheet .pc-character-banner:has(.pc-banner-subtitle.is-editing) {
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+
 .actor-sheet > .character-header .character-name,
 .window-app.peasant-core .actor-sheet .pc-character-banner .character-name {
     min-width: min(360px, 100%);
@@ -1907,41 +1917,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     letter-spacing: 0.04em;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
     border-bottom-color: rgba(218, 190, 130, 0.66) !important;
-}
-
-.actor-sheet > .character-header .character-field:not(select),
-.actor-sheet > .character-header .character-field-popover-input,
-.window-app.peasant-core .actor-sheet .pc-character-banner .character-field:not(select),
-.window-app.peasant-core .actor-sheet .pc-character-banner .character-field-popover-input {
-    background: var(--pc-sheet-surface) !important;
-    border-color: rgba(218, 190, 130, 0.42) !important;
-    color: #f3e8d2 !important;
-    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32);
-}
-
-.actor-sheet > .character-header select.character-field,
-.window-app.peasant-core .actor-sheet .pc-character-banner select.character-field {
-    background: var(--pc-sheet-surface) !important;
-    border-color: rgba(218, 190, 130, 0.42) !important;
-    color: #f3e8d2 !important;
-    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32);
-}
-
-.actor-sheet > .character-header .character-field:not(select):hover,
-.actor-sheet > .character-header .character-field:not(select):focus,
-.actor-sheet > .character-header select.character-field:hover,
-.actor-sheet > .character-header select.character-field:focus,
-.actor-sheet > .character-header .character-field-popover-input:hover,
-.actor-sheet > .character-header .character-field-popover-input:focus,
-.window-app.peasant-core .actor-sheet .pc-character-banner .character-field:not(select):hover,
-.window-app.peasant-core .actor-sheet .pc-character-banner .character-field:not(select):focus,
-.window-app.peasant-core .actor-sheet .pc-character-banner select.character-field:hover,
-.window-app.peasant-core .actor-sheet .pc-character-banner select.character-field:focus,
-.window-app.peasant-core .actor-sheet .pc-character-banner .character-field-popover-input:hover,
-.window-app.peasant-core .actor-sheet .pc-character-banner .character-field-popover-input:focus {
-    background: rgba(18, 14, 12, 0.9) !important;
-    border-color: var(--pc-foundry-input-focus-border) !important;
-    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
 }
 
 @media (max-width: 760px) {
@@ -2006,34 +1981,12 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .actor-sheet select.character-field {
-    background: var(--input-background-color, #2a2a2a) !important;
-    color: #e0e0e0 !important;
-    border: 1px solid var(--input-border-color, #555) !important;
-    border-radius: 3px !important;
-    padding: 6px 8px !important;
     width: 132px !important;
     min-width: 132px;
     max-width: 132px;
     flex: 0 0 132px !important;
     flex-shrink: 0 !important;
     white-space: nowrap !important;
-    line-height: normal;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-    color-scheme: dark;
-}
-
-.actor-sheet select.character-field:hover,
-.actor-sheet select.character-field:focus {
-    background: #333 !important;
-    border-color: var(--pc-foundry-input-focus-border) !important;
-    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
-}
-
-.actor-sheet select.character-field option {
-    background: #2a2a2a;
-    color: #e0e0e0;
 }
 
 .actor-sheet .character-field-popover {
@@ -2051,23 +2004,16 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     width: 132px;
     min-width: 132px;
     max-width: 132px;
-    background: var(--input-background-color, #2a2a2a);
-    color: #e0e0e0;
-    border: 1px solid var(--input-border-color, #555);
-    border-radius: 3px;
-    padding: 6px 8px;
+    padding: 4px 8px;
     line-height: normal;
+    font-family: var(--font-body);
     font-size: 14px;
+    font-weight: normal;
+    letter-spacing: normal;
+    text-transform: none;
+    text-shadow: none;
     box-sizing: border-box;
     z-index: 25;
-}
-
-.actor-sheet .character-field-popover-input:hover,
-.actor-sheet .character-field-popover-input:focus {
-    background: #333;
-    border-color: var(--pc-foundry-input-focus-border);
-    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
-    outline: none;
 }
 
 .actor-sheet > .character-header .pc-banner-identity,
@@ -2107,25 +2053,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     width: min(520px, 100%) !important;
     min-width: min(360px, 100%) !important;
     padding: 8px 12px 7px !important;
-    border: 1px solid rgba(203, 191, 154, 0.34) !important;
-    border-radius: 3px !important;
-    background:
-        linear-gradient(90deg, rgba(4, 4, 7, 0.9) 0%, rgba(4, 4, 7, 0.62) 72%, rgba(4, 4, 7, 0.08) 100%) !important;
-    box-shadow:
-        inset 0 0 18px rgba(0, 0, 0, 0.58),
-        0 1px 5px rgba(0, 0, 0, 0.38) !important;
     cursor: text;
-}
-
-.actor-sheet > .character-header .pc-banner-identity input.character-name.pc-banner-name-input:hover,
-.actor-sheet > .character-header .pc-banner-identity input.character-name.pc-banner-name-input:focus,
-.window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-identity input.character-name.pc-banner-name-input:hover,
-.window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-identity input.character-name.pc-banner-name-input:focus {
-    border-color: var(--pc-foundry-input-focus-border) !important;
-    box-shadow:
-        inset 0 0 18px rgba(0, 0, 0, 0.62),
-        0 0 4px var(--pc-foundry-input-focus-shadow) !important;
-    outline: none;
 }
 
 .actor-sheet > .character-header .pc-banner-subtitle,
@@ -2181,6 +2109,7 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 }
 
 .actor-sheet > .character-header .pc-banner-rest-button,
+.actor-sheet > .character-header .pc-banner-scale,
 .window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-rest-button {
     position: relative;
     display: grid;
@@ -2206,6 +2135,24 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
 .actor-sheet > .character-header .pc-banner-rest-button::after,
 .window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-rest-button::after {
     content: none;
+}
+
+.actor-sheet > .character-header .pc-banner-scale {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 72px;
+    min-width: 72px;
+    cursor: default;
+}
+
+.actor-sheet > .character-header .pc-banner-scale input {
+    width: 38px;
+    min-width: 0;
+    height: 26px;
+    padding: 0 4px;
+    text-align: center;
 }
 
 .actor-sheet > .character-header .pc-banner-rest-button:hover,
@@ -2256,22 +2203,10 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     min-height: 18px;
     margin: 0;
     padding: 0 3px;
-    border: 1px solid rgba(203, 191, 154, 0.72);
-    border-radius: 3px;
-    background: var(--pc-sheet-surface);
-    color: #efe7d2;
     font-size: 11px;
     font-weight: 800;
     line-height: 16px;
     text-align: center;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.65);
-}
-
-.actor-sheet > .character-header .pc-banner-ap-input:focus,
-.window-app.peasant-core .actor-sheet .pc-character-banner .pc-banner-ap-input:focus {
-    border-color: var(--pc-foundry-input-focus-border);
-    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
-    outline: none;
 }
 
 .actor-sheet > .character-header .pc-banner-ap-track,
@@ -2315,11 +2250,6 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     width: auto !important;
     min-width: 118px !important;
     max-width: 220px !important;
-    height: 28px;
-    padding: 4px 8px !important;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
 }
 
 .actor-sheet > .character-header .pc-banner-subtitle.is-editing .character-field-popover-input,
@@ -2327,7 +2257,34 @@ body.detached .application.peasant-actor-sheet .pc-sheet-tab-rail,
     width: 180px;
     min-width: 180px;
     max-width: 180px;
-    font-size: 12px;
+}
+
+.actor-sheet > .character-header .pc-banner-heraldries {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.actor-sheet > .character-header .pc-banner-heraldries label {
+    display: block;
+    font-size: 10px;
+}
+
+.actor-sheet > .character-header .pc-banner-heraldries .pc-heraldry-select {
+    display: block;
+    width: 220px;
+    max-width: 100%;
+    margin-top: 3px;
+}
+
+.actor-sheet > .character-header .pc-banner-heraldries .character-field-popover-input {
+    position: static;
+    margin-top: 6px;
+}
+
+.actor-sheet > .character-header .pc-banner-heraldries ~ .character-field-popover {
+    align-self: flex-start;
+    margin-top: 14.5px;
 }
 
 
@@ -4567,7 +4524,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     background: transparent !important;
     box-shadow: none;
     color: var(--button-text-color, var(--color-light-3, #e7d1b1));
-    cursor: pointer;
+    cursor: default;
     font-size: 11px;
     font-weight: 900;
     letter-spacing: 0.055em;
@@ -4577,13 +4534,6 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     text-shadow: none;
     appearance: none;
     -webkit-appearance: none;
-}
-
-.pc-hex-attributes .attr-label.pc-attr-hex-name:hover,
-.pc-hex-attributes .attr-label.pc-attr-hex-name:focus-visible {
-    color: var(--button-hover-text-color, var(--color-light-1, #ffffff));
-    text-shadow: none;
-    outline: none;
 }
 
 .pc-attr-hex-frame {
@@ -6205,31 +6155,39 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
     }
 }
 
-/* Scoped dropdown styling - peasant system UI only */
-.window-app.peasant-core .actor-sheet select:not(.pm-dropdown),
-.peasant-tag-editor select {
+/* Shared native dropdown appearance; individual forms retain their layout widths. */
+:is(.peasant-core, .pc-resource-dialog, .pc-description-editor,
+    .pc-notable-combat-tag-editor, .peasant-tag-editor, .peasant-macro-dialog,
+    .peasant-macro-dialog-force, .macro-sheet, :where(#macro-config)) select:not(.pm-dropdown) {
     background: var(--input-background-color, #2a2a2a);
-    color: #e0e0e0;
+    color: var(--input-text-color, #e0e0e0);
     border: 1px solid var(--input-border-color, #555);
-    border-radius: 3px !important;
-    padding: 6px 8px;
+    border-radius: 3px;
+    height: var(--input-height, 32px);
+    min-height: 24px;
+    padding: 4px 8px;
+    font-family: var(--font-body);
+    font-size: var(--font-size-14, 14px);
+    font-weight: normal;
+    letter-spacing: normal;
+    line-height: normal;
+    text-transform: none;
+    text-shadow: none;
+    color-scheme: dark;
+    box-shadow: none;
     outline: none;
-    cursor: pointer;
 }
 
-.window-app.peasant-core .actor-sheet select:not(.pm-dropdown):hover,
-.window-app.peasant-core .actor-sheet select:not(.pm-dropdown):focus,
-.peasant-tag-editor select:hover,
-.peasant-tag-editor select:focus {
-    background: #333;
-    border-color: var(--pc-foundry-input-focus-border);
-    box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
-}
-
-.window-app.peasant-core .actor-sheet select:not(.pm-dropdown) option,
-.peasant-tag-editor select option {
+:is(.peasant-core, .pc-resource-dialog, .pc-description-editor,
+    .pc-notable-combat-tag-editor, .peasant-tag-editor, .peasant-macro-dialog,
+    .peasant-macro-dialog-force, .macro-sheet, :where(#macro-config)) select:not(.pm-dropdown) :is(option, optgroup) {
     background: var(--input-background-color, #2a2a2a);
-    color: #e0e0e0;
+    color: var(--input-text-color, #e0e0e0);
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+    text-shadow: none;
 }
 /* TinyMCE v6 specific dropdowns */
 .tox-collection__group,
@@ -6598,6 +6556,7 @@ nav.pc-stress-grid-tabs .pc-stress-grid-tab.active {
 #chat-log .message .message-header .message-sender,
 .chat-message .message-header .message-sender {
     min-width: 0 !important;
+    font-size: 14px !important;
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
@@ -6697,7 +6656,7 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
     border: 0 !important;
     background: transparent !important;
     color: var(--button-text-color, #e0e0e0) !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
     font-weight: 700 !important;
     line-height: 1.2 !important;
     white-space: normal !important;
@@ -6822,13 +6781,9 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
     padding: 0 !important;
 }
 
-#chat-log .message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
-#chat-log .message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
-#chat-log .message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
-.chat-message .skill-roll-card.pc-damage-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
-.chat-message .skill-roll-card.pc-heal-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child,
-.chat-message .skill-roll-card.pc-manifest-roll-card div[style*="justify-content"][style*="space-between"] > span:first-child {
-    font-size: 13px !important;
+#chat-log .message .skill-roll-card div[style*="justify-content"][style*="space-between"] > span,
+.chat-message .skill-roll-card div[style*="justify-content"][style*="space-between"] > span {
+    font-size: 14px !important;
     line-height: 1.2 !important;
 }
 
@@ -7665,11 +7620,15 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 }
 
 .pc-notable-combat-image {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   align-self: start;
   pointer-events: none;
 }
 
 .pc-notable-combat-content {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -7677,15 +7636,72 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   gap: 2px 4px;
   min-width: 0;
   padding-left: 4px;
+  overflow-wrap: anywhere;
 }
 
-.pc-notable-combat-content > .combat-edit-heading,
-.pc-notable-combat-content > .combat-tags-inline {
+.pc-notable-combat-content > .combat-edit-heading {
   flex: 1 1 100%;
 }
 
+.pc-notable-combat-list .combat-edit-heading > :is(.combat-input, .combat-select) {
+  box-sizing: border-box;
+  height: 26px;
+  min-height: 26px;
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.pc-notable-combat-list .combat-edit-heading > :is(.combat-class, .combat-rank) {
+  flex: 0 0 34px;
+}
+
+.pc-notable-combat-list .combat-edit-heading > .combat-select {
+  flex: 0 1 100px;
+}
+
+.pc-notable-combat-list .combat-edit-heading > .combat-special-grade {
+  flex: 0 0 52px;
+}
+
+.pc-notable-combat-list .combat-edit-heading > .combat-name {
+  flex: 1 1 110px;
+  width: auto;
+  text-align: left;
+}
+
+.pc-notable-combat-list .combat-edit-heading > :is(.combat-tohit, .combat-accuracy, .combat-ap, .combat-sp) {
+  flex: 0 0 40px;
+  text-align: center;
+}
+
+.pc-skill-advancement-display {
+  color: #aaa;
+  font-weight: bold;
+}
+
+.pc-notable-combat-list .combat-tags-inline {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  min-width: 0;
+  margin: 0;
+  padding-left: 4px;
+}
+
+.pc-notable-combat-list .combat-tags-inline > * {
+  box-sizing: border-box;
+  min-width: 0 !important;
+  max-width: 100%;
+  height: auto !important;
+  flex-wrap: wrap;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
 .pc-notable-combat-row-controls {
-  align-self: stretch;
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
   width: max-content;
   min-width: max-content;
 }
@@ -8018,22 +8034,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 }
 
 .peasant-tag-editor .tag-input-area input:focus {
-  outline: none;
-  border-color: var(--pc-foundry-input-focus-border);
-  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
-  background: #333;
-}
-
-.peasant-tag-editor .tag-input-area select {
-  background: #2a2a2a;
-  border: 1px solid #555;
-    border-radius: 3px !important;
-  color: #e0e0e0;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-.peasant-tag-editor .tag-input-area select:focus {
   outline: none;
   border-color: var(--pc-foundry-input-focus-border);
   box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow);
@@ -8428,64 +8428,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   max-width: min(300px, calc(100vw - 32px)) !important;
 }
 
-.window-app.pc-defense-prompt-dialog .pc-defense-prompt-select,
-.pc-defense-prompt-dialog .pc-defense-prompt-select,
-.window-app.pc-force-pass-dialog .pc-defense-prompt-select,
-.pc-force-pass-dialog .pc-defense-prompt-select,
-.window-app.pc-location-by-skill-dialog .pc-defense-prompt-select,
-.pc-location-by-skill-dialog .pc-defense-prompt-select,
-.window-app.pc-incoming-hit-dialog .pc-defense-prompt-select,
-.pc-incoming-hit-dialog .pc-defense-prompt-select {
-  background: var(--input-background-color, #2a2a2a) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-  border: 1px solid var(--input-border-color, #555) !important;
-  border-radius: 3px !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-.window-app.pc-defense-prompt-dialog .pc-defense-prompt-select:hover,
-.window-app.pc-defense-prompt-dialog .pc-defense-prompt-select:focus,
-.window-app.pc-defense-prompt-dialog .pc-defense-prompt-select:focus-visible,
-.pc-defense-prompt-dialog .pc-defense-prompt-select:hover,
-.pc-defense-prompt-dialog .pc-defense-prompt-select:focus,
-.pc-defense-prompt-dialog .pc-defense-prompt-select:focus-visible,
-.window-app.pc-force-pass-dialog .pc-defense-prompt-select:hover,
-.window-app.pc-force-pass-dialog .pc-defense-prompt-select:focus,
-.window-app.pc-force-pass-dialog .pc-defense-prompt-select:focus-visible,
-.pc-force-pass-dialog .pc-defense-prompt-select:hover,
-.pc-force-pass-dialog .pc-defense-prompt-select:focus,
-.pc-force-pass-dialog .pc-defense-prompt-select:focus-visible,
-.window-app.pc-location-by-skill-dialog .pc-defense-prompt-select:hover,
-.window-app.pc-location-by-skill-dialog .pc-defense-prompt-select:focus,
-.window-app.pc-location-by-skill-dialog .pc-defense-prompt-select:focus-visible,
-.pc-location-by-skill-dialog .pc-defense-prompt-select:hover,
-.pc-location-by-skill-dialog .pc-defense-prompt-select:focus,
-.pc-location-by-skill-dialog .pc-defense-prompt-select:focus-visible,
-.window-app.pc-incoming-hit-dialog .pc-defense-prompt-select:hover,
-.window-app.pc-incoming-hit-dialog .pc-defense-prompt-select:focus,
-.window-app.pc-incoming-hit-dialog .pc-defense-prompt-select:focus-visible,
-.pc-incoming-hit-dialog .pc-defense-prompt-select:hover,
-.pc-incoming-hit-dialog .pc-defense-prompt-select:focus,
-.pc-incoming-hit-dialog .pc-defense-prompt-select:focus-visible {
-  background: #333 !important;
-  border-color: var(--pc-foundry-input-focus-border) !important;
-  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
-  outline: none !important;
-}
-
-.window-app.pc-defense-prompt-dialog .pc-defense-prompt-select option,
-.pc-defense-prompt-dialog .pc-defense-prompt-select option,
-.window-app.pc-force-pass-dialog .pc-defense-prompt-select option,
-.pc-force-pass-dialog .pc-defense-prompt-select option,
-.window-app.pc-location-by-skill-dialog .pc-defense-prompt-select option,
-.pc-location-by-skill-dialog .pc-defense-prompt-select option,
-.window-app.pc-incoming-hit-dialog .pc-defense-prompt-select option,
-.pc-incoming-hit-dialog .pc-defense-prompt-select option {
-  background: var(--input-background-color, #2a2a2a) !important;
-  color: var(--input-text-color, #e0e0e0) !important;
-}
-
 .pc-defense-prompt-dialog .pc-mage-barrier-effect-group {
   grid-column: 1 / -1;
   width: 100%;
@@ -8752,7 +8694,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   border: 1px solid var(--button-border-color, #9a8462) !important;
   color: var(--button-text-color, #e5cfaa) !important;
   line-height: 1.2 !important;
-  white-space: nowrap !important;
   box-shadow: none !important;
 }
 
@@ -8817,7 +8758,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 .window-app.peasant-core .actor-sheet .notable-combats-list-view .combat-tags-inline button.combat-tag-button,
 .window-app.peasant-core .actor-sheet .notable-combats-list .combat-tags-inline button.combat-tag-button {
   --button-size: 24px;
-  min-width: max-content;
   min-height: var(--button-size) !important;
   padding: 0 0.4rem !important;
   margin: 0 !important;
@@ -8832,7 +8772,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   line-height: normal !important;
   cursor: var(--cursor-pointer) !important;
   box-shadow: none !important;
-  white-space: nowrap !important;
 }
 
 .window-app.peasant-core .actor-sheet .notable-combats-list-view .combat-tags-inline button.combat-tag-button:hover,
@@ -8877,7 +8816,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 .window-app.peasant-core .actor-sheet .notable-combats-list .combat-tags-inline span.combat-tag-sections,
 .window-app.peasant-core .actor-sheet .notable-combats-list .combat-tags-inline span.combat-tag-speed {
   --button-size: 24px;
-  min-width: max-content;
   min-height: var(--button-size) !important;
   padding: 0 0.4rem !important;
   margin: 0 !important;
@@ -8890,7 +8828,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   color: var(--button-text-color) !important;
   border-radius: 4px !important;
   line-height: normal !important;
-  white-space: nowrap !important;
   box-shadow: none !important;
   cursor: grab !important;
 }
@@ -8969,39 +8906,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 .peasant-tag-editor .tag-input-area input[type="text"]:invalid,
 .peasant-tag-editor .tag-input-area input[type="number"]:user-invalid,
 .peasant-tag-editor .tag-input-area input[type="text"]:user-invalid {
-  border-color: var(--pc-foundry-input-focus-border) !important;
-  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
-  outline: none !important;
-}
-
-.window-app.peasant-core .peasant-tag-editor .tag-input-area select,
-.peasant-tag-editor .tag-input-area select {
-  background: var(--input-background-color, #2a2a2a) !important;
-  color: #e0e0e0 !important;
-  border: 1px solid var(--input-border-color, #555) !important;
-  border-radius: 3px !important;
-  padding: 4px 8px !important;
-  font-size: 12px !important;
-  outline: none !important;
-  box-shadow: none !important;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
-  appearance: auto;
-  color-scheme: dark;
-}
-
-.window-app.peasant-core .peasant-tag-editor .tag-input-area select:hover,
-.window-app.peasant-core .peasant-tag-editor .tag-input-area select:focus,
-.window-app.peasant-core .peasant-tag-editor .tag-input-area select:focus-visible,
-.peasant-tag-editor .tag-input-area select:hover,
-.peasant-tag-editor .tag-input-area select:focus,
-.peasant-tag-editor .tag-input-area select:focus-visible {
-  background: #333 !important;
-  border-color: var(--pc-foundry-input-focus-border) !important;
-  box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
-}
-
-.window-app.peasant-core .peasant-tag-editor .tag-input-area select:invalid,
-.peasant-tag-editor .tag-input-area select:invalid {
   border-color: var(--pc-foundry-input-focus-border) !important;
   box-shadow: 0 0 4px var(--pc-foundry-input-focus-shadow) !important;
   outline: none !important;
@@ -9541,11 +9445,6 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   min-height: 0;
 }
 
-.pc-blessing-dialog:not(.minimized, .minimizing, .maximizing) {
-  min-width: 320px;
-  min-height: 240px;
-}
-
 .pc-description-editor:not(.minimized, .minimizing, .maximizing) {
   min-width: 520px;
   min-height: 420px;
@@ -9724,15 +9623,13 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   min-height: 32px;
 }
 
-.pc-resource-checks,
-.pc-blessing-grid {
+.pc-resource-checks {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.pc-resource-checks label,
-.pc-blessing-grid label {
+.pc-resource-checks label {
   flex-direction: row;
   align-items: center;
   min-height: 30px;
@@ -9817,10 +9714,21 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
 @media (max-width: 520px) {
   .pc-damage-grid,
   .pc-heal-grid,
-  .pc-resource-checks,
-  .pc-blessing-grid {
+  .pc-resource-checks {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Editable fields share Foundry's plain control appearance and keep their layout sizes. */
+:is(.peasant-core.editable, .pc-skill-editor, .pc-resource-dialog,
+    .pc-description-editor, .peasant-tag-editor, .peasant-macro-dialog,
+    .peasant-macro-dialog-force, .macro-sheet, #macro-config)
+    :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea):not(.pc-portrait-armor-charge-input) {
+  background: var(--input-background-color, #2a2a2a) !important;
+  color: var(--input-text-color, #e0e0e0) !important;
+  border: 1px solid var(--input-border-color, #555) !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
 }
 
 /* Match Foundry's settings inputs: hover stays neutral, focus uses an inset outline. */
@@ -10110,6 +10018,9 @@ body:has(.chat-message.context) > #context-menu[popover] li.context-item:hover {
   min-width: 520px;
   min-height: 0;
   height: auto !important;
+}
+
+body:not(.detached) .peasant-core.peasant-item-sheet:not(.minimized, .minimizing, .maximizing) {
   max-height: calc(100vh - 80px);
 }
 
@@ -10791,7 +10702,7 @@ nav.pc-item-tabs .pc-item-tab.active {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  align-items: end;
+  align-items: start;
 }
 
 .pc-skill-editor-type-choice {
@@ -11342,15 +11253,9 @@ nav.pc-item-tabs .pc-item-tab.active {
   margin: 0;
 }
 
-.pc-skill-tag-draft-actions {
-  display: flex;
-  gap: 6px;
-  justify-content: flex-end;
-}
-
-.pc-skill-tag-draft-actions > button {
-  flex: 0 1 140px;
-  margin: 0;
+.pc-skill-editor :is(input, select, textarea, button):disabled {
+  opacity: 0.65;
+  cursor: default;
 }
 
 @container (max-width: 500px) {
